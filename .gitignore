@@ -1,0 +1,28 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Build outputs (game demo)
+dist/
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+*.log
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# PartyKit / Cloudflare temp
+.partykit/
+.wrangler/
+
+# OS / Editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

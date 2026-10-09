@@ -1,0 +1,785 @@
+//#region \0rolldown/runtime.js
+var e = Object.defineProperty, t = (t, n) => {
+	let r = {};
+	for (var i in t) e(r, i, {
+		get: t[i],
+		enumerable: !0
+	});
+	return n || e(r, Symbol.toStringTag, { value: "Module" }), r;
+};
+//#endregion
+//#region node_modules/partysocket/dist/ws.js
+(!globalThis.EventTarget || !globalThis.Event) && console.error("\n  PartySocket requires a global 'EventTarget' class to be available!\n  You can polyfill this global by adding this to your code before any partysocket imports: \n  \n  ```\n  import 'partysocket/event-target-polyfill';\n  ```\n  Please file an issue at https://github.com/partykit/partykit if you're still having trouble.\n");
+var n = class extends Event {
+	message;
+	error;
+	constructor(e, t) {
+		super("error", t), this.message = e.message, this.error = e;
+	}
+}, r = class extends Event {
+	code;
+	reason;
+	wasClean = !0;
+	constructor(e = 1e3, t = "", n) {
+		super("close", n), this.code = e, this.reason = t;
+	}
+}, i = {
+	Event,
+	ErrorEvent: n,
+	CloseEvent: r
+};
+function a(e, t) {
+	if (!e) throw Error(t);
+}
+function o(e) {
+	return new e.constructor(e.type, e);
+}
+function s(e) {
+	return "data" in e ? new MessageEvent(e.type, e) : "code" in e || "reason" in e ? new r(e.code || 1999, e.reason || "unknown reason", e) : "error" in e ? new n(e.error, e) : new Event(e.type, e);
+}
+var c = typeof process < "u" && process.versions?.node !== void 0, l = typeof navigator < "u" && navigator.product === "ReactNative", u = c || l ? s : o, d = {
+	maxReconnectionDelay: 1e4,
+	minReconnectionDelay: 3e3,
+	minUptime: 5e3,
+	reconnectionDelayGrowFactor: 1.3,
+	connectionTimeout: 4e3,
+	maxRetries: Infinity,
+	maxEnqueuedMessages: Infinity,
+	startClosed: !1,
+	debug: !1
+}, f = !1;
+function p() {}
+var m = class e extends EventTarget {
+	_ws;
+	_retryCount = -1;
+	_uptimeTimeout;
+	_connectTimeout;
+	_shouldReconnect = !0;
+	_connectLock = !1;
+	_binaryType = "blob";
+	_closeCalled = !1;
+	_didWarnAboutClosedSend = !1;
+	_messageQueue = [];
+	_debugLogger = console.log.bind(console);
+	_url;
+	_protocols;
+	_options;
+	constructor(e, t, n = {}) {
+		super(), this._url = e, this._protocols = t, this._options = n, this._options.startClosed && (this._shouldReconnect = !1), this._options.debugLogger && (this._debugLogger = this._options.debugLogger), this._connect();
+	}
+	static get CONNECTING() {
+		return 0;
+	}
+	static get OPEN() {
+		return 1;
+	}
+	static get CLOSING() {
+		return 2;
+	}
+	static get CLOSED() {
+		return 3;
+	}
+	get CONNECTING() {
+		return e.CONNECTING;
+	}
+	get OPEN() {
+		return e.OPEN;
+	}
+	get CLOSING() {
+		return e.CLOSING;
+	}
+	get CLOSED() {
+		return e.CLOSED;
+	}
+	get binaryType() {
+		return this._ws ? this._ws.binaryType : this._binaryType;
+	}
+	set binaryType(e) {
+		this._binaryType = e, this._ws && (this._ws.binaryType = e);
+	}
+	get retryCount() {
+		return Math.max(this._retryCount, 0);
+	}
+	get bufferedAmount() {
+		return this._messageQueue.reduce((e, t) => (typeof t == "string" ? e += t.length : t instanceof Blob ? e += t.size : e += t.byteLength, e), 0) + (this._ws ? this._ws.bufferedAmount : 0);
+	}
+	get extensions() {
+		return this._ws ? this._ws.extensions : "";
+	}
+	get protocol() {
+		return this._ws ? this._ws.protocol : "";
+	}
+	get readyState() {
+		return this._closeCalled ? e.CLOSED : this._ws ? this._ws.readyState : this._options.startClosed ? e.CLOSED : e.CONNECTING;
+	}
+	get url() {
+		return this._ws ? this._ws.url : "";
+	}
+	get shouldReconnect() {
+		return this._shouldReconnect;
+	}
+	onclose = null;
+	onerror = null;
+	onmessage = null;
+	onopen = null;
+	close(e = 1e3, t) {
+		if (this._closeCalled = !0, this._shouldReconnect = !1, this._clearTimeouts(), !this._ws) {
+			this._debug("close enqueued: no ws instance");
+			return;
+		}
+		if (this._ws.readyState === this.CLOSED || this._ws.readyState === this.CLOSING) {
+			this._debug("close: already closing or closed");
+			return;
+		}
+		this._disconnect(e, t);
+	}
+	reconnect(e, t) {
+		this._shouldReconnect = !0, this._closeCalled = !1, this._didWarnAboutClosedSend = !1, this._retryCount = -1, !this._ws || this._ws.readyState === this.CLOSED || this._ws.readyState === this.CLOSING || this._disconnect(e, t), this._connect();
+	}
+	send(e) {
+		if (this._ws && this._ws.readyState === this.OPEN) return this._debug("send", e), this._ws.send(e), !0;
+		this._closeCalled && !this._didWarnAboutClosedSend && (this._didWarnAboutClosedSend = !0, console.warn("ReconnectingWebSocket: send() was called after close(). The message has been buffered, but it will only be delivered if reconnect() is called on this socket. If this socket has been discarded, the message is lost — this usually means a stale socket reference is being used."));
+		let { maxEnqueuedMessages: t = d.maxEnqueuedMessages } = this._options;
+		return this._messageQueue.length < t && (this._debug("enqueue", e), this._messageQueue.push(e)), !1;
+	}
+	drainQueuedMessages() {
+		let e = this._messageQueue;
+		return this._messageQueue = [], e;
+	}
+	_debug(...e) {
+		this._options.debug && this._debugLogger("RWS>", ...e);
+	}
+	_getNextDelay() {
+		let { reconnectionDelayGrowFactor: e = d.reconnectionDelayGrowFactor, minReconnectionDelay: t = d.minReconnectionDelay, maxReconnectionDelay: n = d.maxReconnectionDelay } = this._options, r = 0;
+		return this._retryCount > 0 && (r = t * e ** (this._retryCount - 1), r > n && (r = n)), this._debug("next delay", r), r;
+	}
+	_wait() {
+		return new Promise((e) => {
+			setTimeout(e, this._getNextDelay());
+		});
+	}
+	_getNextProtocols(e) {
+		if (!e) return Promise.resolve(null);
+		if (typeof e == "string" || Array.isArray(e)) return Promise.resolve(e);
+		if (typeof e == "function") {
+			let t = e();
+			if (!t) return Promise.resolve(null);
+			if (typeof t == "string" || Array.isArray(t)) return Promise.resolve(t);
+			if (t.then) return t;
+		}
+		throw Error("Invalid protocols");
+	}
+	_getNextUrl(e) {
+		if (typeof e == "string") return Promise.resolve(e);
+		if (typeof e == "function") {
+			let t = e();
+			if (typeof t == "string") return Promise.resolve(t);
+			if (t.then) return t;
+		}
+		throw Error("Invalid URL");
+	}
+	_connect() {
+		if (this._connectLock || !this._shouldReconnect) return;
+		this._connectLock = !0;
+		let { maxRetries: e = d.maxRetries, connectionTimeout: t = d.connectionTimeout } = this._options;
+		if (this._retryCount >= e) {
+			this._debug("max retries reached", this._retryCount, ">=", e), this._connectLock = !1;
+			return;
+		}
+		this._retryCount++, this._debug("connect", this._retryCount), this._removeListeners(), this._wait().then(() => Promise.all([this._getNextUrl(this._url), this._getNextProtocols(this._protocols || null)])).then(([e, n]) => {
+			if (this._closeCalled) {
+				this._connectLock = !1;
+				return;
+			}
+			!this._options.WebSocket && typeof WebSocket > "u" && !f && (console.error("‼️ No WebSocket implementation available. You should define options.WebSocket. \n\nFor example, if you're using node.js, run `npm install ws`, and then in your code:\n\nimport PartySocket from 'partysocket';\nimport WS from 'ws';\n\nconst partysocket = new PartySocket({\n  host: \"127.0.0.1:1999\",\n  room: \"test-room\",\n  WebSocket: WS\n});\n\n"), f = !0);
+			let r = this._options.WebSocket || WebSocket;
+			this._debug("connect", {
+				url: e,
+				protocols: n
+			}), this._ws = n ? new r(e, n) : new r(e), this._ws.binaryType = this._binaryType, this._connectLock = !1, this._addListeners(), this._connectTimeout = setTimeout(() => this._handleTimeout(), t);
+		}).catch((e) => {
+			this._connectLock = !1, this._handleError(new i.ErrorEvent(Error(e.message), this));
+		});
+	}
+	_handleTimeout() {
+		this._debug("timeout event"), this._handleError(new i.ErrorEvent(Error("TIMEOUT"), this));
+	}
+	_disconnect(e = 1e3, t) {
+		if (this._clearTimeouts(), this._ws) {
+			this._removeListeners();
+			try {
+				(this._ws.readyState === this.OPEN || this._ws.readyState === this.CONNECTING) && this._ws.close(e, t), this._handleClose(new i.CloseEvent(e, t, this));
+			} catch {}
+		}
+	}
+	_acceptOpen() {
+		this._debug("accept open"), this._retryCount = 0;
+	}
+	_handleOpen = (e) => {
+		this._debug("open event");
+		let { minUptime: t = d.minUptime } = this._options;
+		clearTimeout(this._connectTimeout), this._uptimeTimeout = setTimeout(() => this._acceptOpen(), t), a(this._ws, "WebSocket is not defined"), this._ws.binaryType = this._binaryType, this._messageQueue.forEach((e) => {
+			this._ws?.send(e);
+		}), this._messageQueue = [], this.onopen && this.onopen(e), this.dispatchEvent(u(e));
+	};
+	_handleMessage = (e) => {
+		this._debug("message event"), this.onmessage && this.onmessage(e), this.dispatchEvent(u(e));
+	};
+	_handleError = (e) => {
+		this._debug("error event", e.message), this._disconnect(void 0, e.message === "TIMEOUT" ? "timeout" : void 0), this.onerror && this.onerror(e), this._debug("exec error listeners"), this.dispatchEvent(u(e)), this._connect();
+	};
+	_handleClose = (e) => {
+		this._debug("close event"), this._clearTimeouts(), this._options.shouldReconnectOnClose && !this._options.shouldReconnectOnClose(e) && (this._shouldReconnect = !1), this._shouldReconnect && this._connect(), this.onclose && this.onclose(e), this.dispatchEvent(u(e));
+	};
+	_removeListeners() {
+		this._ws && (this._debug("removeListeners"), this._ws.removeEventListener("open", this._handleOpen), this._ws.removeEventListener("close", this._handleClose), this._ws.removeEventListener("message", this._handleMessage), this._ws.removeEventListener("error", this._handleError), this._ws.addEventListener("error", p));
+	}
+	_addListeners() {
+		this._ws && (this._debug("addListeners"), this._ws.addEventListener("open", this._handleOpen), this._ws.addEventListener("close", this._handleClose), this._ws.addEventListener("message", this._handleMessage), this._ws.addEventListener("error", this._handleError));
+	}
+	_clearTimeouts() {
+		clearTimeout(this._connectTimeout), clearTimeout(this._uptimeTimeout);
+	}
+}, h = (e) => e[1] !== null && e[1] !== void 0;
+function g() {
+	if (crypto?.randomUUID) return crypto.randomUUID();
+	let e = Date.now(), t = performance?.now && performance.now() * 1e3 || 0;
+	return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, function(n) {
+		let r = Math.random() * 16;
+		return e > 0 ? (r = (e + r) % 16 | 0, e = Math.floor(e / 16)) : (r = (t + r) % 16 | 0, t = Math.floor(t / 16)), (n === "x" ? r : r & 3 | 8).toString(16);
+	});
+}
+function _(e, t, n = {}) {
+	let { host: r, path: i, protocol: a, room: o, party: s, basePath: c, prefix: l, query: u } = e, d = r.replace(/^(http|https|ws|wss):\/\//, "");
+	if (d.endsWith("/") && (d = d.slice(0, -1)), i?.startsWith("/")) throw Error("path must not start with a slash");
+	let f = s ?? "main", p = i ? `/${i}` : "", m = a || (d.startsWith("localhost:") || d.startsWith("127.0.0.1:") || d.startsWith("192.168.") || d.startsWith("10.") || d.startsWith("172.") && d.split(".")[1] >= "16" && d.split(".")[1] <= "31" || d.startsWith("[::ffff:7f00:1]:") ? t : `${t}s`), g = `${m}://${d}/${c || `${l || "parties"}/${f}/${o}`}${p}`, _ = (e = {}) => `${g}?${new URLSearchParams([...Object.entries(n), ...Object.entries(e).filter(h)])}`, v = typeof u == "function" ? async () => _(await u()) : _(u);
+	return {
+		host: d,
+		path: p,
+		room: o,
+		name: f,
+		protocol: m,
+		partyUrl: g,
+		urlProvider: v
+	};
+}
+var v = class extends m {
+	_pk;
+	_pkurl;
+	name;
+	room;
+	host;
+	path;
+	basePath;
+	constructor(e) {
+		let t = y(e);
+		if (super(t.urlProvider, t.protocols, t.socketOptions), this.partySocketOptions = e, this.setWSProperties(t), !e.startClosed && !this.room && !this.basePath) throw this.close(), Error("Either room or basePath must be provided to connect. Use startClosed: true to create a socket and set them via updateProperties before calling reconnect().");
+		e.disableNameValidation || (e.party?.includes("/") && console.warn(`PartySocket: party name "${e.party}" contains forward slash which may cause routing issues. Consider using a name without forward slashes or set disableNameValidation: true to bypass this warning.`), e.room?.includes("/") && console.warn(`PartySocket: room name "${e.room}" contains forward slash which may cause routing issues. Consider using a name without forward slashes or set disableNameValidation: true to bypass this warning.`));
+	}
+	updateProperties(e) {
+		let t = y({
+			...this.partySocketOptions,
+			...e,
+			host: e.host ?? this.host,
+			room: e.room ?? this.room,
+			path: e.path ?? this.path,
+			basePath: e.basePath ?? this.basePath
+		});
+		this._url = t.urlProvider, this._protocols = t.protocols, this._options = t.socketOptions, this.setWSProperties(t);
+	}
+	setWSProperties(e) {
+		let { _pk: t, _pkurl: n, name: r, room: i, host: a, path: o, basePath: s } = e;
+		this._pk = t, this._pkurl = n, this.name = r, this.room = i, this.host = a, this.path = o, this.basePath = s;
+	}
+	reconnect(e, t) {
+		if (!this.host) throw Error("The host must be set before connecting, use `updateProperties` method to set it or pass it to the constructor.");
+		if (!this.room && !this.basePath) throw Error("The room (or basePath) must be set before connecting, use `updateProperties` method to set it or pass it to the constructor.");
+		super.reconnect(e, t);
+	}
+	get id() {
+		return this._pk;
+	}
+	get roomUrl() {
+		return this._pkurl;
+	}
+	static async fetch(e, t) {
+		let n = _(e, "http"), r = typeof n.urlProvider == "string" ? n.urlProvider : await n.urlProvider();
+		return (e.fetch ?? fetch)(r, t);
+	}
+};
+function y(e) {
+	let { id: t, host: n, path: r, party: i, room: a, protocol: o, query: s, protocols: c, ...l } = e, u = t || g(), d = _(e, "ws", { _pk: u });
+	return {
+		_pk: u,
+		_pkurl: d.partyUrl,
+		name: d.name,
+		room: d.room,
+		host: d.host,
+		path: d.path,
+		basePath: e.basePath,
+		protocols: c,
+		socketOptions: l,
+		urlProvider: d.urlProvider
+	};
+}
+//#endregion
+//#region src/sdk/constants.js
+var b = /* @__PURE__ */ t({
+	DC: () => T,
+	DEFAULT_ICE_SERVERS: () => x,
+	ROLE: () => S,
+	STATUS: () => C,
+	WS: () => w,
+	generateRoomCode: () => E
+}), x = [
+	{ urls: "stun:stun.l.google.com:19302" },
+	{ urls: "stun:stun1.l.google.com:19302" },
+	{ urls: "stun:stun.cloudflare.com:3478" },
+	{ urls: "stun:openrelay.metered.ca:80" }
+], S = {
+	HOST: "host",
+	CLIENT: "client",
+	BOT: "bot"
+}, C = {
+	IDLE: "idle",
+	CONNECTING: "connecting",
+	IN_LOBBY: "in_lobby",
+	MATCHING: "matching",
+	CONNECTED: "connected",
+	DISCONNECTED: "disconnected"
+}, w = {
+	CREATE_ROOM: "create-room",
+	JOIN_ROOM: "join-room",
+	QUICK_PLAY: "quick-play",
+	SIGNAL: "signal",
+	ROOM_CREATED: "room-created",
+	ROOM_JOINED: "room-joined",
+	PLAYER_JOINED: "player-joined",
+	PLAYER_LEFT: "player-left",
+	MATCH_QUEUED: "match-queued",
+	MATCH_FOUND: "match-found",
+	START_SIGNAL: "start-signal",
+	ERROR: "error"
+}, T = {
+	STATE: "state",
+	INPUT: "input",
+	EVENT: "event",
+	PING: "ping",
+	PONG: "pong"
+};
+function E() {
+	let e = "";
+	for (let t = 0; t < 4; t++) e += "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"[Math.floor(Math.random() * 32)];
+	return e;
+}
+//#endregion
+//#region src/sdk/SignalingClient.js
+var D = class extends EventTarget {
+	constructor(e) {
+		super(), this.host = e, this.ws = null, this.roomId = null;
+	}
+	connect(e) {
+		return this.roomId = e, new Promise((t, n) => {
+			try {
+				this.ws && this.ws.close(), this.ws = new v({
+					host: this.host,
+					room: e
+				}), this.ws.addEventListener("open", () => {
+					this.dispatchEvent(new CustomEvent("open", { detail: { id: this.playerId } })), t();
+				}), this.ws.addEventListener("message", (e) => {
+					try {
+						let t = JSON.parse(e.data);
+						this.dispatchEvent(new CustomEvent("message", { detail: t }));
+					} catch (e) {
+						console.error("[Mereb:Signaling] JSON Parse error", e);
+					}
+				}), this.ws.addEventListener("close", () => {
+					this.dispatchEvent(new CustomEvent("close"));
+				}), this.ws.addEventListener("error", (e) => {
+					this.dispatchEvent(new CustomEvent("error", { detail: e })), n(e);
+				});
+			} catch (e) {
+				n(e);
+			}
+		});
+	}
+	send(e) {
+		this.ws && this.ws.readyState === WebSocket.OPEN && this.ws.send(JSON.stringify(e));
+	}
+	sendSignal(e, t) {
+		this.send({
+			type: w.SIGNAL,
+			to: e,
+			signal: t
+		});
+	}
+	disconnect() {
+		this.ws &&= (this.ws.close(), null), this.roomId = null;
+	}
+	get playerId() {
+		return this.ws ? this.ws.id : null;
+	}
+}, O = class extends EventTarget {
+	constructor(e = {}) {
+		super(), this.iceServers = e.iceServers || x, this.pc = new RTCPeerConnection({ iceServers: this.iceServers }), this.unreliableChannel = null, this.reliableChannel = null, this._connected = !1, this.latency = 0, this._pingInterval = null, this.pc.onicecandidate = (e) => {
+			e.candidate && this.dispatchEvent(new CustomEvent("ice-candidate", { detail: { candidate: e.candidate } }));
+		}, this.pc.onconnectionstatechange = () => {
+			let e = this.pc.connectionState;
+			(e === "disconnected" || e === "failed" || e === "closed") && this._handleDisconnect();
+		}, this.pc.ondatachannel = (e) => {
+			let t = e.channel;
+			t.label === "unreliable" ? this._setupUnreliableChannel(t) : t.label === "reliable" && this._setupReliableChannel(t);
+		};
+	}
+	_setupUnreliableChannel(e) {
+		this.unreliableChannel = e, e.onopen = () => this._checkChannelsOpen(), e.onclose = () => this._handleDisconnect(), e.onmessage = (e) => {
+			try {
+				let t = JSON.parse(e.data);
+				t.type === T.STATE ? this.dispatchEvent(new CustomEvent("state", { detail: t.data })) : t.type === T.INPUT && this.dispatchEvent(new CustomEvent("input", { detail: t.data }));
+			} catch (e) {
+				console.warn("[Mereb:RTC] Failed to parse message on unreliable channel", e);
+			}
+		};
+	}
+	_setupReliableChannel(e) {
+		this.reliableChannel = e, e.onopen = () => this._checkChannelsOpen(), e.onclose = () => this._handleDisconnect(), e.onmessage = (e) => {
+			try {
+				let t = JSON.parse(e.data);
+				t.type === T.EVENT ? this.dispatchEvent(new CustomEvent("event", { detail: t })) : t.type === T.PING ? this.sendReliable({
+					type: T.PONG,
+					time: t.time
+				}) : t.type === T.PONG && (this.latency = Math.max(1, Math.round(Date.now() - t.time)), this.dispatchEvent(new CustomEvent("latency", { detail: { latency: this.latency } })));
+			} catch (e) {
+				console.warn("[Mereb:RTC] Failed to parse message on reliable channel", e);
+			}
+		};
+	}
+	_checkChannelsOpen() {
+		let e = this.unreliableChannel && this.unreliableChannel.readyState === "open", t = this.reliableChannel && this.reliableChannel.readyState === "open";
+		e && t && !this._connected && (this._connected = !0, this._startPing(), this.dispatchEvent(new CustomEvent("open")));
+	}
+	_startPing() {
+		this._pingInterval && clearInterval(this._pingInterval), this._pingInterval = setInterval(() => {
+			this.reliableChannel && this.reliableChannel.readyState === "open" && this.sendReliable({
+				type: T.PING,
+				time: Date.now()
+			});
+		}, 2e3);
+	}
+	_handleDisconnect() {
+		this._connected && (this._connected = !1, this._pingInterval && clearInterval(this._pingInterval), this.dispatchEvent(new CustomEvent("close")));
+	}
+	async createOffer() {
+		let e = this.pc.createDataChannel("unreliable", {
+			ordered: !1,
+			maxRetransmits: 0
+		});
+		this._setupUnreliableChannel(e);
+		let t = this.pc.createDataChannel("reliable", { ordered: !0 });
+		this._setupReliableChannel(t);
+		let n = await this.pc.createOffer();
+		return await this.pc.setLocalDescription(n), this.pc.localDescription;
+	}
+	async handleOffer(e) {
+		try {
+			if (this.pc.signalingState !== "stable") return null;
+			await this.pc.setRemoteDescription(new RTCSessionDescription(e));
+			let t = await this.pc.createAnswer();
+			return await this.pc.setLocalDescription(t), this.pc.localDescription;
+		} catch (e) {
+			return console.warn("[Mereb:RTC] Handled offer race condition:", e.message), null;
+		}
+	}
+	async handleAnswer(e) {
+		try {
+			this.pc.signalingState === "have-local-offer" && await this.pc.setRemoteDescription(new RTCSessionDescription(e));
+		} catch (e) {
+			console.warn("[Mereb:RTC] Handled answer race condition:", e.message);
+		}
+	}
+	async addIceCandidate(e) {
+		try {
+			e && await this.pc.addIceCandidate(new RTCIceCandidate(e));
+		} catch {}
+	}
+	sendState(e) {
+		this.unreliableChannel && this.unreliableChannel.readyState === "open" && this.unreliableChannel.send(JSON.stringify({
+			type: T.STATE,
+			data: e
+		}));
+	}
+	sendInput(e) {
+		this.unreliableChannel && this.unreliableChannel.readyState === "open" && this.unreliableChannel.send(JSON.stringify({
+			type: T.INPUT,
+			data: e
+		}));
+	}
+	sendReliable(e) {
+		this.reliableChannel && this.reliableChannel.readyState === "open" && this.reliableChannel.send(JSON.stringify(e));
+	}
+	sendEvent(e, t = {}) {
+		this.sendReliable({
+			type: T.EVENT,
+			name: e,
+			data: t
+		});
+	}
+	get connected() {
+		return this._connected;
+	}
+	close() {
+		this._pingInterval && clearInterval(this._pingInterval), this.unreliableChannel && this.unreliableChannel.close(), this.reliableChannel && this.reliableChannel.close(), this.pc && this.pc.close(), this._connected = !1;
+	}
+}, k = class extends EventTarget {
+	constructor(e = {}) {
+		if (super(), this.host = e.host || (typeof window < "u" && window.location.hostname === "localhost" ? "localhost:1999" : ""), this.botTimeoutMs = e.botTimeoutMs ?? 8e3, this.iceServers = e.iceServers, this.autoJoinFromUrl = e.autoJoinFromUrl ?? !0, this.signaling = new D(this.host), this.peer = null, this.status = C.IDLE, this.role = null, this.localId = null, this.peerId = null, this.roomCode = null, this.isBot = !1, this.latency = 0, this._matchTimeout = null, e.onMatchStart && this.on("match-start", e.onMatchStart), e.onState && this.on("state", e.onState), e.onInput && this.on("input", e.onInput), e.onEvent && this.on("event", e.onEvent), e.onPeerDisconnect && this.on("peer-disconnect", e.onPeerDisconnect), e.onStatusChange && this.on("status-change", e.onStatusChange), e.onLatency && this.on("latency", e.onLatency), this._setupSignalingListeners(), this.autoJoinFromUrl && typeof window < "u") {
+			let e = new URLSearchParams(window.location.search).get("room");
+			e && setTimeout(() => this.joinRoom(e), 50);
+		}
+	}
+	on(e, t) {
+		this.addEventListener(e, (e) => t(e.detail));
+	}
+	off(e, t) {
+		this.removeEventListener(e, t);
+	}
+	_setStatus(e) {
+		this.status = e, this.dispatchEvent(new CustomEvent("status-change", { detail: { status: e } }));
+	}
+	_setupSignalingListeners() {
+		this.signaling.addEventListener("message", async (e) => {
+			let t = e.detail;
+			switch (t.type) {
+				case w.PLAYER_JOINED:
+					this.peerId = t.playerId;
+					break;
+				case w.ROOM_JOINED:
+					this.peerId = t.players.find((e) => e !== this.localId), t.hostId !== this.localId && (this.role = S.CLIENT);
+					break;
+				case w.START_SIGNAL:
+					this.peerId = t.peerId, this.role = S.HOST, await this._initPeerConnection(!0);
+					break;
+				case w.SIGNAL:
+					await this._handleSignal(t);
+					break;
+				case w.MATCH_FOUND:
+					this._matchTimeout && clearTimeout(this._matchTimeout), this.roomCode = t.roomCode, this.peerId = t.opponentId, this._setStatus(C.CONNECTING), this.signaling.disconnect(), setTimeout(async () => {
+						await this.signaling.connect(this.roomCode), this.localId = this.signaling.playerId;
+					}, 150);
+					break;
+				case w.MATCH_QUEUED:
+					this._setStatus(C.MATCHING);
+					break;
+				case w.PLAYER_LEFT:
+					this._handlePeerLeft("disconnected");
+					break;
+				case w.ERROR: this.dispatchEvent(new CustomEvent("error", { detail: { message: t.message } }));
+			}
+		});
+	}
+	async _initPeerConnection(e) {
+		if (this.peer && this.peer.close(), this.peer = new O({ iceServers: this.iceServers }), this.peer.addEventListener("ice-candidate", (e) => {
+			this.signaling.sendSignal(this.peerId, {
+				type: "ice-candidate",
+				candidate: e.detail.candidate
+			});
+		}), this.peer.addEventListener("open", () => {
+			this._setStatus(C.CONNECTED), this.dispatchEvent(new CustomEvent("match-start", { detail: {
+				role: this.role,
+				localId: this.localId,
+				peerId: this.peerId,
+				isBot: !1,
+				isHost: this.role === S.HOST
+			} }));
+		}), this.peer.addEventListener("close", () => {
+			this._handlePeerLeft("rtc_closed");
+		}), this.peer.addEventListener("state", (e) => {
+			this.dispatchEvent(new CustomEvent("state", { detail: e.detail }));
+		}), this.peer.addEventListener("input", (e) => {
+			this.dispatchEvent(new CustomEvent("input", { detail: e.detail }));
+		}), this.peer.addEventListener("event", (e) => {
+			this.dispatchEvent(new CustomEvent("event", { detail: e.detail }));
+		}), this.peer.addEventListener("latency", (e) => {
+			this.latency = e.detail.latency, this.dispatchEvent(new CustomEvent("latency", { detail: { latency: this.latency } }));
+		}), e) {
+			let e = await this.peer.createOffer();
+			this.signaling.sendSignal(this.peerId, {
+				type: "offer",
+				sdp: e
+			});
+		}
+	}
+	async _handleSignal(e) {
+		let t = e.signal;
+		if (!this.peer && t.type === "offer" && (this.role = S.CLIENT, await this._initPeerConnection(!1)), this.peer) {
+			if (t.type === "offer") {
+				let n = await this.peer.handleOffer(t.sdp);
+				this.signaling.sendSignal(e.from, {
+					type: "answer",
+					sdp: n
+				});
+			} else t.type === "answer" ? await this.peer.handleAnswer(t.sdp) : t.type === "ice-candidate" && await this.peer.addIceCandidate(t.candidate);
+		}
+	}
+	_handlePeerLeft(e) {
+		this.status === C.CONNECTED && (this._setStatus(C.DISCONNECTED), this.dispatchEvent(new CustomEvent("peer-disconnect", { detail: {
+			peerId: this.peerId,
+			reason: e
+		} })));
+	}
+	async createRoom() {
+		this.disconnect(), this.role = S.HOST, this.roomCode = E(), this._setStatus(C.CONNECTING), await this.signaling.connect(this.roomCode), this.localId = this.signaling.playerId, this._setStatus(C.IN_LOBBY);
+		let e = typeof window < "u" ? `${window.location.origin}${window.location.pathname}?room=${this.roomCode}` : `?room=${this.roomCode}`;
+		return this.dispatchEvent(new CustomEvent("room-created", { detail: {
+			roomCode: this.roomCode,
+			shareUrl: e
+		} })), {
+			roomCode: this.roomCode,
+			shareUrl: e
+		};
+	}
+	async joinRoom(e) {
+		this.disconnect(), this.role = S.CLIENT, this.roomCode = e.toUpperCase().trim(), this._setStatus(C.CONNECTING), await this.signaling.connect(this.roomCode), this.localId = this.signaling.playerId, this._setStatus(C.IN_LOBBY), this.dispatchEvent(new CustomEvent("room-joined", { detail: { roomCode: this.roomCode } }));
+	}
+	async quickPlay() {
+		this.disconnect(), this._setStatus(C.MATCHING), await this.signaling.connect("matchmaker"), this.localId = this.signaling.playerId, this.signaling.send({ type: w.QUICK_PLAY }), this.botTimeoutMs && this.botTimeoutMs > 0 && (this._matchTimeout = setTimeout(() => {
+			this._startBotMatch();
+		}, this.botTimeoutMs));
+	}
+	_startBotMatch() {
+		this.disconnect(), this.isBot = !0, this.role = S.HOST, this.localId = "local_player", this.peerId = "bot_opponent", this._setStatus(C.CONNECTED), this.dispatchEvent(new CustomEvent("match-start", { detail: {
+			role: S.HOST,
+			localId: this.localId,
+			peerId: this.peerId,
+			isBot: !0,
+			isHost: !0
+		} }));
+	}
+	sendState(e) {
+		this.peer && this.peer.connected && this.peer.sendState(e);
+	}
+	sendInput(e) {
+		this.peer && this.peer.connected && this.peer.sendInput(e);
+	}
+	sendEvent(e, t = {}) {
+		this.peer && this.peer.connected && this.peer.sendEvent(e, t);
+	}
+	get isHost() {
+		return this.role === S.HOST;
+	}
+	disconnect() {
+		this._matchTimeout && clearTimeout(this._matchTimeout), this.peer &&= (this.peer.close(), null), this.signaling.disconnect(), this.status = C.IDLE, this.role = null, this.localId = null, this.peerId = null, this.roomCode = null, this.isBot = !1, this.latency = 0;
+	}
+}, A = class {
+	constructor(e, t = {}) {
+		this.client = e, this.options = Object.assign({
+			title: "⚔️ MEREB ARENA",
+			container: document.body
+		}, t), this.element = document.createElement("div"), this.element.className = "mereb-lobby-overlay", this._injectStyles(), this._buildDOM(), this._setupHandlers(), this.options.container && this.options.container.appendChild(this.element);
+	}
+	_injectStyles() {
+		if (document.getElementById("mereb-lobby-styles")) return;
+		let e = document.createElement("style");
+		e.id = "mereb-lobby-styles", e.textContent = "\n      .mereb-lobby-overlay {\n        position: fixed; inset: 0; z-index: 1000;\n        background: rgba(10, 10, 26, 0.88); backdrop-filter: blur(6px);\n        display: flex; flex-direction: column; align-items: center; justify-content: center;\n        font-family: 'Fredoka', system-ui, sans-serif; color: #fff;\n        user-select: none;\n      }\n      .mereb-lobby-title {\n        font-size: clamp(32px, 6vw, 56px); font-weight: 800;\n        text-shadow: 0 4px 0 #333, 0 8px 24px rgba(0,0,0,0.6);\n        margin-bottom: 32px; text-transform: uppercase; letter-spacing: 2px;\n      }\n      .mereb-menu-stack {\n        display: flex; flex-direction: column; gap: 14px; width: min(300px, 85vw);\n      }\n      .mereb-btn {\n        appearance: none; border: none; outline: none; cursor: pointer;\n        font-family: inherit; font-size: 19px; font-weight: 700; text-transform: uppercase;\n        padding: 16px 24px; border-radius: 14px; color: #fff;\n        transition: transform 0.08s ease, box-shadow 0.08s ease;\n        box-shadow: 0 4px 0 rgba(0,0,0,0.4);\n      }\n      .mereb-btn:active {\n        transform: translateY(3px);\n        box-shadow: 0 1px 0 rgba(0,0,0,0.4) !important;\n      }\n      .btn-create { background: #16a34a; border-bottom: 4px solid #14532d; }\n      .btn-join { background: #2563eb; border-bottom: 4px solid #1e3a8a; }\n      .btn-quick { background: #f59e0b; border-bottom: 4px solid #b45309; color: #000; }\n      .btn-copy { background: #0891b2; border-bottom: 4px solid #155e75; margin-top: 10px; }\n      .btn-back { background: #475569; border-bottom: 4px solid #1e293b; margin-top: 10px; }\n      .btn-submit { background: #9333ea; border-bottom: 4px solid #581c87; padding: 16px; flex-shrink: 0; }\n      \n      .mereb-join-box { display: flex; flex-direction: column; gap: 10px; width: 100%; }\n      .mereb-input-row { display: flex; gap: 8px; width: 100%; }\n      .mereb-code-input {\n        flex: 1; padding: 14px; font-size: 24px; font-family: monospace; font-weight: 800;\n        text-align: center; border-radius: 14px; border: 2px solid #475569;\n        background: #1e1e2f; color: #fff; text-transform: uppercase; outline: none; min-width: 0;\n      }\n      .mereb-code-input:focus { border-color: #38bdf8; }\n\n      .mereb-room-display { text-align: center; width: min(320px, 85vw); }\n      .mereb-room-code {\n        font-size: clamp(48px, 12vw, 68px); font-family: monospace; font-weight: 800;\n        letter-spacing: 6px; color: #facc15; text-shadow: 0 4px 0 #ca8a04; margin-bottom: 4px;\n      }\n      .mereb-status-text {\n        margin-top: 20px; font-size: 17px; color: #94a3b8; font-weight: 600;\n        min-height: 24px; text-transform: uppercase; letter-spacing: 1px;\n      }\n      .mereb-error-text {\n        margin-top: 8px; font-size: 15px; color: #f87171; font-weight: 700;\n        min-height: 20px; text-transform: uppercase;\n      }\n      .mereb-dots::after { content: ''; animation: merebDots 1.5s steps(4, end) infinite; }\n      @keyframes merebDots { 0%, 20% { content: '.'; } 40% { content: '..'; } 60%, 100% { content: '...'; } }\n    ", document.head.appendChild(e);
+	}
+	_buildDOM() {
+		this.element.innerHTML = `
+      <h1 class="mereb-lobby-title">${this.options.title}</h1>
+
+      <div class="mereb-menu-stack" id="mereb-main-menu">
+        <button class="mereb-btn btn-create" id="mereb-btn-create">🎮 CREATE ROOM</button>
+        <button class="mereb-btn btn-join" id="mereb-btn-join">🔗 JOIN ROOM</button>
+        <button class="mereb-btn btn-quick" id="mereb-btn-quick">⚡ QUICK PLAY</button>
+      </div>
+
+      <div class="mereb-menu-stack" id="mereb-join-menu" style="display: none;">
+        <div class="mereb-input-row">
+          <input type="text" class="mereb-code-input" id="mereb-input-code" maxlength="4" placeholder="CODE" />
+          <button class="mereb-btn btn-submit" id="mereb-btn-submit">GO ➜</button>
+        </div>
+        <button class="mereb-btn btn-back" id="mereb-btn-join-back">◀ BACK</button>
+      </div>
+
+      <div class="mereb-room-display" id="mereb-room-view" style="display: none;">
+        <div class="mereb-room-code" id="mereb-code-text">----</div>
+        <button class="mereb-btn btn-copy" id="mereb-btn-copy">📋 COPY INVITE LINK</button>
+        <button class="mereb-btn btn-back" id="mereb-btn-room-back">◀ BACK</button>
+      </div>
+
+      <div class="mereb-status-text" id="mereb-status-text"></div>
+      <div class="mereb-error-text" id="mereb-error-text"></div>
+    `, this.mainMenu = this.element.querySelector("#mereb-main-menu"), this.joinMenu = this.element.querySelector("#mereb-join-menu"), this.roomView = this.element.querySelector("#mereb-room-view"), this.codeInput = this.element.querySelector("#mereb-input-code"), this.codeText = this.element.querySelector("#mereb-code-text"), this.statusText = this.element.querySelector("#mereb-status-text"), this.errorText = this.element.querySelector("#mereb-error-text");
+	}
+	_setupHandlers() {
+		this.element.querySelector("#mereb-btn-create").addEventListener("click", async () => {
+			this.setStatus("Creating room...");
+			try {
+				let { roomCode: e } = await this.client.createRoom();
+				this.mainMenu.style.display = "none", this.roomView.style.display = "block", this.codeText.innerText = e, this.setStatus("Waiting for opponent...", !0);
+			} catch {
+				this.showError("Failed to create room");
+			}
+		}), this.element.querySelector("#mereb-btn-join").addEventListener("click", () => {
+			this.mainMenu.style.display = "none", this.joinMenu.style.display = "flex", this.codeInput.focus();
+		});
+		let e = () => {
+			let e = this.codeInput.value.trim().toUpperCase();
+			e.length === 4 ? (this.setStatus("Joining room..."), this.client.joinRoom(e)) : this.showError("Code must be 4 characters");
+		};
+		this.element.querySelector("#mereb-btn-submit").addEventListener("click", e), this.codeInput.addEventListener("keypress", (t) => {
+			t.key === "Enter" && e();
+		}), this.element.querySelector("#mereb-btn-quick").addEventListener("click", () => {
+			this.setStatus("Finding opponent...", !0), this.client.quickPlay();
+		});
+		let t = this.element.querySelector("#mereb-btn-copy");
+		t.addEventListener("click", () => {
+			let e = this.codeText.innerText, n = `${window.location.origin}${window.location.pathname}?room=${e}`;
+			navigator.clipboard.writeText(n).then(() => {
+				let e = t.innerText;
+				t.innerText = "COPIED! ✅", setTimeout(() => {
+					t.innerText = e;
+				}, 2e3);
+			}).catch(() => {
+				this.showError("Failed to copy");
+			});
+		});
+		let n = () => {
+			this.client.disconnect(), this.resetToMenu();
+		};
+		this.element.querySelector("#mereb-btn-join-back").addEventListener("click", n), this.element.querySelector("#mereb-btn-room-back").addEventListener("click", n), this.client.on("match-start", () => {
+			this.hide();
+		}), this.client.on("error", (e) => {
+			this.showError(e.message || "Network error");
+		}), this.client.on("peer-disconnect", () => {
+			this.show(), this.resetToMenu(), this.showError("Opponent disconnected");
+		});
+	}
+	setStatus(e, t = !1) {
+		this.statusText.innerText = e, t ? this.statusText.classList.add("mereb-dots") : this.statusText.classList.remove("mereb-dots");
+	}
+	showError(e) {
+		this.errorText.innerText = e, setTimeout(() => {
+			this.errorText.innerText = "";
+		}, 3500);
+	}
+	resetToMenu() {
+		this.mainMenu.style.display = "flex", this.joinMenu.style.display = "none", this.roomView.style.display = "none", this.codeInput.value = "", this.statusText.innerText = "", this.statusText.classList.remove("mereb-dots");
+	}
+	show() {
+		this.element.style.display = "flex";
+	}
+	hide() {
+		this.element.style.display = "none";
+	}
+};
+//#endregion
+//#region src/sdk/index.js
+typeof window < "u" && (window.Mereb = {
+	MerebClient: k,
+	MerebLobby: A,
+	PeerConnection: O,
+	SignalingClient: D,
+	...b
+});
+//#endregion
+export { T as DC, x as DEFAULT_ICE_SERVERS, k as MerebClient, A as MerebLobby, O as PeerConnection, S as ROLE, C as STATUS, D as SignalingClient, w as WS, E as generateRoomCode };
