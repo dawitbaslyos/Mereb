@@ -161,6 +161,10 @@ export class MerebClient extends EventTarget {
       this.dispatchEvent(new CustomEvent('latency', { detail: { latency: this.latency } }));
     });
 
+    this.peer.addEventListener('binary', (e) => {
+      this.dispatchEvent(new CustomEvent('binary', { detail: e.detail }));
+    });
+
     if (isInitiator) {
       const offer = await this.peer.createOffer();
       this.signaling.sendSignal(this.peerId, {
@@ -276,6 +280,13 @@ export class MerebClient extends EventTarget {
   sendState(data) {
     if (this.peer && this.peer.connected) {
       this.peer.sendState(data);
+    }
+  }
+
+  // Send raw ArrayBuffer or TypedArray view directly over unreliable channel
+  sendBinary(bufferOrView) {
+    if (this.peer && this.peer.connected) {
+      this.peer.sendBinary(bufferOrView);
     }
   }
 

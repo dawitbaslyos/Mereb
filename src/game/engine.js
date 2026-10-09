@@ -7,6 +7,8 @@ import {
   BULLET_DAMAGE, SCORE_TO_WIN, TICK_RATE, SHOOT_COOLDOWN,
   RESPAWN_TIME, SPAWN_POSITIONS, DC 
 } from '../network/protocol.js';
+import { SnapshotInterpolator } from '../sdk/index.js';
+import { TankBinaryProtocol } from './TankBinary.js';
 
 export class GameEngine {
   constructor(container) {
@@ -106,8 +108,13 @@ export class GameEngine {
 
     // Callbacks
     this.onGameState = null;
+    this.onBinaryState = null;
     this.onInput = null;
     this.onMatchEnd = null;
+
+    // Netcode: Snapshot Interpolator & Binary Protocol
+    this.interpolator = new SnapshotInterpolator({ bufferTime: 80 });
+    this.binaryProtocol = new TankBinaryProtocol();
 
     // Render loop
     this.animate = this.animate.bind(this);
@@ -119,6 +126,7 @@ export class GameEngine {
     this.remoteId = remoteId;
     this.isHost = isHost;
     this.hostPlayerId = isHost ? localId : remoteId;
+    this.interpolator.clear();
 
     this.inputManager = new InputManager(this.renderer.domElement);
 
@@ -152,9 +160,20 @@ export class GameEngine {
     
     if (this.running) {
       this.processLocalInput();
-      if (!this.isHost && this.inputManager) {
-        const input = this.inputManager.getInput();
-        this.predictLocalMovement(input);
+      if (!this.isHost) {
+        if (this.inputManager) {
+          const input = this.inputManager.getInput();
+          this.predictLocalMovement(input);
+        }
+
+        // Smoothly interpolate remote entity from snapshot buffer!
+        const smoothEntities = this.interpolator.getInterpolated();
+        const remoteSmooth = smoothEntities[this.remoteId];
+        if (remoteSmooth && this.tanks[this.remoteId]) {
+          this.tanks[this.remoteId].setPosition(remoteSmooth.x, remoteSmooth.z);
+          this.tanks[this.remoteId].setBodyRotation(remoteSmooth.rotation);
+          this.tanks[this.remoteId].setTurretRotation(remoteSmooth.turretRotation);
+        }
       }
       
       // Update client bullet visuals if not host (host does it in tick)
@@ -261,6 +280,16 @@ export class GameEngine {
 
     this.syncVisualsFromState();
 
+    // Compact binary broadcast (~40 bytes)
+    const binaryPacket = this.binaryProtocol.encodeState(
+      this.playerStates,
+      this.bulletStates,
+      now,
+      this.localId,
+      this.remoteId
+    );
+    if (this.onBinaryState) this.onBinaryState(binaryPacket);
+
     const state = {
       type: DC.GAME_STATE,
       players: { ...this.playerStates },
@@ -285,6 +314,38 @@ export class GameEngine {
     this.pendingInputs[this.remoteId] = input;
   }
 
+  applyBinaryState(arrayBuffer) {
+    if (!this.running) return;
+    const state = this.binaryProtocol.decodeState(arrayBuffer, this.remoteId, this.localId);
+    if (!state) return;
+
+    // Push remote state into snapshot interpolator for silky-smooth rendering
+    const remote = state.players[this.remoteId];
+    if (remote) {
+      this.interpolator.pushSnapshot(state.tick, {
+        [this.remoteId]: remote
+      });
+      if (this.playerStates[this.remoteId]) {
+        this.playerStates[this.remoteId].health = remote.health;
+        this.playerStates[this.remoteId].score = remote.score;
+        this.tanks[this.remoteId]?.setInvulnerable(remote.isInvuln);
+      } else {
+        this.playerStates[this.remoteId] = { ...remote };
+      }
+    }
+
+    // Local player health/score authoritative confirmation
+    const local = state.players[this.localId];
+    if (local && this.playerStates[this.localId]) {
+      this.playerStates[this.localId].health = local.health;
+      this.playerStates[this.localId].score = local.score;
+      this.tanks[this.localId]?.setInvulnerable(local.isInvuln);
+    }
+
+    this.bulletStates = state.bullets || [];
+    this.syncBulletVisuals();
+  }
+
   applyGameState(state) {
     if (!this.running) return;
     for (const [id, ps] of Object.entries(state.players)) {
@@ -301,24 +362,17 @@ export class GameEngine {
         }
       } else {
         this.playerStates[id] = { ...ps };
+        // Also push to interpolator
+        this.interpolator.pushSnapshot(state.tick || Date.now(), {
+          [id]: ps
+        });
       }
     }
     this.bulletStates = state.bullets || [];
-    this.syncVisualsFromState();
+    this.syncBulletVisuals();
   }
 
-  syncVisualsFromState() {
-    for (const [id, ps] of Object.entries(this.playerStates)) {
-      const tank = this.tanks[id];
-      if (tank) {
-        tank.setPosition(ps.x, ps.z);
-        tank.setBodyRotation(ps.rotation);
-        tank.setTurretRotation(ps.turretRotation);
-        const isInvuln = Date.now() < (ps.respawnUntil || 0);
-        tank.setInvulnerable(isInvuln);
-      }
-    }
-
+  syncBulletVisuals() {
     const stateIds = new Set(this.bulletStates.map(b => b.id));
     this.bullets = this.bullets.filter(b => {
       if (!stateIds.has(b.id)) {
@@ -339,6 +393,20 @@ export class GameEngine {
         this.bullets.push(bullet);
       }
     }
+  }
+
+  syncVisualsFromState() {
+    for (const [id, ps] of Object.entries(this.playerStates)) {
+      const tank = this.tanks[id];
+      if (tank) {
+        tank.setPosition(ps.x, ps.z);
+        tank.setBodyRotation(ps.rotation);
+        tank.setTurretRotation(ps.turretRotation);
+        const isInvuln = Date.now() < (ps.respawnUntil || 0);
+        tank.setInvulnerable(isInvuln);
+      }
+    }
+    this.syncBulletVisuals();
   }
 
   predictLocalMovement(input) {

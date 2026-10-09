@@ -45,11 +45,14 @@ class App {
       this.engine.startMatch(localId, peerId, isHost);
 
       if (isHost) {
-        // Host broadcasts authoritative state
-        this.engine.onGameState = (state) => {
+        // Host broadcasts ultra-compact binary packet (~40 bytes)
+        this.engine.onBinaryState = (binaryBuf) => {
           if (!isBot) {
-            this.client.sendState(state);
+            this.client.sendBinary(binaryBuf);
           }
+        };
+
+        this.engine.onGameState = (state) => {
           const local = state.players[localId];
           const remote = state.players[peerId];
           if (local && remote) {
@@ -83,7 +86,18 @@ class App {
       };
     });
 
-    // Client receives authoritative game state from host
+    // Client receives compact binary packet from host (decoded & interpolated)
+    this.client.on('binary', (arrayBuffer) => {
+      this.engine.applyBinaryState(arrayBuffer);
+      const local = this.engine.playerStates[this.client.localId];
+      const remote = this.engine.playerStates[this.client.peerId];
+      if (local && remote) {
+        this.hud.updateHealth(local.health, remote.health);
+        this.hud.updateScore(local.score, remote.score);
+      }
+    });
+
+    // Fallback: Client receives JSON game state from host
     this.client.on('state', (state) => {
       this.engine.applyGameState(state);
       const local = state.players[this.client.localId];

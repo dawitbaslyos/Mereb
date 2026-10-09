@@ -44,9 +44,14 @@ export class PeerConnection extends EventTarget {
 
   _setupUnreliableChannel(channel) {
     this.unreliableChannel = channel;
+    this.unreliableChannel.binaryType = 'arraybuffer';
     channel.onopen = () => this._checkChannelsOpen();
     channel.onclose = () => this._handleDisconnect();
     channel.onmessage = (e) => {
+      if (e.data instanceof ArrayBuffer) {
+        this.dispatchEvent(new CustomEvent('binary', { detail: e.data }));
+        return;
+      }
       try {
         const msg = JSON.parse(e.data);
         if (msg.type === DC.STATE) {
@@ -163,15 +168,30 @@ export class PeerConnection extends EventTarget {
     }
   }
 
+  sendBinary(bufferOrView) {
+    if (this.unreliableChannel && this.unreliableChannel.readyState === 'open') {
+      const data = bufferOrView instanceof ArrayBuffer ? bufferOrView : bufferOrView.buffer;
+      this.unreliableChannel.send(data);
+    }
+  }
+
   sendState(data) {
     if (this.unreliableChannel && this.unreliableChannel.readyState === 'open') {
-      this.unreliableChannel.send(JSON.stringify({ type: DC.STATE, data }));
+      if (data instanceof ArrayBuffer || ArrayBuffer.isView(data)) {
+        this.sendBinary(data);
+      } else {
+        this.unreliableChannel.send(JSON.stringify({ type: DC.STATE, data }));
+      }
     }
   }
 
   sendInput(data) {
     if (this.unreliableChannel && this.unreliableChannel.readyState === 'open') {
-      this.unreliableChannel.send(JSON.stringify({ type: DC.INPUT, data }));
+      if (data instanceof ArrayBuffer || ArrayBuffer.isView(data)) {
+        this.sendBinary(data);
+      } else {
+        this.unreliableChannel.send(JSON.stringify({ type: DC.INPUT, data }));
+      }
     }
   }
 

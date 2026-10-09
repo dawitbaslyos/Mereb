@@ -432,7 +432,11 @@ var D = class extends EventTarget {
 		};
 	}
 	_setupUnreliableChannel(e) {
-		this.unreliableChannel = e, e.onopen = () => this._checkChannelsOpen(), e.onclose = () => this._handleDisconnect(), e.onmessage = (e) => {
+		this.unreliableChannel = e, this.unreliableChannel.binaryType = "arraybuffer", e.onopen = () => this._checkChannelsOpen(), e.onclose = () => this._handleDisconnect(), e.onmessage = (e) => {
+			if (e.data instanceof ArrayBuffer) {
+				this.dispatchEvent(new CustomEvent("binary", { detail: e.data }));
+				return;
+			}
 			try {
 				let t = JSON.parse(e.data);
 				t.type === T.STATE ? this.dispatchEvent(new CustomEvent("state", { detail: t.data })) : t.type === T.INPUT && this.dispatchEvent(new CustomEvent("input", { detail: t.data }));
@@ -502,17 +506,23 @@ var D = class extends EventTarget {
 			e && await this.pc.addIceCandidate(new RTCIceCandidate(e));
 		} catch {}
 	}
+	sendBinary(e) {
+		if (this.unreliableChannel && this.unreliableChannel.readyState === "open") {
+			let t = e instanceof ArrayBuffer ? e : e.buffer;
+			this.unreliableChannel.send(t);
+		}
+	}
 	sendState(e) {
-		this.unreliableChannel && this.unreliableChannel.readyState === "open" && this.unreliableChannel.send(JSON.stringify({
+		this.unreliableChannel && this.unreliableChannel.readyState === "open" && (e instanceof ArrayBuffer || ArrayBuffer.isView(e) ? this.sendBinary(e) : this.unreliableChannel.send(JSON.stringify({
 			type: T.STATE,
 			data: e
-		}));
+		})));
 	}
 	sendInput(e) {
-		this.unreliableChannel && this.unreliableChannel.readyState === "open" && this.unreliableChannel.send(JSON.stringify({
+		this.unreliableChannel && this.unreliableChannel.readyState === "open" && (e instanceof ArrayBuffer || ArrayBuffer.isView(e) ? this.sendBinary(e) : this.unreliableChannel.send(JSON.stringify({
 			type: T.INPUT,
 			data: e
-		}));
+		})));
 	}
 	sendReliable(e) {
 		this.reliableChannel && this.reliableChannel.readyState === "open" && this.reliableChannel.send(JSON.stringify(e));
@@ -601,6 +611,8 @@ var D = class extends EventTarget {
 			this.dispatchEvent(new CustomEvent("event", { detail: e.detail }));
 		}), this.peer.addEventListener("latency", (e) => {
 			this.latency = e.detail.latency, this.dispatchEvent(new CustomEvent("latency", { detail: { latency: this.latency } }));
+		}), this.peer.addEventListener("binary", (e) => {
+			this.dispatchEvent(new CustomEvent("binary", { detail: e.detail }));
 		}), e) {
 			let e = await this.peer.createOffer();
 			this.signaling.sendSignal(this.peerId, {
@@ -657,6 +669,9 @@ var D = class extends EventTarget {
 	}
 	sendState(e) {
 		this.peer && this.peer.connected && this.peer.sendState(e);
+	}
+	sendBinary(e) {
+		this.peer && this.peer.connected && this.peer.sendBinary(e);
 	}
 	sendInput(e) {
 		this.peer && this.peer.connected && this.peer.sendInput(e);
@@ -771,6 +786,229 @@ var D = class extends EventTarget {
 	hide() {
 		this.element.style.display = "none";
 	}
+}, j = typeof TextEncoder < "u" ? new TextEncoder() : null, M = typeof TextDecoder < "u" ? new TextDecoder() : null, N = class {
+	constructor(e = 512) {
+		this.capacity = e, this.buffer = new ArrayBuffer(this.capacity), this.view = new DataView(this.buffer), this.offset = 0;
+	}
+	_ensureCapacity(e) {
+		if (this.offset + e > this.capacity) {
+			let t = this.capacity * 2;
+			for (; this.offset + e > t;) t *= 2;
+			let n = new ArrayBuffer(t);
+			new Uint8Array(n).set(new Uint8Array(this.buffer)), this.buffer = n, this.view = new DataView(this.buffer), this.capacity = t;
+		}
+	}
+	reset() {
+		return this.offset = 0, this;
+	}
+	writeUint8(e) {
+		return this._ensureCapacity(1), this.view.setUint8(this.offset, e), this.offset += 1, this;
+	}
+	writeInt8(e) {
+		return this._ensureCapacity(1), this.view.setInt8(this.offset, e), this.offset += 1, this;
+	}
+	writeBoolean(e) {
+		return this.writeUint8(+!!e);
+	}
+	writeUint16(e) {
+		return this._ensureCapacity(2), this.view.setUint16(this.offset, e, !0), this.offset += 2, this;
+	}
+	writeInt16(e) {
+		return this._ensureCapacity(2), this.view.setInt16(this.offset, e, !0), this.offset += 2, this;
+	}
+	writeUint32(e) {
+		return this._ensureCapacity(4), this.view.setUint32(this.offset, e, !0), this.offset += 4, this;
+	}
+	writeInt32(e) {
+		return this._ensureCapacity(4), this.view.setInt32(this.offset, e, !0), this.offset += 4, this;
+	}
+	writeFloat32(e) {
+		return this._ensureCapacity(4), this.view.setFloat32(this.offset, e, !0), this.offset += 4, this;
+	}
+	writeFloat64(e) {
+		return this._ensureCapacity(8), this.view.setFloat64(this.offset, e, !0), this.offset += 8, this;
+	}
+	writeFixed16(e, t = 100) {
+		let n = Math.max(-32768, Math.min(32767, Math.round(e * t)));
+		return this.writeInt16(n);
+	}
+	writeFixed8(e, t = 10) {
+		let n = Math.max(-128, Math.min(127, Math.round(e * t)));
+		return this.writeInt8(n);
+	}
+	writeString(e) {
+		if (!j) {
+			let t = e.length;
+			this.writeUint16(t);
+			for (let n = 0; n < t; n++) this.writeUint8(e.charCodeAt(n));
+			return this;
+		}
+		let t = j.encode(e);
+		return this.writeUint16(t.length), this._ensureCapacity(t.length), new Uint8Array(this.buffer, this.offset, t.length).set(t), this.offset += t.length, this;
+	}
+	writeBytes(e) {
+		return this._ensureCapacity(e.length), new Uint8Array(this.buffer, this.offset, e.length).set(e), this.offset += e.length, this;
+	}
+	getBuffer() {
+		return this.buffer.slice(0, this.offset);
+	}
+	getView() {
+		return new Uint8Array(this.buffer, 0, this.offset);
+	}
+	get length() {
+		return this.offset;
+	}
+}, P = class {
+	constructor(e) {
+		if (e instanceof ArrayBuffer) this.buffer = e, this.view = new DataView(this.buffer), this.byteLength = this.buffer.byteLength;
+		else if (ArrayBuffer.isView(e)) this.buffer = e.buffer, this.view = new DataView(this.buffer, e.byteOffset, e.byteLength), this.byteLength = e.byteLength;
+		else throw Error("BinaryReader requires an ArrayBuffer or TypedArray view");
+		this.offset = 0;
+	}
+	seek(e) {
+		return this.offset = Math.max(0, Math.min(this.byteLength, e)), this;
+	}
+	readUint8() {
+		let e = this.view.getUint8(this.offset);
+		return this.offset += 1, e;
+	}
+	readInt8() {
+		let e = this.view.getInt8(this.offset);
+		return this.offset += 1, e;
+	}
+	readBoolean() {
+		return this.readUint8() !== 0;
+	}
+	readUint16() {
+		let e = this.view.getUint16(this.offset, !0);
+		return this.offset += 2, e;
+	}
+	writeInt16() {
+		let e = this.view.getInt16(this.offset, !0);
+		return this.offset += 2, e;
+	}
+	readInt16() {
+		let e = this.view.getInt16(this.offset, !0);
+		return this.offset += 2, e;
+	}
+	readUint32() {
+		let e = this.view.getUint32(this.offset, !0);
+		return this.offset += 4, e;
+	}
+	readInt32() {
+		let e = this.view.getInt32(this.offset, !0);
+		return this.offset += 4, e;
+	}
+	readFloat32() {
+		let e = this.view.getFloat32(this.offset, !0);
+		return this.offset += 4, e;
+	}
+	readFloat64() {
+		let e = this.view.getFloat64(this.offset, !0);
+		return this.offset += 8, e;
+	}
+	readFixed16(e = 100) {
+		return this.readInt16() / e;
+	}
+	readFixed8(e = 10) {
+		return this.readInt8() / e;
+	}
+	readString() {
+		let e = this.readUint16();
+		if (!M) {
+			let t = "";
+			for (let n = 0; n < e; n++) t += String.fromCharCode(this.readUint8());
+			return t;
+		}
+		let t = new Uint8Array(this.buffer, this.view.byteOffset + this.offset, e);
+		return this.offset += e, M.decode(t);
+	}
+	readBytes(e) {
+		let t = new Uint8Array(this.buffer, this.view.byteOffset + this.offset, e);
+		return this.offset += e, t;
+	}
+	get bytesRemaining() {
+		return this.byteLength - this.offset;
+	}
+};
+//#endregion
+//#region src/sdk/netcode/SnapshotInterpolator.js
+function F(e, t, n) {
+	return e + (t - e) * n;
+}
+function I(e, t, n) {
+	let r = (t - e) % (Math.PI * 2);
+	return r < -Math.PI && (r += Math.PI * 2), r > Math.PI && (r -= Math.PI * 2), e + r * n;
+}
+var L = class {
+	constructor(e = {}) {
+		this.bufferTime = e.bufferTime ?? 100, this.maxExtrapolation = e.maxExtrapolation ?? 120, this.maxSnapshots = e.maxSnapshots ?? 30, this.snapshots = [], this.angleProperties = new Set(e.angleProperties || [
+			"rotation",
+			"turretRotation",
+			"angle",
+			"yaw",
+			"pitch"
+		]), this.snapProperties = new Set(e.snapProperties || [
+			"health",
+			"score",
+			"team",
+			"state",
+			"invulnerable",
+			"isShooting"
+		]);
+	}
+	pushSnapshot(e, t) {
+		let n = performance.now(), r = {
+			clientRecvTime: n,
+			serverTime: e || n,
+			entities: t
+		};
+		this.snapshots.length > 0 && r.serverTime < this.snapshots[0].serverTime || (this.snapshots.push(r), this.snapshots.sort((e, t) => e.serverTime - t.serverTime), this.snapshots.length > this.maxSnapshots && this.snapshots.shift());
+	}
+	getInterpolated() {
+		if (this.snapshots.length === 0) return {};
+		if (this.snapshots.length === 1) return this.snapshots[0].entities;
+		performance.now();
+		let e = this.snapshots[this.snapshots.length - 1].serverTime - this.bufferTime, t = null, n = null;
+		for (let r = 0; r < this.snapshots.length - 1; r++) if (this.snapshots[r].serverTime <= e && this.snapshots[r + 1].serverTime >= e) {
+			t = this.snapshots[r], n = this.snapshots[r + 1];
+			break;
+		}
+		if (!t && e < this.snapshots[0].serverTime) return this.snapshots[0].entities;
+		if (!t) {
+			t = this.snapshots[this.snapshots.length - 2], n = this.snapshots[this.snapshots.length - 1];
+			let r = n.serverTime - t.serverTime;
+			if (r <= 0) return n.entities;
+			let i = e - n.serverTime, a = 1 + Math.min(i, this.maxExtrapolation) / r;
+			return this._interpolateEntities(t.entities, n.entities, a);
+		}
+		let r = n.serverTime - t.serverTime, i = r > 0 ? (e - t.serverTime) / r : 1;
+		return this._interpolateEntities(t.entities, n.entities, Math.max(0, Math.min(1, i)));
+	}
+	_interpolateEntities(e, t, n) {
+		let r = {}, i = /* @__PURE__ */ new Set([...Object.keys(e || {}), ...Object.keys(t || {})]);
+		for (let a of i) {
+			let i = e[a], o = t[a];
+			if (!i && o) {
+				r[a] = { ...o };
+				continue;
+			}
+			if (i && !o) {
+				r[a] = { ...i };
+				continue;
+			}
+			let s = {};
+			for (let e of Object.keys(o)) {
+				let t = i[e], r = o[e];
+				s[e] = typeof r == "number" && typeof t == "number" ? this.snapProperties.has(e) ? r : this.angleProperties.has(e) ? I(t, r, n) : F(t, r, n) : r === void 0 ? t : r;
+			}
+			r[a] = s;
+		}
+		return r;
+	}
+	clear() {
+		this.snapshots = [];
+	}
 };
 //#endregion
 //#region src/sdk/index.js
@@ -779,7 +1017,10 @@ typeof window < "u" && (window.Mereb = {
 	MerebLobby: A,
 	PeerConnection: O,
 	SignalingClient: D,
+	BinaryWriter: N,
+	BinaryReader: P,
+	SnapshotInterpolator: L,
 	...b
 });
 //#endregion
-export { T as DC, x as DEFAULT_ICE_SERVERS, k as MerebClient, A as MerebLobby, O as PeerConnection, S as ROLE, C as STATUS, D as SignalingClient, w as WS, E as generateRoomCode };
+export { P as BinaryReader, N as BinaryWriter, T as DC, x as DEFAULT_ICE_SERVERS, k as MerebClient, A as MerebLobby, O as PeerConnection, S as ROLE, C as STATUS, D as SignalingClient, L as SnapshotInterpolator, w as WS, E as generateRoomCode };
