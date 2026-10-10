@@ -5,6 +5,7 @@
 import { SignalingClient } from './SignalingClient.js';
 import { PeerConnection } from './PeerConnection.js';
 import { WS, ROLE, STATUS, generateRoomCode } from './constants.js';
+import { PortalManager } from './portals/PortalManager.js';
 
 export class MerebClient extends EventTarget {
   constructor(options = {}) {
@@ -17,6 +18,7 @@ export class MerebClient extends EventTarget {
     // State
     this.signaling = new SignalingClient(this.host);
     this.peer = null;
+    this.portal = new PortalManager(this);
     this.status = STATUS.IDLE;
     this.role = null;
     this.localId = null;
@@ -34,6 +36,7 @@ export class MerebClient extends EventTarget {
     if (options.onPeerDisconnect) this.on('peer-disconnect', options.onPeerDisconnect);
     if (options.onStatusChange) this.on('status-change', options.onStatusChange);
     if (options.onLatency) this.on('latency', options.onLatency);
+    if (options.onQuality) this.on('quality', options.onQuality);
 
     this._setupSignalingListeners();
 
@@ -163,6 +166,10 @@ export class MerebClient extends EventTarget {
 
     this.peer.addEventListener('binary', (e) => {
       this.dispatchEvent(new CustomEvent('binary', { detail: e.detail }));
+    });
+
+    this.peer.addEventListener('quality', (e) => {
+      this.dispatchEvent(new CustomEvent('quality', { detail: e.detail }));
     });
 
     if (isInitiator) {
@@ -302,6 +309,16 @@ export class MerebClient extends EventTarget {
     if (this.peer && this.peer.connected) {
       this.peer.sendEvent(name, data);
     }
+  }
+
+  // Connect official portal SDK (Poki or CrazyGames)
+  usePortal(type = 'auto', sdkInstance = null) {
+    return this.portal.attach(type, sdkInstance);
+  }
+
+  // Real-time network health metrics: { ping, jitter, packetLoss, rating }
+  get stats() {
+    return this.peer ? this.peer.quality.getStats() : { ping: 0, jitter: 0, packetLoss: 0, rating: 'good' };
   }
 
   get isHost() {

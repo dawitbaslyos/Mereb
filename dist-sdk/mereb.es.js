@@ -323,31 +323,49 @@ function y(e) {
 	};
 }
 //#endregion
-//#region src/sdk/constants.js
-var b = /* @__PURE__ */ t({
-	DC: () => T,
-	DEFAULT_ICE_SERVERS: () => x,
-	ROLE: () => S,
-	STATUS: () => C,
-	WS: () => w,
-	generateRoomCode: () => E
-}), x = [
+//#region src/sdk/netcode/TurnPool.js
+var b = [
 	{ urls: "stun:stun.l.google.com:19302" },
 	{ urls: "stun:stun1.l.google.com:19302" },
 	{ urls: "stun:stun.cloudflare.com:3478" },
 	{ urls: "stun:openrelay.metered.ca:80" }
-], S = {
+], x = [{
+	urls: [
+		"turn:openrelay.metered.ca:80",
+		"turn:openrelay.metered.ca:443",
+		"turns:openrelay.metered.ca:443?transport=tcp"
+	],
+	username: "openrelayproject",
+	credential: "openrelayproject"
+}], S = class {
+	static async resolveIceServers(e) {
+		if (typeof e == "function") try {
+			let t = await e();
+			if (Array.isArray(t) && t.length > 0) return t;
+		} catch (e) {
+			console.warn("[Mereb:TurnPool] Failed to fetch dynamic TURN servers, falling back to defaults", e);
+		}
+		return Array.isArray(e) && e.length > 0 ? e : [...b, ...x];
+	}
+}, C = /* @__PURE__ */ t({
+	DC: () => O,
+	DEFAULT_ICE_SERVERS: () => w,
+	ROLE: () => T,
+	STATUS: () => E,
+	WS: () => D,
+	generateRoomCode: () => k
+}), w = [...b, ...x], T = {
 	HOST: "host",
 	CLIENT: "client",
 	BOT: "bot"
-}, C = {
+}, E = {
 	IDLE: "idle",
 	CONNECTING: "connecting",
 	IN_LOBBY: "in_lobby",
 	MATCHING: "matching",
 	CONNECTED: "connected",
 	DISCONNECTED: "disconnected"
-}, w = {
+}, D = {
 	CREATE_ROOM: "create-room",
 	JOIN_ROOM: "join-room",
 	QUICK_PLAY: "quick-play",
@@ -360,21 +378,21 @@ var b = /* @__PURE__ */ t({
 	MATCH_FOUND: "match-found",
 	START_SIGNAL: "start-signal",
 	ERROR: "error"
-}, T = {
+}, O = {
 	STATE: "state",
 	INPUT: "input",
 	EVENT: "event",
 	PING: "ping",
 	PONG: "pong"
 };
-function E() {
+function k() {
 	let e = "";
 	for (let t = 0; t < 4; t++) e += "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"[Math.floor(Math.random() * 32)];
 	return e;
 }
 //#endregion
 //#region src/sdk/SignalingClient.js
-var D = class extends EventTarget {
+var A = class extends EventTarget {
 	constructor(e) {
 		super(), this.host = e, this.ws = null, this.roomId = null;
 	}
@@ -408,7 +426,7 @@ var D = class extends EventTarget {
 	}
 	sendSignal(e, t) {
 		this.send({
-			type: w.SIGNAL,
+			type: D.SIGNAL,
 			to: e,
 			signal: t
 		});
@@ -419,9 +437,56 @@ var D = class extends EventTarget {
 	get playerId() {
 		return this.ws ? this.ws.id : null;
 	}
-}, O = class extends EventTarget {
+}, j = class extends EventTarget {
 	constructor(e = {}) {
-		super(), this.iceServers = e.iceServers || x, this.pc = new RTCPeerConnection({ iceServers: this.iceServers }), this.unreliableChannel = null, this.reliableChannel = null, this._connected = !1, this.latency = 0, this._pingInterval = null, this.pc.onicecandidate = (e) => {
+		super(), this.ping = 0, this.jitter = 0, this.packetLoss = 0, this.rating = "good", this._pingHistory = [], this._sentPings = /* @__PURE__ */ new Map(), this._nextSeq = 1, this._lostCount = 0, this._totalSent = 0, this._windowSize = e.windowSize || 10;
+	}
+	createPingPacket() {
+		let e = this._nextSeq++, t = performance.now();
+		this._sentPings.set(e, t), this._totalSent++;
+		for (let [e, n] of this._sentPings.entries()) t - n > 3500 && (this._sentPings.delete(e), this._lostCount++, this._updateStats());
+		return {
+			seq: e,
+			time: t
+		};
+	}
+	recordPong(e) {
+		if (!this._sentPings.has(e)) return;
+		let t = this._sentPings.get(e);
+		this._sentPings.delete(e);
+		let n = Math.max(1, Math.round(performance.now() - t));
+		this._pingHistory.push(n), this._pingHistory.length > this._windowSize && this._pingHistory.shift(), this._updateStats();
+	}
+	_updateStats() {
+		if (this._pingHistory.length === 0) return;
+		let e = this._pingHistory.reduce((e, t) => e + t, 0), t = Math.round(e / this._pingHistory.length);
+		this.ping = t;
+		let n = 0;
+		for (let e = 1; e < this._pingHistory.length; e++) n += Math.abs(this._pingHistory[e] - this._pingHistory[e - 1]);
+		this.jitter = this._pingHistory.length > 1 ? Math.round(n / (this._pingHistory.length - 1)) : 0;
+		let r = Math.min(this._totalSent, 30);
+		this.packetLoss = r > 0 ? Math.min(100, Math.round(this._lostCount / r * 100)) : 0;
+		let i = "great";
+		i = this.ping > 220 || this.packetLoss >= 10 ? "poor" : this.ping > 130 || this.packetLoss >= 4 ? "fair" : this.ping > 65 || this.packetLoss >= 2 ? "good" : "great";
+		let a = i !== this.rating;
+		this.rating = i, this.dispatchEvent(new CustomEvent("update", { detail: this.getStats() })), a && this.dispatchEvent(new CustomEvent("rating-change", { detail: { rating: this.rating } }));
+	}
+	getStats() {
+		return {
+			ping: this.ping,
+			jitter: this.jitter,
+			packetLoss: this.packetLoss,
+			rating: this.rating
+		};
+	}
+	reset() {
+		this.ping = 0, this.jitter = 0, this.packetLoss = 0, this.rating = "good", this._pingHistory = [], this._sentPings.clear(), this._lostCount = 0, this._totalSent = 0;
+	}
+}, M = class extends EventTarget {
+	constructor(e = {}) {
+		super(), this.iceServers = e.iceServers || w, this.pc = new RTCPeerConnection({ iceServers: this.iceServers }), this.unreliableChannel = null, this.reliableChannel = null, this._connected = !1, this.latency = 0, this.quality = new j(), this._pingInterval = null, this.quality.addEventListener("update", (e) => {
+			this.dispatchEvent(new CustomEvent("quality", { detail: e.detail }));
+		}), this.pc.onicecandidate = (e) => {
 			e.candidate && this.dispatchEvent(new CustomEvent("ice-candidate", { detail: { candidate: e.candidate } }));
 		}, this.pc.onconnectionstatechange = () => {
 			let e = this.pc.connectionState;
@@ -439,7 +504,7 @@ var D = class extends EventTarget {
 			}
 			try {
 				let t = JSON.parse(e.data);
-				t.type === T.STATE ? this.dispatchEvent(new CustomEvent("state", { detail: t.data })) : t.type === T.INPUT && this.dispatchEvent(new CustomEvent("input", { detail: t.data }));
+				t.type === O.STATE ? this.dispatchEvent(new CustomEvent("state", { detail: t.data })) : t.type === O.INPUT && this.dispatchEvent(new CustomEvent("input", { detail: t.data }));
 			} catch (e) {
 				console.warn("[Mereb:RTC] Failed to parse message on unreliable channel", e);
 			}
@@ -449,10 +514,11 @@ var D = class extends EventTarget {
 		this.reliableChannel = e, e.onopen = () => this._checkChannelsOpen(), e.onclose = () => this._handleDisconnect(), e.onmessage = (e) => {
 			try {
 				let t = JSON.parse(e.data);
-				t.type === T.EVENT ? this.dispatchEvent(new CustomEvent("event", { detail: t })) : t.type === T.PING ? this.sendReliable({
-					type: T.PONG,
+				t.type === O.EVENT ? this.dispatchEvent(new CustomEvent("event", { detail: t })) : t.type === O.PING ? this.sendReliable({
+					type: O.PONG,
+					seq: t.seq,
 					time: t.time
-				}) : t.type === T.PONG && (this.latency = Math.max(1, Math.round(Date.now() - t.time)), this.dispatchEvent(new CustomEvent("latency", { detail: { latency: this.latency } })));
+				}) : t.type === O.PONG && (this.quality.recordPong(t.seq), this.latency = this.quality.ping, this.dispatchEvent(new CustomEvent("latency", { detail: { latency: this.latency } })));
 			} catch (e) {
 				console.warn("[Mereb:RTC] Failed to parse message on reliable channel", e);
 			}
@@ -464,14 +530,18 @@ var D = class extends EventTarget {
 	}
 	_startPing() {
 		this._pingInterval && clearInterval(this._pingInterval), this._pingInterval = setInterval(() => {
-			this.reliableChannel && this.reliableChannel.readyState === "open" && this.sendReliable({
-				type: T.PING,
-				time: Date.now()
-			});
-		}, 2e3);
+			if (this.reliableChannel && this.reliableChannel.readyState === "open") {
+				let e = this.quality.createPingPacket();
+				this.sendReliable({
+					type: O.PING,
+					seq: e.seq,
+					time: e.time
+				});
+			}
+		}, 1500);
 	}
 	_handleDisconnect() {
-		this._connected && (this._connected = !1, this._pingInterval && clearInterval(this._pingInterval), this.dispatchEvent(new CustomEvent("close")));
+		this._connected && (this._connected = !1, this._pingInterval && clearInterval(this._pingInterval), this.quality.reset(), this.dispatchEvent(new CustomEvent("close")));
 	}
 	async createOffer() {
 		let e = this.pc.createDataChannel("unreliable", {
@@ -514,13 +584,13 @@ var D = class extends EventTarget {
 	}
 	sendState(e) {
 		this.unreliableChannel && this.unreliableChannel.readyState === "open" && (e instanceof ArrayBuffer || ArrayBuffer.isView(e) ? this.sendBinary(e) : this.unreliableChannel.send(JSON.stringify({
-			type: T.STATE,
+			type: O.STATE,
 			data: e
 		})));
 	}
 	sendInput(e) {
 		this.unreliableChannel && this.unreliableChannel.readyState === "open" && (e instanceof ArrayBuffer || ArrayBuffer.isView(e) ? this.sendBinary(e) : this.unreliableChannel.send(JSON.stringify({
-			type: T.INPUT,
+			type: O.INPUT,
 			data: e
 		})));
 	}
@@ -529,7 +599,7 @@ var D = class extends EventTarget {
 	}
 	sendEvent(e, t = {}) {
 		this.sendReliable({
-			type: T.EVENT,
+			type: O.EVENT,
 			name: e,
 			data: t
 		});
@@ -540,9 +610,83 @@ var D = class extends EventTarget {
 	close() {
 		this._pingInterval && clearInterval(this._pingInterval), this.unreliableChannel && this.unreliableChannel.close(), this.reliableChannel && this.reliableChannel.close(), this.pc && this.pc.close(), this._connected = !1;
 	}
-}, k = class extends EventTarget {
+}, N = class extends EventTarget {
+	constructor(e) {
+		super(), this.client = e, this.portalType = null, this.sdk = null, this.isAdPlaying = !1, this.userProfile = null, this.client.on("match-start", () => this.notifyGameplayStart()), this.client.on("peer-disconnect", () => this.notifyGameplayStop());
+	}
+	attach(e = "auto", t = null) {
+		let n = e, r = t;
+		if (n === "auto") {
+			if (typeof window < "u" && window.PokiSDK) n = "poki", r = window.PokiSDK;
+			else if (typeof window < "u" && (window.CrazyGames?.SDK || window.CrazyGames)) n = "crazygames", r = window.CrazyGames?.SDK || window.CrazyGames;
+			else return console.info("[Mereb:Portal] No portal SDK detected in global scope. Running in standalone mode."), this;
+		}
+		return this.portalType = n, this.sdk = r, this.portalType === "poki" ? this._setupPoki() : this.portalType === "crazygames" && this._setupCrazyGames(), console.log(`[Mereb:Portal] Successfully hooked into ${this.portalType.toUpperCase()} SDK.`), this;
+	}
+	_setupPoki() {
+		this.client.addEventListener("room-created", (e) => {
+			if (this.sdk?.shareableURL) try {
+				let t = this.sdk.shareableURL({ room: e.detail.roomCode });
+				t && (e.detail.shareUrl = t);
+			} catch (e) {
+				console.warn("[Mereb:Portal] Poki shareableURL error", e);
+			}
+		});
+	}
+	async requestCommercialBreak() {
+		return this.sdk ? (this.isAdPlaying = !0, this.dispatchEvent(new CustomEvent("ad-start")), new Promise((e) => {
+			let t = () => {
+				this.isAdPlaying = !1, this.dispatchEvent(new CustomEvent("ad-end")), e(!0);
+			};
+			if (this.portalType === "poki" && this.sdk.commercialBreak) this.sdk.commercialBreak().then(t).catch(t);
+			else if (this.portalType === "crazygames") {
+				let e = {
+					adStarted: () => {},
+					adFinished: t,
+					adError: t
+				};
+				this.sdk.ad?.requestAd ? this.sdk.ad.requestAd("midgame", e) : this.sdk.requestAd ? this.sdk.requestAd("midgame", e) : t();
+			} else t();
+		})) : !1;
+	}
+	async _setupCrazyGames() {
+		try {
+			if (this.sdk.user?.getUser) {
+				let e = await this.sdk.user.getUser();
+				e && (this.userProfile = {
+					username: e.username,
+					avatarUrl: e.profilePictureUrl
+				});
+			}
+		} catch {}
+		this.client.addEventListener("room-created", async (e) => {
+			if (this.sdk.game?.inviteLink) try {
+				let t = await this.sdk.game.inviteLink({ room: e.detail.roomCode });
+				t && (e.detail.shareUrl = t);
+			} catch (e) {
+				console.warn("[Mereb:Portal] CrazyGames inviteLink error", e);
+			}
+		});
+	}
+	notifyGameplayStart() {
+		if (this.sdk) try {
+			this.portalType === "poki" && this.sdk.gameplayStart ? this.sdk.gameplayStart() : this.portalType === "crazygames" && (this.sdk.game?.gameplayStart ? this.sdk.game.gameplayStart() : this.sdk.gameplayStart && this.sdk.gameplayStart());
+		} catch {}
+	}
+	notifyGameplayStop() {
+		if (this.sdk) try {
+			this.portalType === "poki" && this.sdk.gameplayStop ? this.sdk.gameplayStop() : this.portalType === "crazygames" && (this.sdk.game?.gameplayStop ? this.sdk.game.gameplayStop() : this.sdk.gameplayStop && this.sdk.gameplayStop());
+		} catch {}
+	}
+	getInviteUrl(e) {
+		if (this.portalType === "poki" && this.sdk?.shareableURL) try {
+			return this.sdk.shareableURL({ room: e });
+		} catch {}
+		return typeof window < "u" ? `${window.location.origin}${window.location.pathname}?room=${e}` : `?room=${e}`;
+	}
+}, P = class extends EventTarget {
 	constructor(e = {}) {
-		if (super(), this.host = e.host || (typeof window < "u" && window.location.hostname === "localhost" ? "localhost:1999" : ""), this.botTimeoutMs = e.botTimeoutMs ?? 8e3, this.iceServers = e.iceServers, this.autoJoinFromUrl = e.autoJoinFromUrl ?? !0, this.signaling = new D(this.host), this.peer = null, this.status = C.IDLE, this.role = null, this.localId = null, this.peerId = null, this.roomCode = null, this.isBot = !1, this.latency = 0, this._matchTimeout = null, e.onMatchStart && this.on("match-start", e.onMatchStart), e.onState && this.on("state", e.onState), e.onInput && this.on("input", e.onInput), e.onEvent && this.on("event", e.onEvent), e.onPeerDisconnect && this.on("peer-disconnect", e.onPeerDisconnect), e.onStatusChange && this.on("status-change", e.onStatusChange), e.onLatency && this.on("latency", e.onLatency), this._setupSignalingListeners(), this.autoJoinFromUrl && typeof window < "u") {
+		if (super(), this.host = e.host || (typeof window < "u" && window.location.hostname === "localhost" ? "localhost:1999" : ""), this.botTimeoutMs = e.botTimeoutMs ?? 8e3, this.iceServers = e.iceServers, this.autoJoinFromUrl = e.autoJoinFromUrl ?? !0, this.signaling = new A(this.host), this.peer = null, this.portal = new N(this), this.status = E.IDLE, this.role = null, this.localId = null, this.peerId = null, this.roomCode = null, this.isBot = !1, this.latency = 0, this._matchTimeout = null, e.onMatchStart && this.on("match-start", e.onMatchStart), e.onState && this.on("state", e.onState), e.onInput && this.on("input", e.onInput), e.onEvent && this.on("event", e.onEvent), e.onPeerDisconnect && this.on("peer-disconnect", e.onPeerDisconnect), e.onStatusChange && this.on("status-change", e.onStatusChange), e.onLatency && this.on("latency", e.onLatency), e.onQuality && this.on("quality", e.onQuality), this._setupSignalingListeners(), this.autoJoinFromUrl && typeof window < "u") {
 			let e = new URLSearchParams(window.location.search).get("room");
 			e && setTimeout(() => this.joinRoom(e), 50);
 		}
@@ -560,46 +704,46 @@ var D = class extends EventTarget {
 		this.signaling.addEventListener("message", async (e) => {
 			let t = e.detail;
 			switch (t.type) {
-				case w.PLAYER_JOINED:
+				case D.PLAYER_JOINED:
 					this.peerId = t.playerId;
 					break;
-				case w.ROOM_JOINED:
-					this.peerId = t.players.find((e) => e !== this.localId), t.hostId !== this.localId && (this.role = S.CLIENT);
+				case D.ROOM_JOINED:
+					this.peerId = t.players.find((e) => e !== this.localId), t.hostId !== this.localId && (this.role = T.CLIENT);
 					break;
-				case w.START_SIGNAL:
-					this.peerId = t.peerId, this.role = S.HOST, await this._initPeerConnection(!0);
+				case D.START_SIGNAL:
+					this.peerId = t.peerId, this.role = T.HOST, await this._initPeerConnection(!0);
 					break;
-				case w.SIGNAL:
+				case D.SIGNAL:
 					await this._handleSignal(t);
 					break;
-				case w.MATCH_FOUND:
-					this._matchTimeout && clearTimeout(this._matchTimeout), this.roomCode = t.roomCode, this.peerId = t.opponentId, this._setStatus(C.CONNECTING), this.signaling.disconnect(), setTimeout(async () => {
+				case D.MATCH_FOUND:
+					this._matchTimeout && clearTimeout(this._matchTimeout), this.roomCode = t.roomCode, this.peerId = t.opponentId, this._setStatus(E.CONNECTING), this.signaling.disconnect(), setTimeout(async () => {
 						await this.signaling.connect(this.roomCode), this.localId = this.signaling.playerId;
 					}, 150);
 					break;
-				case w.MATCH_QUEUED:
-					this._setStatus(C.MATCHING);
+				case D.MATCH_QUEUED:
+					this._setStatus(E.MATCHING);
 					break;
-				case w.PLAYER_LEFT:
+				case D.PLAYER_LEFT:
 					this._handlePeerLeft("disconnected");
 					break;
-				case w.ERROR: this.dispatchEvent(new CustomEvent("error", { detail: { message: t.message } }));
+				case D.ERROR: this.dispatchEvent(new CustomEvent("error", { detail: { message: t.message } }));
 			}
 		});
 	}
 	async _initPeerConnection(e) {
-		if (this.peer && this.peer.close(), this.peer = new O({ iceServers: this.iceServers }), this.peer.addEventListener("ice-candidate", (e) => {
+		if (this.peer && this.peer.close(), this.peer = new M({ iceServers: this.iceServers }), this.peer.addEventListener("ice-candidate", (e) => {
 			this.signaling.sendSignal(this.peerId, {
 				type: "ice-candidate",
 				candidate: e.detail.candidate
 			});
 		}), this.peer.addEventListener("open", () => {
-			this._setStatus(C.CONNECTED), this.dispatchEvent(new CustomEvent("match-start", { detail: {
+			this._setStatus(E.CONNECTED), this.dispatchEvent(new CustomEvent("match-start", { detail: {
 				role: this.role,
 				localId: this.localId,
 				peerId: this.peerId,
 				isBot: !1,
-				isHost: this.role === S.HOST
+				isHost: this.role === T.HOST
 			} }));
 		}), this.peer.addEventListener("close", () => {
 			this._handlePeerLeft("rtc_closed");
@@ -613,6 +757,8 @@ var D = class extends EventTarget {
 			this.latency = e.detail.latency, this.dispatchEvent(new CustomEvent("latency", { detail: { latency: this.latency } }));
 		}), this.peer.addEventListener("binary", (e) => {
 			this.dispatchEvent(new CustomEvent("binary", { detail: e.detail }));
+		}), this.peer.addEventListener("quality", (e) => {
+			this.dispatchEvent(new CustomEvent("quality", { detail: e.detail }));
 		}), e) {
 			let e = await this.peer.createOffer();
 			this.signaling.sendSignal(this.peerId, {
@@ -623,7 +769,7 @@ var D = class extends EventTarget {
 	}
 	async _handleSignal(e) {
 		let t = e.signal;
-		if (!this.peer && t.type === "offer" && (this.role = S.CLIENT, await this._initPeerConnection(!1)), this.peer) {
+		if (!this.peer && t.type === "offer" && (this.role = T.CLIENT, await this._initPeerConnection(!1)), this.peer) {
 			if (t.type === "offer") {
 				let n = await this.peer.handleOffer(t.sdp);
 				this.signaling.sendSignal(e.from, {
@@ -634,13 +780,13 @@ var D = class extends EventTarget {
 		}
 	}
 	_handlePeerLeft(e) {
-		this.status === C.CONNECTED && (this._setStatus(C.DISCONNECTED), this.dispatchEvent(new CustomEvent("peer-disconnect", { detail: {
+		this.status === E.CONNECTED && (this._setStatus(E.DISCONNECTED), this.dispatchEvent(new CustomEvent("peer-disconnect", { detail: {
 			peerId: this.peerId,
 			reason: e
 		} })));
 	}
 	async createRoom() {
-		this.disconnect(), this.role = S.HOST, this.roomCode = E(), this._setStatus(C.CONNECTING), await this.signaling.connect(this.roomCode), this.localId = this.signaling.playerId, this._setStatus(C.IN_LOBBY);
+		this.disconnect(), this.role = T.HOST, this.roomCode = k(), this._setStatus(E.CONNECTING), await this.signaling.connect(this.roomCode), this.localId = this.signaling.playerId, this._setStatus(E.IN_LOBBY);
 		let e = typeof window < "u" ? `${window.location.origin}${window.location.pathname}?room=${this.roomCode}` : `?room=${this.roomCode}`;
 		return this.dispatchEvent(new CustomEvent("room-created", { detail: {
 			roomCode: this.roomCode,
@@ -651,16 +797,16 @@ var D = class extends EventTarget {
 		};
 	}
 	async joinRoom(e) {
-		this.disconnect(), this.role = S.CLIENT, this.roomCode = e.toUpperCase().trim(), this._setStatus(C.CONNECTING), await this.signaling.connect(this.roomCode), this.localId = this.signaling.playerId, this._setStatus(C.IN_LOBBY), this.dispatchEvent(new CustomEvent("room-joined", { detail: { roomCode: this.roomCode } }));
+		this.disconnect(), this.role = T.CLIENT, this.roomCode = e.toUpperCase().trim(), this._setStatus(E.CONNECTING), await this.signaling.connect(this.roomCode), this.localId = this.signaling.playerId, this._setStatus(E.IN_LOBBY), this.dispatchEvent(new CustomEvent("room-joined", { detail: { roomCode: this.roomCode } }));
 	}
 	async quickPlay() {
-		this.disconnect(), this._setStatus(C.MATCHING), await this.signaling.connect("matchmaker"), this.localId = this.signaling.playerId, this.signaling.send({ type: w.QUICK_PLAY }), this.botTimeoutMs && this.botTimeoutMs > 0 && (this._matchTimeout = setTimeout(() => {
+		this.disconnect(), this._setStatus(E.MATCHING), await this.signaling.connect("matchmaker"), this.localId = this.signaling.playerId, this.signaling.send({ type: D.QUICK_PLAY }), this.botTimeoutMs && this.botTimeoutMs > 0 && (this._matchTimeout = setTimeout(() => {
 			this._startBotMatch();
 		}, this.botTimeoutMs));
 	}
 	_startBotMatch() {
-		this.disconnect(), this.isBot = !0, this.role = S.HOST, this.localId = "local_player", this.peerId = "bot_opponent", this._setStatus(C.CONNECTED), this.dispatchEvent(new CustomEvent("match-start", { detail: {
-			role: S.HOST,
+		this.disconnect(), this.isBot = !0, this.role = T.HOST, this.localId = "local_player", this.peerId = "bot_opponent", this._setStatus(E.CONNECTED), this.dispatchEvent(new CustomEvent("match-start", { detail: {
+			role: T.HOST,
 			localId: this.localId,
 			peerId: this.peerId,
 			isBot: !0,
@@ -679,13 +825,24 @@ var D = class extends EventTarget {
 	sendEvent(e, t = {}) {
 		this.peer && this.peer.connected && this.peer.sendEvent(e, t);
 	}
+	usePortal(e = "auto", t = null) {
+		return this.portal.attach(e, t);
+	}
+	get stats() {
+		return this.peer ? this.peer.quality.getStats() : {
+			ping: 0,
+			jitter: 0,
+			packetLoss: 0,
+			rating: "good"
+		};
+	}
 	get isHost() {
-		return this.role === S.HOST;
+		return this.role === T.HOST;
 	}
 	disconnect() {
-		this._matchTimeout && clearTimeout(this._matchTimeout), this.peer &&= (this.peer.close(), null), this.signaling.disconnect(), this.status = C.IDLE, this.role = null, this.localId = null, this.peerId = null, this.roomCode = null, this.isBot = !1, this.latency = 0;
+		this._matchTimeout && clearTimeout(this._matchTimeout), this.peer &&= (this.peer.close(), null), this.signaling.disconnect(), this.status = E.IDLE, this.role = null, this.localId = null, this.peerId = null, this.roomCode = null, this.isBot = !1, this.latency = 0;
 	}
-}, A = class {
+}, F = class {
 	constructor(e, t = {}) {
 		this.client = e, this.options = Object.assign({
 			title: "⚔️ MEREB ARENA",
@@ -786,7 +943,7 @@ var D = class extends EventTarget {
 	hide() {
 		this.element.style.display = "none";
 	}
-}, j = typeof TextEncoder < "u" ? new TextEncoder() : null, M = typeof TextDecoder < "u" ? new TextDecoder() : null, N = class {
+}, I = typeof TextEncoder < "u" ? new TextEncoder() : null, L = typeof TextDecoder < "u" ? new TextDecoder() : null, R = class {
 	constructor(e = 512) {
 		this.capacity = e, this.buffer = new ArrayBuffer(this.capacity), this.view = new DataView(this.buffer), this.offset = 0;
 	}
@@ -837,13 +994,13 @@ var D = class extends EventTarget {
 		return this.writeInt8(n);
 	}
 	writeString(e) {
-		if (!j) {
+		if (!I) {
 			let t = e.length;
 			this.writeUint16(t);
 			for (let n = 0; n < t; n++) this.writeUint8(e.charCodeAt(n));
 			return this;
 		}
-		let t = j.encode(e);
+		let t = I.encode(e);
 		return this.writeUint16(t.length), this._ensureCapacity(t.length), new Uint8Array(this.buffer, this.offset, t.length).set(t), this.offset += t.length, this;
 	}
 	writeBytes(e) {
@@ -858,7 +1015,7 @@ var D = class extends EventTarget {
 	get length() {
 		return this.offset;
 	}
-}, P = class {
+}, z = class {
 	constructor(e) {
 		if (e instanceof ArrayBuffer) this.buffer = e, this.view = new DataView(this.buffer), this.byteLength = this.buffer.byteLength;
 		else if (ArrayBuffer.isView(e)) this.buffer = e.buffer, this.view = new DataView(this.buffer, e.byteOffset, e.byteLength), this.byteLength = e.byteLength;
@@ -915,13 +1072,13 @@ var D = class extends EventTarget {
 	}
 	readString() {
 		let e = this.readUint16();
-		if (!M) {
+		if (!L) {
 			let t = "";
 			for (let n = 0; n < e; n++) t += String.fromCharCode(this.readUint8());
 			return t;
 		}
 		let t = new Uint8Array(this.buffer, this.view.byteOffset + this.offset, e);
-		return this.offset += e, M.decode(t);
+		return this.offset += e, L.decode(t);
 	}
 	readBytes(e) {
 		let t = new Uint8Array(this.buffer, this.view.byteOffset + this.offset, e);
@@ -933,14 +1090,14 @@ var D = class extends EventTarget {
 };
 //#endregion
 //#region src/sdk/netcode/SnapshotInterpolator.js
-function F(e, t, n) {
+function B(e, t, n) {
 	return e + (t - e) * n;
 }
-function I(e, t, n) {
+function V(e, t, n) {
 	let r = (t - e) % (Math.PI * 2);
 	return r < -Math.PI && (r += Math.PI * 2), r > Math.PI && (r -= Math.PI * 2), e + r * n;
 }
-var L = class {
+var H = class {
 	constructor(e = {}) {
 		this.bufferTime = e.bufferTime ?? 100, this.maxExtrapolation = e.maxExtrapolation ?? 120, this.maxSnapshots = e.maxSnapshots ?? 30, this.snapshots = [], this.angleProperties = new Set(e.angleProperties || [
 			"rotation",
@@ -1000,7 +1157,7 @@ var L = class {
 			let s = {};
 			for (let e of Object.keys(o)) {
 				let t = i[e], r = o[e];
-				s[e] = typeof r == "number" && typeof t == "number" ? this.snapProperties.has(e) ? r : this.angleProperties.has(e) ? I(t, r, n) : F(t, r, n) : r === void 0 ? t : r;
+				s[e] = typeof r == "number" && typeof t == "number" ? this.snapProperties.has(e) ? r : this.angleProperties.has(e) ? V(t, r, n) : B(t, r, n) : r === void 0 ? t : r;
 			}
 			r[a] = s;
 		}
@@ -1013,14 +1170,19 @@ var L = class {
 //#endregion
 //#region src/sdk/index.js
 typeof window < "u" && (window.Mereb = {
-	MerebClient: k,
-	MerebLobby: A,
-	PeerConnection: O,
-	SignalingClient: D,
-	BinaryWriter: N,
-	BinaryReader: P,
-	SnapshotInterpolator: L,
-	...b
+	MerebClient: P,
+	MerebLobby: F,
+	PeerConnection: M,
+	SignalingClient: A,
+	BinaryWriter: R,
+	BinaryReader: z,
+	SnapshotInterpolator: H,
+	TurnPool: S,
+	NetworkQuality: j,
+	PortalManager: N,
+	DEFAULT_STUN_SERVERS: b,
+	DEFAULT_TURN_SERVERS: x,
+	...C
 });
 //#endregion
-export { P as BinaryReader, N as BinaryWriter, T as DC, x as DEFAULT_ICE_SERVERS, k as MerebClient, A as MerebLobby, O as PeerConnection, S as ROLE, C as STATUS, D as SignalingClient, L as SnapshotInterpolator, w as WS, E as generateRoomCode };
+export { z as BinaryReader, R as BinaryWriter, O as DC, w as DEFAULT_ICE_SERVERS, b as DEFAULT_STUN_SERVERS, x as DEFAULT_TURN_SERVERS, P as MerebClient, F as MerebLobby, j as NetworkQuality, M as PeerConnection, N as PortalManager, T as ROLE, E as STATUS, A as SignalingClient, H as SnapshotInterpolator, S as TurnPool, D as WS, k as generateRoomCode };

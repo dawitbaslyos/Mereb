@@ -160,75 +160,58 @@ function render() {
 
 ---
 
-## 🎮 Godot 4 Web Export Integration
+## 🎮 Godot 4 Addon (`addons/mereb/`)
 
-Because Mereb exposes `window.Mereb` in UMD format (`dist-sdk/mereb.umd.js`), you can drive multiplayer directly inside **Godot 4 HTML5 exports** using GDScript's `JavaScriptBridge`!
+Mereb includes a native Godot 4 addon located in `addons/mereb/`:
+1. Copy `addons/mereb` to your Godot project's `res://addons/` directory.
+2. Enable **Mereb Multiplayer** in **Project Settings -> Plugins**.
+3. Add a `MerebMultiplayer` node to your scene and connect GDScript signals (`match_started`, `state_received`, `input_received`, `quality_updated`).
+4. Ensure `mereb.umd.js` is included in your export HTML template.
 
-### 1. In your Godot HTML shell (`index.html`)
-Add the script tag before your game starts:
-```html
-<script src="mereb.umd.js"></script>
+See [addons/mereb/README.md](./addons/mereb/README.md) for full GDScript code samples.
+
+---
+
+## 🌐 Web Portal Adapters (Poki & CrazyGames)
+
+Hook official portal SDKs in 1 line:
+
+```javascript
+// Connect Poki SDK: handles shareableURL and pauses netcode on video ads
+net.usePortal('poki', window.PokiSDK);
+
+// Or connect CrazyGames SDK: handles invite links and avatar sync
+net.usePortal('crazygames', window.CrazyGames.SDK);
+
+// Listen to commercial break freeze events:
+net.portal.on('ad-start', () => {
+  // Automatically pauses simulation tick so player isn't killed during ads
+  gameEngine.pause();
+});
+
+net.portal.on('ad-end', () => {
+  gameEngine.resume();
+});
 ```
 
-### 2. In GDScript (`NetworkManager.gd`)
-```gdscript
-extends Node
+---
 
-var mereb_client = null
-var is_host: bool = false
+## 📶 Multi-TURN Pool & Real-Time Network Quality
 
-func _ready():
-    if not OS.has_feature("web"):
-        print("Mereb is running in Web exports")
-        return
+### 1. Resilient ICE Pool
+The SDK automatically pools redundant STUN servers (Google, Cloudflare, OpenRelay) and falls back to **OpenRelay TLS TURN over Port 443**, guaranteeing connections even on strict school or dorm Wi-Fi networks.
 
-    var window = JavaScriptBridge.get_interface("window")
-    var Mereb = window.Mereb
+### 2. Live Quality Monitor
+Inspect live ping, jitter, packet loss, and rating:
+```javascript
+// Real-time metric snapshot:
+console.log(net.stats);
+// Output: { ping: 28, jitter: 3, packetLoss: 0, rating: 'great' }
 
-    # Create MerebClient
-    var options = JavaScriptBridge.create_object("Object")
-    options.host = "localhost:1999" # Or your deployed PartyKit host
-    options.botTimeoutMs = 8000
-    options.autoJoinFromUrl = true
-
-    mereb_client = JavaScriptBridge.create_object("Mereb.MerebClient", options)
-
-    # Listen for match-start
-    var on_match_start = JavaScriptBridge.create_callback(_on_match_start)
-    mereb_client.on("match-start", on_match_start)
-
-    # Listen for state
-    var on_state = JavaScriptBridge.create_callback(_on_state_received)
-    mereb_client.on("state", on_state)
-
-func quick_play():
-    if mereb_client:
-        mereb_client.quickPlay()
-
-func create_room():
-    if mereb_client:
-        mereb_client.createRoom()
-
-func join_room(code: String):
-    if mereb_client:
-        mereb_client.joinRoom(code)
-
-func send_state(state_json: String):
-    if mereb_client:
-        mereb_client.sendState(state_json)
-
-func send_input(input_json: String):
-    if mereb_client:
-        mereb_client.sendInput(input_json)
-
-func _on_match_start(args):
-    var detail = args[0]
-    is_host = detail.isHost
-    print("Godot: Match started! IsHost: ", is_host)
-
-func _on_state_received(args):
-    var state = args[0]
-    # Apply state to your Godot nodes
+// Listen for connection quality shifts:
+net.on('quality', ({ ping, jitter, packetLoss, rating }) => {
+  hud.updatePingBadge(`${ping}ms`, rating);
+});
 ```
 
 ---
@@ -241,7 +224,7 @@ new MerebClient({
   host: 'localhost:1999',  // Signaling server URL
   botTimeoutMs: 8000,      // Quick play timeout before triggering local bot (default: 8000)
   autoJoinFromUrl: true,   // Auto join room from ?room=XXXX query parameter (default: true)
-  iceServers: [...]        // Custom STUN/TURN servers (defaults to Google + Cloudflare + OpenRelay)
+  iceServers: [...]        // Custom STUN/TURN servers (defaults to resilient Multi-TURN pool)
 })
 ```
 
@@ -252,19 +235,32 @@ new MerebClient({
 | `joinRoom(code)` | Joins an existing room with a 4-letter code. |
 | `quickPlay()` | Enters global matchmaking queue with automatic bot fallback. |
 | `sendState(state)` | Broadcasts authoritative state over unordered, unreliable channel (UDP-like). |
+| `sendBinary(buffer)` | Sends raw `ArrayBuffer` or `TypedArray` view with zero serialization overhead. |
 | `sendInput(input)` | Client sends user input to host over unordered channel. |
 | `sendEvent(name, data)` | Sends guaranteed, ordered event over reliable channel (scores, chat, game over). |
+| `usePortal(type, sdk)` | Hooks official portal SDK (`'poki'`, `'crazygames'`, or `'auto'`). |
 | `disconnect()` | Cleans up WebRTC and WebSocket connections. |
+
+### Properties
+| Property | Type | Description |
+| :--- | :--- | :--- |
+| `stats` | `Object` | `{ ping, jitter, packetLoss, rating }` |
+| `isHost` | `boolean` | True if this peer is the authoritative host. |
+| `isBot` | `boolean` | True if playing against local fallback bot. |
+| `latency` | `number` | Real-time round trip time in milliseconds. |
+| `roomCode` | `string` | 4-letter room code (e.g. `W7KP`). |
 
 ### Events (`net.on(event, handler)`)
 | Event | Payload | Triggered When |
 | :--- | :--- | :--- |
 | `match-start` | `{ role, localId, peerId, isBot, isHost }` | P2P connection opens or bot spawns. |
 | `state` | `(serverState)` | Client receives high-frequency game state. |
+| `binary` | `(arrayBuffer)` | Raw binary packet arrives over data channel. |
 | `input` | `(clientInput)` | Host receives high-frequency player inputs. |
 | `event` | `{ name, data }` | Either peer sends reliable event via `sendEvent()`. |
+| `quality` | `{ ping, jitter, packetLoss, rating }` | Live network health stats update. |
 | `peer-disconnect` | `{ peerId, reason }` | Opponent rage-quits or loses connection. |
-| `latency` | `{ latency }` | Ping round-trip measurement (updated every 2s). |
+| `latency` | `{ latency }` | Ping round-trip measurement. |
 | `status-change` | `{ status }` | Status changes (`idle`, `connecting`, `matching`, etc.). |
 
 ---

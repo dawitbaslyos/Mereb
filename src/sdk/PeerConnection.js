@@ -2,6 +2,7 @@
  * Mereb SDK - WebRTC PeerConnection with Dual DataChannels & Latency Measurement
  */
 import { DEFAULT_ICE_SERVERS, DC } from './constants.js';
+import { NetworkQuality } from './netcode/NetworkQuality.js';
 
 export class PeerConnection extends EventTarget {
   constructor(options = {}) {
@@ -14,7 +15,12 @@ export class PeerConnection extends EventTarget {
     
     this._connected = false;
     this.latency = 0;
+    this.quality = new NetworkQuality();
     this._pingInterval = null;
+
+    this.quality.addEventListener('update', (e) => {
+      this.dispatchEvent(new CustomEvent('quality', { detail: e.detail }));
+    });
 
     // ICE Candidate handler
     this.pc.onicecandidate = (e) => {
@@ -75,10 +81,11 @@ export class PeerConnection extends EventTarget {
         if (msg.type === DC.EVENT) {
           this.dispatchEvent(new CustomEvent('event', { detail: msg }));
         } else if (msg.type === DC.PING) {
-          // Respond immediately with pong
-          this.sendReliable({ type: DC.PONG, time: msg.time });
+          // Respond immediately with pong containing original seq
+          this.sendReliable({ type: DC.PONG, seq: msg.seq, time: msg.time });
         } else if (msg.type === DC.PONG) {
-          this.latency = Math.max(1, Math.round(Date.now() - msg.time));
+          this.quality.recordPong(msg.seq);
+          this.latency = this.quality.ping;
           this.dispatchEvent(new CustomEvent('latency', { detail: { latency: this.latency } }));
         }
       } catch (err) {
@@ -102,15 +109,17 @@ export class PeerConnection extends EventTarget {
     if (this._pingInterval) clearInterval(this._pingInterval);
     this._pingInterval = setInterval(() => {
       if (this.reliableChannel && this.reliableChannel.readyState === 'open') {
-        this.sendReliable({ type: DC.PING, time: Date.now() });
+        const pingPacket = this.quality.createPingPacket();
+        this.sendReliable({ type: DC.PING, seq: pingPacket.seq, time: pingPacket.time });
       }
-    }, 2000);
+    }, 1500);
   }
 
   _handleDisconnect() {
     if (this._connected) {
       this._connected = false;
       if (this._pingInterval) clearInterval(this._pingInterval);
+      this.quality.reset();
       this.dispatchEvent(new CustomEvent('close'));
     }
   }

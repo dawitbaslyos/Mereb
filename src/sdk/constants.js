@@ -2,11 +2,11 @@
  * Mereb SDK - Shared Constants and Protocol Specifications
  */
 
+import { DEFAULT_STUN_SERVERS, DEFAULT_TURN_SERVERS } from './netcode/TurnPool.js';
+
 export const DEFAULT_ICE_SERVERS = [
-  { urls: 'stun:stun.l.google.com:19302' },
-  { urls: 'stun:stun1.l.google.com:19302' },
-  { urls: 'stun:stun.cloudflare.com:3478' },
-  { urls: 'stun:openrelay.metered.ca:80' }
+  ...DEFAULT_STUN_SERVERS,
+  ...DEFAULT_TURN_SERVERS
 ];
 
 export const ROLE = {
