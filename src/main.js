@@ -113,7 +113,12 @@ class App {
       this.engine.applyRemoteInput(input);
     });
 
-    // Reliable events (e.g. match end)
+    // Real-time network quality badge
+    this.client.on('quality', (q) => {
+      this.hud.updateQuality(q);
+    });
+
+    // Reliable events (e.g. match end, surrender/forfeit)
     this.client.on('event', (msg) => {
       if (msg.name === 'match-end') {
         const { winnerId, scores } = msg.data;
@@ -122,6 +127,16 @@ class App {
         const rs = scores[this.client.peerId] || 0;
         this.engine.stopMatch();
         this.hud.showMatchEnd(isWinner, ls, rs);
+      } else if (msg.name === 'match-forfeit') {
+        if (this.botInterval) clearInterval(this.botInterval);
+        this.hud.showMessage('OPPONENT SURRENDERED — VICTORY! 🏆', 4000);
+        this.engine.stopMatch();
+        setTimeout(() => {
+          this.hud.hide();
+          this.hud.hideMatchEnd();
+          this.lobby.resetToMenu();
+          this.lobby.show();
+        }, 2500);
       }
     });
 
@@ -150,6 +165,21 @@ class App {
       this.lobby.show();
     };
 
+    const handleSurrender = () => {
+      if (this.botInterval) {
+        clearInterval(this.botInterval);
+        this.botInterval = null;
+      } else {
+        try {
+          this.client.sendEvent('match-forfeit', { forfeitedBy: this.client.localId });
+        } catch (e) {
+          console.warn('[Game] Could not send forfeit event:', e);
+        }
+      }
+      returnToLobby();
+    };
+
+    this.hud.onLeave(handleSurrender);
     this.hud.onRematch(returnToLobby);
     this.hud.onQuit(returnToLobby);
   }

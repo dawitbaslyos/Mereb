@@ -10,6 +10,13 @@ import {
 import { SnapshotInterpolator } from '../sdk/index.js';
 import { TankBinaryProtocol } from './TankBinary.js';
 
+function slerpAngle(current, target, rate) {
+  let diff = (target - current) % (Math.PI * 2);
+  if (diff < -Math.PI) diff += Math.PI * 2;
+  if (diff > Math.PI) diff -= Math.PI * 2;
+  return current + diff * Math.min(1, Math.max(0, rate));
+}
+
 export class GameEngine {
   constructor(container) {
     this.container = container;
@@ -174,6 +181,11 @@ export class GameEngine {
           this.tanks[this.remoteId].setBodyRotation(remoteSmooth.rotation);
           this.tanks[this.remoteId].setTurretRotation(remoteSmooth.turretRotation);
         }
+      } else {
+        if (this.inputManager && this.tanks[this.localId]) {
+          const input = this.inputManager.getInput();
+          this.tanks[this.localId].setTurretRotation(input.aimAngle || 0);
+        }
       }
       
       // Update client bullet visuals if not host (host does it in tick)
@@ -215,7 +227,8 @@ export class GameEngine {
         dz = (dz / len) * TANK_SPEED * dt;
         ps.x += dx;
         ps.z += dz;
-        ps.rotation = Math.atan2(dx, -dz);
+        const targetRot = Math.atan2(dx, -dz);
+        ps.rotation = slerpAngle(ps.rotation || 0, targetRot, TANK_ROTATION_SPEED * dt);
       }
 
       const margin = TANK_RADIUS;
@@ -424,12 +437,20 @@ export class GameEngine {
       dz = (dz / len) * TANK_SPEED * dt;
       ps.x += dx;
       ps.z += dz;
-      ps.rotation = Math.atan2(dx, -dz);
+      const targetRot = Math.atan2(dx, -dz);
+      ps.rotation = slerpAngle(ps.rotation || 0, targetRot, TANK_ROTATION_SPEED * dt);
     }
     const margin = TANK_RADIUS;
     ps.x = Math.max(-ARENA_WIDTH / 2 + margin, Math.min(ARENA_WIDTH / 2 - margin, ps.x));
     ps.z = Math.max(-ARENA_HEIGHT / 2 + margin, Math.min(ARENA_HEIGHT / 2 - margin, ps.z));
     ps.turretRotation = input.aimAngle || 0;
+
+    const localTank = this.tanks[this.localId];
+    if (localTank) {
+      localTank.setPosition(ps.x, ps.z);
+      localTank.setBodyRotation(ps.rotation);
+      localTank.setTurretRotation(ps.turretRotation);
+    }
   }
 
   endMatch(winnerId) {

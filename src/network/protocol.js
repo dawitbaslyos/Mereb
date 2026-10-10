@@ -1,16 +1,16 @@
 // Game constants
 export const ARENA_WIDTH = 20;
 export const ARENA_HEIGHT = 20;
-export const TANK_SPEED = 5;         // units/sec
-export const TANK_ROTATION_SPEED = 3; // rad/sec  
-export const BULLET_SPEED = 15;      // units/sec
+export const TANK_SPEED = 6.4;         // units/sec (snappy arcade movement)
+export const TANK_ROTATION_SPEED = 14; // rad/sec (smooth steering rate)
+export const BULLET_SPEED = 18;      // units/sec
 export const TANK_RADIUS = 0.5;
 export const BULLET_RADIUS = 0.15;
 export const MAX_HEALTH = 100;
 export const BULLET_DAMAGE = 25;
 export const SCORE_TO_WIN = 5;
 export const TICK_RATE = 50;          // ms between host ticks (20 Hz)
-export const SHOOT_COOLDOWN = 400;   // ms between shots
+export const SHOOT_COOLDOWN = 320;   // ms between shots (crisp rapid fire)
 export const RESPAWN_TIME = 1500;    // ms invulnerability after respawn
 
 // Spawn positions
