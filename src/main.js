@@ -1,6 +1,7 @@
 import { MerebClient, MerebLobby } from './sdk/index.js';
 import { GameEngine } from './game/engine.js';
 import { HudUI } from './ui/hud.js';
+import { LandingUI } from './ui/landing.js';
 import { MAX_HEALTH } from './network/protocol.js';
 
 const PARTY_HOST = window.location.hostname === 'localhost'
@@ -9,11 +10,89 @@ const PARTY_HOST = window.location.hostname === 'localhost'
 
 class App {
   constructor() {
+    this.landingContainer = document.getElementById('landing-container');
+    this.gameView = document.getElementById('game-view');
+    this.uiLayer = document.getElementById('ui-layer');
+
+    // Mount Landing UI
+    this.landing = new LandingUI(() => this.enterGameMode());
+    this.landingContainer.appendChild(this.landing.getElement());
+
+    // Game state references (lazy-initialized when playing)
+    this.engine = null;
+    this.hud = null;
+    this.client = null;
+    this.lobby = null;
+    this.botInterval = null;
+    this.gameInitialized = false;
+
+    // Check if initial URL demands game view (e.g. ?room=ABCD, ?play=1, #/play)
+    const params = new URLSearchParams(window.location.search);
+    const hasRoomParam = params.has('room');
+    const hasPlayParam = params.has('play');
+    const isPlayHash = window.location.hash === '#/play' || window.location.hash === '#play';
+
+    if (hasRoomParam || hasPlayParam || isPlayHash) {
+      this.enterGameMode();
+    } else {
+      this.exitGameMode();
+    }
+
+    // Handle hash changes
+    window.addEventListener('hashchange', () => {
+      if (window.location.hash === '#/play' || window.location.hash === '#play') {
+        this.enterGameMode();
+      } else if (window.location.hash === '#/' || window.location.hash === '') {
+        this.exitGameMode();
+      }
+    });
+  }
+
+  enterGameMode() {
+    this.landingContainer.style.display = 'none';
+    this.gameView.style.display = 'block';
+    document.body.classList.add('in-game-mode');
+
+    if (!window.location.hash.includes('play') && !window.location.search.includes('room')) {
+      window.history.pushState(null, '', '#/play');
+    }
+
+    if (!this.gameInitialized) {
+      this._initGame();
+      this.gameInitialized = true;
+    } else {
+      // Trigger canvas resize & reset lobby
+      this.engine?.onWindowResize?.();
+      this.hud?.hide();
+      this.hud?.hideMatchEnd();
+      this.lobby?.resetToMenu();
+      this.lobby?.show();
+    }
+  }
+
+  exitGameMode() {
+    if (this.gameInitialized) {
+      if (this.botInterval) clearInterval(this.botInterval);
+      this.client?.disconnect();
+      this.engine?.stopMatch();
+      this.hud?.hide();
+      this.hud?.hideMatchEnd();
+      this.lobby?.hide();
+    }
+
+    this.gameView.style.display = 'none';
+    this.landingContainer.style.display = 'flex';
+    document.body.classList.remove('in-game-mode');
+
+    if (window.location.hash.includes('play')) {
+      window.history.pushState(null, '', window.location.pathname);
+    }
+  }
+
+  _initGame() {
     this.engine = new GameEngine(document.getElementById('game-container'));
     this.hud = new HudUI();
-
-    const uiLayer = document.getElementById('ui-layer');
-    uiLayer.appendChild(this.hud.getElement());
+    this.uiLayer.appendChild(this.hud.getElement());
     this.hud.hide();
 
     // Initialize Mereb SDK Client
@@ -23,13 +102,13 @@ class App {
       autoJoinFromUrl: true
     });
 
-    // Drop-in Arcade Lobby
+    // Drop-in Arcade Lobby with onHome callback
     this.lobby = new MerebLobby(this.client, {
       title: '⚔️ MEREB ARENA',
-      container: uiLayer
+      container: this.uiLayer,
+      onHome: () => this.exitGameMode()
     });
 
-    this.botInterval = null;
     this._setupClientEvents();
     this._setupHudEvents();
   }

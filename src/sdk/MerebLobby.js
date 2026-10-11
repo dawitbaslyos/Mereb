@@ -98,6 +98,7 @@ export class MerebLobby {
         <button class="mereb-btn btn-create" id="mereb-btn-create">🎮 CREATE ROOM</button>
         <button class="mereb-btn btn-join" id="mereb-btn-join">🔗 JOIN ROOM</button>
         <button class="mereb-btn btn-quick" id="mereb-btn-quick">⚡ QUICK PLAY</button>
+        ${this.options.onHome ? '<button class="mereb-btn btn-back" id="mereb-btn-home" style="margin-top: 10px; background: #334155; font-size: 14px; padding: 12px 18px;">← LANDING PAGE</button>' : ''}
       </div>
 
       <div class="mereb-menu-stack" id="mereb-join-menu" style="display: none;">
@@ -128,6 +129,15 @@ export class MerebLobby {
   }
 
   _setupHandlers() {
+    if (this.options.onHome) {
+      const homeBtn = this.element.querySelector('#mereb-btn-home');
+      if (homeBtn) {
+        homeBtn.addEventListener('click', () => {
+          this.options.onHome();
+        });
+      }
+    }
+
     // Create Room
     this.element.querySelector('#mereb-btn-create').addEventListener('click', async () => {
       this.setStatus('Creating room...');
