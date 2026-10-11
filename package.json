@@ -1,28 +1,72 @@
 {
   "name": "mereb",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "description": "Zero-cost, serverless WebRTC P2P multiplayer netcode & matchmaking SDK for web & indie games (Three.js, Godot, React, Poki, CrazyGames).",
+  "type": "module",
+  "main": "dist-sdk/mereb.umd.js",
+  "module": "dist-sdk/mereb.es.js",
+  "types": "dist-sdk/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist-sdk/index.d.ts",
+      "import": "./dist-sdk/mereb.es.js",
+      "require": "./dist-sdk/mereb.umd.js"
+    }
+  },
+  "files": [
+    "dist-sdk",
+    "src/sdk",
+    "addons/mereb",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
     "dev": "concurrently \"npx vite\" \"node dev-server.js\"",
     "dev:server": "node dev-server.js",
     "dev:party": "npx partykit dev",
     "build": "vite build",
     "build:sdk": "vite build --mode lib",
+    "typecheck": "tsc --noEmit",
+    "prepack": "npm run build:sdk",
     "preview": "vite preview",
     "deploy:party": "npx partykit deploy"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/dawitbaslyos/Mereb.git"
+  },
+  "bugs": {
+    "url": "https://github.com/dawitbaslyos/Mereb/issues"
+  },
+  "homepage": "https://github.com/dawitbaslyos/Mereb#readme",
+  "keywords": [
+    "webrtc",
+    "multiplayer",
+    "netcode",
+    "p2p",
+    "peer-to-peer",
+    "game-dev",
+    "indie-games",
+    "web-games",
+    "threejs",
+    "godot",
+    "partykit",
+    "cloudflare-workers",
+    "poki",
+    "crazygames",
+    "snapshot-interpolation",
+    "binary-packing"
+  ],
+  "author": "Dawit Baslyos",
+  "license": "MIT",
   "dependencies": {
-    "partysocket": "^1.3.0",
-    "three": "^0.186.1"
+    "partysocket": "^1.3.0"
   },
   "devDependencies": {
     "concurrently": "^10.0.5",
     "partykit": "^0.0.115",
+    "three": "^0.186.1",
+    "typescript": "^5.9.3",
     "vite": "^8.3.2"
   }
 }
