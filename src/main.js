@@ -2,6 +2,8 @@ import { MerebClient, MerebLobby } from './sdk/index.js';
 import { GameEngine } from './game/engine.js';
 import { HudUI } from './ui/hud.js';
 import { LandingUI } from './ui/landing.js';
+import { DashboardUI } from './ui/dashboard.js';
+import { auth } from './ui/auth.js';
 import { MAX_HEALTH } from './network/protocol.js';
 
 const PARTY_HOST = window.location.hostname === 'localhost'
@@ -11,12 +13,23 @@ const PARTY_HOST = window.location.hostname === 'localhost'
 class App {
   constructor() {
     this.landingContainer = document.getElementById('landing-container');
+    this.dashboardContainer = document.getElementById('dashboard-container');
     this.gameView = document.getElementById('game-view');
     this.uiLayer = document.getElementById('ui-layer');
 
-    // Mount Landing UI
-    this.landing = new LandingUI(() => this.enterGameMode());
+    // Instantiate Landing UI
+    this.landing = new LandingUI({
+      onLaunchGame: () => this.navigate('game'),
+      onNavigateDashboard: () => this.navigate('dashboard')
+    });
     this.landingContainer.appendChild(this.landing.getElement());
+
+    // Instantiate Dashboard UI
+    this.dashboard = new DashboardUI({
+      onNavigateHome: () => this.navigate('landing'),
+      onLaunchGame: () => this.navigate('game')
+    });
+    this.dashboardContainer.appendChild(this.dashboard.getElement());
 
     // Game state references (lazy-initialized when playing)
     this.engine = null;
@@ -26,42 +39,62 @@ class App {
     this.botInterval = null;
     this.gameInitialized = false;
 
-    // Check if initial URL demands game view (e.g. ?room=ABCD, ?play=1, #/play)
-    const params = new URLSearchParams(window.location.search);
-    const hasRoomParam = params.has('room');
-    const hasPlayParam = params.has('play');
-    const isPlayHash = window.location.hash === '#/play' || window.location.hash === '#play';
+    // Route determination on load
+    this.handleRoute();
 
-    if (hasRoomParam || hasPlayParam || isPlayHash) {
-      this.enterGameMode();
-    } else {
-      this.exitGameMode();
-    }
-
-    // Handle hash changes
-    window.addEventListener('hashchange', () => {
-      if (window.location.hash === '#/play' || window.location.hash === '#play') {
-        this.enterGameMode();
-      } else if (window.location.hash === '#/' || window.location.hash === '') {
-        this.exitGameMode();
-      }
-    });
+    // Listen to hash routing
+    window.addEventListener('hashchange', () => this.handleRoute());
   }
 
-  enterGameMode() {
+  handleRoute() {
+    const hash = window.location.hash;
+    const params = new URLSearchParams(window.location.search);
+
+    if (params.has('room') || params.has('play') || hash === '#/play' || hash === '#play') {
+      this.showGameView();
+    } else if (hash === '#/dashboard' || hash === '#dashboard') {
+      this.showDashboardView();
+    } else {
+      this.showLandingView();
+    }
+  }
+
+  navigate(route) {
+    if (route === 'game') {
+      window.location.hash = '#/play';
+    } else if (route === 'dashboard') {
+      window.location.hash = '#/dashboard';
+    } else {
+      window.location.hash = '#/';
+    }
+  }
+
+  showLandingView() {
+    this._cleanupGame();
+    this.gameView.style.display = 'none';
+    this.dashboardContainer.style.display = 'none';
+    this.landingContainer.style.display = 'flex';
+    document.body.classList.remove('in-game-mode');
+  }
+
+  showDashboardView() {
+    this._cleanupGame();
+    this.gameView.style.display = 'none';
     this.landingContainer.style.display = 'none';
+    this.dashboardContainer.style.display = 'block';
+    document.body.classList.remove('in-game-mode');
+  }
+
+  showGameView() {
+    this.landingContainer.style.display = 'none';
+    this.dashboardContainer.style.display = 'none';
     this.gameView.style.display = 'block';
     document.body.classList.add('in-game-mode');
-
-    if (!window.location.hash.includes('play') && !window.location.search.includes('room')) {
-      window.history.pushState(null, '', '#/play');
-    }
 
     if (!this.gameInitialized) {
       this._initGame();
       this.gameInitialized = true;
     } else {
-      // Trigger canvas resize & reset lobby
       this.engine?.onWindowResize?.();
       this.hud?.hide();
       this.hud?.hideMatchEnd();
@@ -70,7 +103,7 @@ class App {
     }
   }
 
-  exitGameMode() {
+  _cleanupGame() {
     if (this.gameInitialized) {
       if (this.botInterval) clearInterval(this.botInterval);
       this.client?.disconnect();
@@ -78,14 +111,6 @@ class App {
       this.hud?.hide();
       this.hud?.hideMatchEnd();
       this.lobby?.hide();
-    }
-
-    this.gameView.style.display = 'none';
-    this.landingContainer.style.display = 'flex';
-    document.body.classList.remove('in-game-mode');
-
-    if (window.location.hash.includes('play')) {
-      window.history.pushState(null, '', window.location.pathname);
     }
   }
 
@@ -102,11 +127,11 @@ class App {
       autoJoinFromUrl: true
     });
 
-    // Drop-in Arcade Lobby with onHome callback
+    // Drop-in Arcade Lobby
     this.lobby = new MerebLobby(this.client, {
       title: '⚔️ MEREB ARENA',
       container: this.uiLayer,
-      onHome: () => this.exitGameMode()
+      onHome: () => this.navigate('landing')
     });
 
     this._setupClientEvents();
@@ -114,7 +139,6 @@ class App {
   }
 
   _setupClientEvents() {
-    // When 2 players connect (or bot fallback triggers)
     this.client.on('match-start', ({ role, localId, peerId, isBot, isHost }) => {
       console.log(`[Game] Match started as ${role} vs ${peerId} (bot: ${isBot})`);
       this.hud.show();
@@ -124,7 +148,6 @@ class App {
       this.engine.startMatch(localId, peerId, isHost);
 
       if (isHost) {
-        // Host broadcasts ultra-compact binary packet (~40 bytes)
         this.engine.onBinaryState = (binaryBuf) => {
           if (!isBot) {
             this.client.sendBinary(binaryBuf);
@@ -140,18 +163,15 @@ class App {
           }
         };
 
-        // If playing against bot, run local bot AI
         if (isBot) {
           this._startBotAI(localId, peerId);
         }
       } else {
-        // Client sends inputs to host
         this.engine.onInput = (input) => {
           this.client.sendInput(input);
         };
       }
 
-      // Match win/loss callback
       this.engine.onMatchEnd = (winnerId, scores) => {
         if (this.botInterval) clearInterval(this.botInterval);
         const isWinner = winnerId === localId;
@@ -165,7 +185,6 @@ class App {
       };
     });
 
-    // Client receives compact binary packet from host (decoded & interpolated)
     this.client.on('binary', (arrayBuffer) => {
       this.engine.applyBinaryState(arrayBuffer);
       const local = this.engine.playerStates[this.client.localId];
@@ -176,7 +195,6 @@ class App {
       }
     });
 
-    // Fallback: Client receives JSON game state from host
     this.client.on('state', (state) => {
       this.engine.applyGameState(state);
       const local = state.players[this.client.localId];
@@ -187,17 +205,14 @@ class App {
       }
     });
 
-    // Host receives input from client
     this.client.on('input', (input) => {
       this.engine.applyRemoteInput(input);
     });
 
-    // Real-time network quality badge
     this.client.on('quality', (q) => {
       this.hud.updateQuality(q);
     });
 
-    // Reliable events (e.g. match end, surrender/forfeit)
     this.client.on('event', (msg) => {
       if (msg.name === 'match-end') {
         const { winnerId, scores } = msg.data;
@@ -219,7 +234,6 @@ class App {
       }
     });
 
-    // Opponent disconnect / ragequit handling
     this.client.on('peer-disconnect', () => {
       if (this.botInterval) clearInterval(this.botInterval);
       this.hud.showMessage('OPPONENT FORFEITED — YOU WIN! 🏆', 4000);

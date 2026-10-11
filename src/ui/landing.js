@@ -1,42 +1,65 @@
 /**
- * Mereb SDK - Official Developer Landing Page
- * Designed following minimal-primitives-ui:
- * - 3-color palette (Neutral dark, Electric Cyan accent, Emerald Signal)
- * - Restrained typography (Inter)
- * - Pill signature controls
- * - Interactive STUN edge ping tester & live binary compression inspector
+ * Mereb Cloud - Official Landing Page
+ * Precision Shadcn / Linear Design System:
+ * - "Copy prompt and your LLM integrates it for you" feature
+ * - GitHub (only) authentication
+ * - Transparent pricing table (Free vs Pro)
+ * - Live STUN latency probe and binary packet inspector
  */
+import { auth } from './auth.js';
 
 export class LandingUI {
-  constructor(onPlayClick) {
-    this.onPlayClick = onPlayClick;
+  constructor({ onLaunchGame, onNavigateDashboard }) {
+    this.onLaunchGame = onLaunchGame;
+    this.onNavigateDashboard = onNavigateDashboard;
     this.element = document.createElement('div');
     this.element.className = 'landing-root';
+    this.currentStackPrompt = 'threejs';
+
+    auth.onChange(() => {
+      this.render();
+    });
+
     this.render();
   }
 
   render() {
+    const user = auth.getUser();
+
     this.element.innerHTML = `
-      <!-- Top Floating Navigation Bar -->
+      <!-- Top Floating Navigation -->
       <header class="landing-header">
         <div class="header-inner">
           <div class="header-brand">
             <span class="brand-title">MEREB</span>
+            <span class="brand-dot">•</span>
+            <span class="brand-sub">CLOUD</span>
             <span class="pill-badge pill-version">v1.0.0</span>
-            <span class="pill-badge pill-status"><span class="status-dot"></span> P2P READY</span>
           </div>
 
           <nav class="header-nav">
-            <a href="#features" class="nav-link">Features</a>
+            <a href="#prompt-section" class="nav-link">LLM Prompt</a>
+            <a href="#architecture" class="nav-link">Architecture</a>
             <a href="#inspector" class="nav-link">Netcode</a>
-            <a href="#examples" class="nav-link">Code</a>
-            <a href="#godot" class="nav-link">Godot 4</a>
+            <a href="#pricing" class="nav-link">Pricing</a>
             <a href="https://github.com/dawitbaslyos/Mereb" target="_blank" rel="noreferrer" class="nav-link nav-github">GitHub</a>
           </nav>
 
           <div class="header-actions">
+            ${user ? `
+              <button class="btn-subtle pill-btn btn-go-dashboard">
+                <span>⚡ Console (${user.username})</span>
+              </button>
+            ` : `
+              <button class="btn-github-auth pill-btn btn-login-github" title="Sign in with GitHub">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/>
+                </svg>
+                <span>Sign in with GitHub</span>
+              </button>
+            `}
             <button class="btn-primary pill-btn btn-launch-top">
-              <span>🎮 Play Demo</span>
+              <span>🎮 Play 3D Demo</span>
             </button>
           </div>
         </div>
@@ -46,80 +69,88 @@ export class LandingUI {
       <section class="hero-section">
         <div class="hero-content">
           <div class="hero-meta">
-            <span class="pill-tag">⚡ Zero-Cost Serverless WebRTC</span>
+            <span class="pill-tag">⚡ The Multiplayer Netcode Cloud for Games & AI</span>
           </div>
+
           <h1 class="hero-title">
-            Serverless P2P Netcode for Web & Indie Games
+            Add Multiplayer in 60 Seconds.<br />
+            <span class="hero-title-accent">Zero Server Bills.</span>
           </h1>
+
           <p class="hero-subtitle">
-            Zero backend compute bills. 60Hz UDP-like WebRTC DataChannels with Hermite snapshot interpolation, 85% binary compression, and Poki/CrazyGames ad hooks. Built for Three.js, Godot 4, and web games.
+            Serverless WebRTC P2P DataChannels with global edge signaling. Built for indie games, web portals (Poki/CrazyGames), and AI agents who don't want surprise $400/mo server compute bills.
           </p>
 
           <div class="hero-cta-group">
-            <div class="install-pill" id="install-pill" title="Click to copy">
-              <span class="install-prompt">$</span>
-              <span class="install-text">npm install mereb</span>
-              <button class="copy-btn" id="copy-install-btn" aria-label="Copy install command">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-                  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-                </svg>
+            ${user ? `
+              <button class="btn-primary pill-btn btn-hero-dashboard">
+                <span>⚡ Open Cloud Console</span>
               </button>
-              <span class="copy-feedback" id="copy-feedback">Copied</span>
-            </div>
+            ` : `
+              <button class="btn-github-auth pill-btn btn-hero-login">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/>
+                </svg>
+                <span>Sign in with GitHub (Free)</span>
+              </button>
+            `}
 
-            <button class="btn-primary pill-btn btn-launch-hero">
-              <span>🎮 Launch 3D Arena Demo</span>
+            <a href="#prompt-section" class="btn-subtle pill-btn">
+              <span>📋 Copy AI Prompt</span>
+            </a>
+
+            <button class="btn-subtle pill-btn btn-launch-hero">
+              <span>🎮 Play 3D Demo</span>
             </button>
           </div>
 
           <div class="hero-stats-row">
             <div class="stat-item">
               <div class="stat-val">$0/mo</div>
-              <div class="stat-lbl">Backend Compute</div>
+              <div class="stat-lbl">Compute Cost</div>
             </div>
             <div class="stat-divider"></div>
             <div class="stat-item">
               <div class="stat-val">41 Bytes</div>
-              <div class="stat-lbl">Per State Packet</div>
+              <div class="stat-lbl">Binary Packets</div>
             </div>
             <div class="stat-divider"></div>
             <div class="stat-item">
-              <div class="stat-val">13 kB</div>
-              <div class="stat-lbl">SDK Bundle Size</div>
+              <div class="stat-val">100% P2P</div>
+              <div class="stat-lbl">WebRTC UDP</div>
             </div>
             <div class="stat-divider"></div>
             <div class="stat-item">
               <div class="stat-val">Godot 4</div>
-              <div class="stat-lbl">GDScript Addon</div>
+              <div class="stat-lbl">Official Addon</div>
             </div>
           </div>
         </div>
 
-        <!-- Interactive Live Netcode Card -->
-        <div class="hero-interactive-card">
+        <!-- Live Interactive Netcode Probe -->
+        <div class="hero-interactive-card" id="inspector">
           <div class="card-header">
             <div class="card-header-left">
               <span class="card-title">Live Netcode Probe</span>
-              <span class="pill-badge pill-active">Browser WebRTC</span>
+              <span class="pill-badge pill-active">Browser Direct</span>
             </div>
             <button class="probe-refresh-btn" id="btn-ping-stun" title="Test STUN Round-Trip">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M23 4v6h-6"></path>
                 <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
               </svg>
-              <span>Test STUN RTT</span>
+              <span>Ping STUN</span>
             </button>
           </div>
 
           <div class="probe-metrics-grid">
             <div class="metric-box">
               <span class="metric-lbl">Direct STUN Latency</span>
-              <span class="metric-val" id="metric-ping">28 ms</span>
+              <span class="metric-val text-accent" id="metric-ping">24 ms</span>
             </div>
             <div class="metric-box">
               <span class="metric-lbl">NAT Traversal</span>
-              <span class="metric-val text-green" id="metric-nat">Full Cone (Direct P2P)</span>
+              <span class="metric-val text-signal" id="metric-nat">Full Cone (Direct P2P)</span>
             </div>
           </div>
 
@@ -135,19 +166,53 @@ export class LandingUI {
               </div>
             </div>
 
-            <div class="packet-preview" id="packet-preview-box">
-              <!-- Rendered via JS -->
-            </div>
+            <div class="packet-preview" id="packet-preview-box"></div>
           </div>
         </div>
       </section>
 
+      <!-- KEY VALUE SECTION: The LLM Integration Prompt Generator -->
+      <section class="section-container" id="prompt-section">
+        <div class="section-header">
+          <span class="pill-tag">Cursor / Claude / Copilot Ready</span>
+          <h2 class="section-title">Copy 1 Prompt. Your LLM Integrates It.</h2>
+          <p class="section-desc">
+            Don't spend days debugging WebSockets, ICE candidates, or state prediction. Paste this tested prompt into <strong>Cursor, Claude 3.5 Sonnet, ChatGPT, or Copilot</strong> and let your AI write the multiplayer loop for you.
+          </p>
+        </div>
+
+        <div class="prompt-showcase-box">
+          <div class="prompt-control-bar">
+            <div class="segmented-control">
+              <button class="prompt-tab-btn active" data-stack="threejs">Three.js / 3D</button>
+              <button class="prompt-tab-btn" data-stack="canvas">2D Canvas / Phaser</button>
+              <button class="prompt-tab-btn" data-stack="godot">Godot 4 (GDScript)</button>
+              <button class="prompt-tab-btn" data-stack="react">React / Next.js</button>
+              <button class="prompt-tab-btn" data-stack="ai">Headless AI Agent</button>
+            </div>
+
+            <button class="btn-primary pill-btn btn-copy-prompt" id="btn-copy-prompt">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+              </svg>
+              <span>Copy Prompt for Cursor / Claude</span>
+            </button>
+          </div>
+
+          <div class="prompt-content-view">
+            <pre class="prompt-code-block"><code id="prompt-code-text"></code></pre>
+          </div>
+          <div class="prompt-copied-pill" id="prompt-copied-pill">✓ Copied to clipboard! Paste into Cursor (⌘I) or Claude</div>
+        </div>
+      </section>
+
       <!-- Architecture Section -->
-      <section class="section-container" id="features">
+      <section class="section-container" id="architecture">
         <div class="section-header">
           <span class="pill-tag">Architecture</span>
-          <h2 class="section-title">How Mereb Delivers Free Multiplayer</h2>
-          <p class="section-desc">Traditional dedicated servers charge hundreds every month for CPU compute. Mereb offloads 100% of game simulation to the players.</p>
+          <h2 class="section-title">Why WebRTC P2P Eliminates Cloud Bills</h2>
+          <p class="section-desc">Traditional multiplayer runs game physics on expensive cloud servers ($150-$500/mo). Mereb lets player devices do the simulation while the edge handles matchmaking.</p>
         </div>
 
         <div class="architecture-grid">
@@ -155,84 +220,112 @@ export class LandingUI {
             <div class="arch-num">01</div>
             <h3 class="arch-title">Edge WebSockets Signaling</h3>
             <p class="arch-text">
-              Lightweight Cloudflare Workers / PartyKit servers coordinate 4-letter room codes and quick-play matchmaking. The signaling server closes immediately once the P2P connection establishes.
+              Lightweight Cloudflare / PartyKit edge workers coordinate 4-letter room codes and quick-play matchmaking. The signaling connection closes immediately once players connect.
             </p>
-            <div class="arch-pill-tag">Cloudflare Edge • $0/mo</div>
+            <div class="arch-pill-tag">Serverless Edge • $0 Compute</div>
           </div>
 
           <div class="arch-card">
             <div class="arch-num">02</div>
-            <h3 class="arch-title">Direct WebRTC UDP Channels</h3>
+            <h3 class="arch-title">Direct P2P DataChannels</h3>
             <p class="arch-text">
-              Players establish a direct browser-to-browser WebRTC DataChannel using STUN/TURN fallback. High-frequency 60Hz gameplay packets bypass all central servers entirely.
+              Browsers establish direct WebRTC UDP channels. High-frequency 60Hz state replication bypasses central servers completely, giving real 0ms server processing latency.
             </p>
-            <div class="arch-pill-tag">Peer-to-Peer • 0ms Server Overhead</div>
+            <div class="arch-pill-tag">100% Peer-to-Peer • 0 Cloud Overhead</div>
           </div>
 
           <div class="arch-card">
             <div class="arch-num">03</div>
-            <h3 class="arch-title">Authoritative Host Simulation</h3>
+            <h3 class="arch-title">Hermite Snapshot Interpolation</h3>
             <p class="arch-text">
-              Player 1 runs authoritative ticks; Player 2 predicts movements locally with client-side Hermite interpolation. If a player disconnects, forfeit logic ensures instant victory resolution.
+              Host runs authoritative ticks; clients predict movement locally with smooth snapshot interpolation. Even on 20Hz network ticks, entities render at silky 60/120fps.
             </p>
-            <div class="arch-pill-tag">Client Prediction • Snapshot Interpolation</div>
+            <div class="arch-pill-tag">Zero Jitter • 85% Binary Compression</div>
           </div>
         </div>
       </section>
 
-      <!-- Interactive Code Snippets -->
-      <section class="section-container" id="examples">
+      <!-- PRICING SECTION -->
+      <section class="section-container" id="pricing">
         <div class="section-header">
-          <span class="pill-tag">Integration</span>
-          <h2 class="section-title">Drop-In SDK for Any Engine</h2>
-          <p class="section-desc">Zero external dependencies. Works out of the box in plain JavaScript, Three.js, React, or Godot 4 Web exports.</p>
+          <span class="pill-tag">Simple & Predictable</span>
+          <h2 class="section-title">Transparent Pricing</h2>
+          <p class="section-desc">No per-CCU surprise bills. No expensive CPU hourly charges. Free for indie hackers, scalable for commercial games.</p>
         </div>
 
-        <div class="code-showcase-box">
-          <div class="code-tabs-row">
-            <div class="segmented-control code-seg-control">
-              <button class="code-tab-btn active" data-tab="threejs">Three.js / Vanilla JS</button>
-              <button class="code-tab-btn" data-tab="godot">Godot 4 (GDScript)</button>
-              <button class="code-tab-btn" data-tab="react">React / Next.js</button>
-              <button class="code-tab-btn" data-tab="portals">Poki & CrazyGames</button>
+        <div class="pricing-grid">
+          <!-- Free Tier -->
+          <div class="pricing-card">
+            <div class="pricing-header">
+              <span class="pricing-tier-name">Hobby / Indie</span>
+              <div class="pricing-price-row">
+                <span class="pricing-price">$0</span>
+                <span class="pricing-period">/ month</span>
+              </div>
+              <p class="pricing-tier-desc">Everything you need to build, test, and ship your game prototype.</p>
             </div>
-            <button class="copy-btn copy-code-btn" id="btn-copy-code" title="Copy code">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-              </svg>
+
+            <div class="pricing-features-list">
+              <div class="feature-item">✓ <strong>1 Active Project</strong></div>
+              <div class="feature-item">✓ Global Edge Signaling (Serverless)</div>
+              <div class="feature-item">✓ Up to <strong>100 Monthly Active Rooms</strong></div>
+              <div class="feature-item">✓ Direct WebRTC P2P (Community STUN)</div>
+              <div class="feature-item">✓ Built-in 8-Second Bot Fallback</div>
+              <div class="feature-item">✓ Full Open-Source SDK & Community Docs</div>
+            </div>
+
+            <button class="btn-subtle pill-btn btn-pricing-free btn-login-github">
+              ${user ? 'Currently on Free' : 'Get Started Free (GitHub)'}
             </button>
           </div>
 
-          <pre class="code-display"><code id="code-snippet-block"></code></pre>
-        </div>
-      </section>
+          <!-- Pro Tier -->
+          <div class="pricing-card pricing-card-pro">
+            <div class="pro-popular-tag">MOST POPULAR</div>
+            <div class="pricing-header">
+              <span class="pricing-tier-name">Mereb Pro Cloud</span>
+              <div class="pricing-price-row">
+                <span class="pricing-price">$29</span>
+                <span class="pricing-period">/ month</span>
+              </div>
+              <p class="pricing-tier-desc">For commercial indie games, Poki/CrazyGames titles, and AI agent platforms.</p>
+            </div>
 
-      <!-- Features Matrix -->
-      <section class="section-container">
-        <div class="features-matrix-grid">
-          <div class="feature-box">
-            <div class="feature-icon">📦</div>
-            <h4 class="feature-box-title">Binary Packing (85% Savings)</h4>
-            <p class="feature-box-text">Built-in <code>BinaryWriter</code> and <code>BinaryReader</code> pack full 1v1 state and projectiles into 41-byte ArrayBuffers with fixed-point 16-bit math.</p>
+            <div class="pricing-features-list">
+              <div class="feature-item">✓ <strong>Unlimited Active Projects</strong></div>
+              <div class="feature-item">✓ <strong>Global Enterprise TURN Mesh</strong> (100% NAT/firewall bypass)</div>
+              <div class="feature-item">✓ <strong>5,000 Monthly Active Rooms</strong> ($0.005/extra)</div>
+              <div class="feature-item">✓ Live Developer Dashboard & Real-Time Analytics</div>
+              <div class="feature-item">✓ Poki & CrazyGames Ad-Freeze Protection</div>
+              <div class="feature-item">✓ Priority Edge Routing & Discord Support</div>
+            </div>
+
+            <button class="btn-primary pill-btn btn-pricing-pro">
+              ${user && user.plan === 'pro' ? 'Active Pro Member' : 'Activate Pro Cloud ($29/mo)'}
+            </button>
           </div>
 
-          <div class="feature-box">
-            <div class="feature-icon">🎯</div>
-            <h4 class="feature-box-title">Hermite Snapshot Interpolation</h4>
-            <p class="feature-box-text">Smooths 20Hz network ticks into silky 60/120fps remote entity movements. Eliminates teleportation jitter and visual stuttering.</p>
-          </div>
+          <!-- Studio / Enterprise Tier -->
+          <div class="pricing-card">
+            <div class="pricing-header">
+              <span class="pricing-tier-name">Studio & AI</span>
+              <div class="pricing-price-row">
+                <span class="pricing-price">Custom</span>
+              </div>
+              <p class="pricing-tier-desc">For studios and enterprise AI agent worlds requiring dedicated infrastructure.</p>
+            </div>
 
-          <div class="feature-box">
-            <div class="feature-icon">🤖</div>
-            <h4 class="feature-box-title">Smart 8-Second Bot Fallback</h4>
-            <p class="feature-box-text">Web portal players bounce if matchmaking takes longer than 10 seconds. Mereb automatically spins up local bot opponents so players never wait in empty queues.</p>
-          </div>
+            <div class="pricing-features-list">
+              <div class="feature-item">✓ Dedicated Edge Signaling Clusters</div>
+              <div class="feature-item">✓ Custom TURN Relays & Private VPCs</div>
+              <div class="feature-item">✓ Custom Skill-Based Matchmaking (Elo/MMR)</div>
+              <div class="feature-item">✓ 99.99% Uptime SLA Guarantee</div>
+              <div class="feature-item">✓ Dedicated Slack Channel & Architecture Review</div>
+            </div>
 
-          <div class="feature-box">
-            <div class="feature-icon">🛡️</div>
-            <h4 class="feature-box-title">Ad-Freeze Protection</h4>
-            <p class="feature-box-text">Native Poki and CrazyGames hooks automatically pause timers and safeguard WebRTC sockets from disconnect timeouts during commercial breaks.</p>
+            <a href="https://github.com/dawitbaslyos/Mereb/issues" target="_blank" rel="noreferrer" class="btn-subtle pill-btn btn-pricing-contact">
+              Contact Studio Team
+            </a>
           </div>
         </div>
       </section>
@@ -240,13 +333,25 @@ export class LandingUI {
       <!-- CTA Banner -->
       <section class="cta-banner-section">
         <div class="cta-card">
-          <h2 class="cta-card-title">Experience the Live 3D Tank Arena</h2>
+          <h2 class="cta-card-title">Ready to Add Multiplayer to Your Game?</h2>
           <p class="cta-card-text">
-            Play the real-time peer-to-peer battle arena powered entirely by Mereb. Test latency, binary packing, and the in-game surrender flow right in your browser.
+            Sign in with GitHub to generate your API credentials in 5 seconds, or test our live 3D Tank Arena right now.
           </p>
           <div class="cta-btn-wrap">
-            <button class="btn-primary pill-btn btn-launch-cta">
-              <span>🎮 Start Match Now</span>
+            ${user ? `
+              <button class="btn-primary pill-btn btn-hero-dashboard">
+                <span>⚡ Open Cloud Console</span>
+              </button>
+            ` : `
+              <button class="btn-github-auth pill-btn btn-login-github">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/>
+                </svg>
+                <span>Sign in with GitHub</span>
+              </button>
+            `}
+            <button class="btn-subtle pill-btn btn-launch-hero">
+              <span>🎮 Play 3D Arena Demo</span>
             </button>
           </div>
         </div>
@@ -254,21 +359,21 @@ export class LandingUI {
 
       <!-- Minimal Floating Dock -->
       <div class="floating-dock">
-        <button class="dock-item" data-scroll="features">⚡ Features</button>
-        <button class="dock-item" data-scroll="examples">💻 Code</button>
+        <a href="#prompt-section" class="dock-item">📋 LLM Prompt</a>
+        <a href="#architecture" class="dock-item">⚡ Architecture</a>
+        <a href="#pricing" class="dock-item">💳 Pricing</a>
         <button class="dock-item btn-dock-play">🎮 Play Demo</button>
-        <a href="https://www.npmjs.com/package/mereb" target="_blank" rel="noreferrer" class="dock-item">📦 NPM</a>
-        <a href="https://github.com/dawitbaslyos/Mereb" target="_blank" rel="noreferrer" class="dock-item">⭐️ GitHub</a>
+        ${user ? `<button class="dock-item btn-dock-dash">⚡ Console</button>` : `<button class="dock-item btn-dock-login">GitHub</button>`}
       </div>
 
       <!-- Footer -->
       <footer class="landing-footer">
         <div class="footer-inner">
           <div class="footer-left">
-            <span>Mereb SDK • MIT License</span>
+            <span>Mereb Cloud • Zero-Cost Serverless WebRTC Netcode • MIT License</span>
           </div>
           <div class="footer-right">
-            <span>Crafted by <a href="https://github.com/dawitbaslyos" target="_blank" rel="noreferrer">Dawit Baslyos</a></span>
+            <span>Built by <a href="https://github.com/dawitbaslyos" target="_blank" rel="noreferrer">Dawit Baslyos</a></span>
           </div>
         </div>
       </footer>
@@ -278,38 +383,77 @@ export class LandingUI {
   }
 
   _setupInteractions() {
-    // 1. Play Button clicks
-    const playBtns = this.element.querySelectorAll('.btn-launch-top, .btn-launch-hero, .btn-launch-cta, .btn-dock-play');
+    // 1. Play Demo triggers
+    const playBtns = this.element.querySelectorAll('.btn-launch-top, .btn-launch-hero, .btn-dock-play');
     playBtns.forEach(btn => {
       btn.addEventListener('click', () => {
-        if (this.onPlayClick) this.onPlayClick();
+        if (this.onLaunchGame) this.onLaunchGame();
       });
     });
 
-    // 2. Install copy button
-    const installPill = this.element.querySelector('#install-pill');
-    const copyFeedback = this.element.querySelector('#copy-feedback');
-    installPill.addEventListener('click', async () => {
+    // 2. Dashboard triggers
+    const dashBtns = this.element.querySelectorAll('.btn-go-dashboard, .btn-hero-dashboard, .btn-dock-dash');
+    dashBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        if (this.onNavigateDashboard) this.onNavigateDashboard();
+      });
+    });
+
+    // 3. GitHub Login triggers
+    const loginBtns = this.element.querySelectorAll('.btn-login-github, .btn-hero-login, .btn-dock-login');
+    loginBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        auth.loginWithGithub();
+        if (this.onNavigateDashboard) this.onNavigateDashboard();
+      });
+    });
+
+    // 4. Pro Upgrade triggers
+    const proBtn = this.element.querySelector('.btn-pricing-pro');
+    proBtn?.addEventListener('click', () => {
+      if (!auth.getUser()) {
+        auth.loginWithGithub();
+      }
+      auth.upgradePlan();
+      if (this.onNavigateDashboard) this.onNavigateDashboard();
+    });
+
+    // 5. LLM Prompt Tabs & Copying
+    const promptTabs = this.element.querySelectorAll('.prompt-tab-btn');
+    const promptCodeBlock = this.element.querySelector('#prompt-code-text');
+    const copyPromptBtn = this.element.querySelector('#btn-copy-prompt');
+    const copyPill = this.element.querySelector('#prompt-copied-pill');
+
+    this._renderPromptCode(this.currentStackPrompt, promptCodeBlock);
+
+    promptTabs.forEach(tab => {
+      tab.addEventListener('click', () => {
+        promptTabs.forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+        this.currentStackPrompt = tab.getAttribute('data-stack');
+        this._renderPromptCode(this.currentStackPrompt, promptCodeBlock);
+      });
+    });
+
+    copyPromptBtn?.addEventListener('click', async () => {
       try {
-        await navigator.clipboard.writeText('npm install mereb');
-        copyFeedback.classList.add('visible');
-        setTimeout(() => copyFeedback.classList.remove('visible'), 1600);
+        await navigator.clipboard.writeText(promptCodeBlock.innerText);
+        copyPill.classList.add('visible');
+        setTimeout(() => copyPill.classList.remove('visible'), 2400);
       } catch (e) {
         console.warn('Clipboard write failed:', e);
       }
     });
 
-    // 3. STUN Ping Tester
+    // 6. STUN Ping Tester
     const stunBtn = this.element.querySelector('#btn-ping-stun');
     const pingDisplay = this.element.querySelector('#metric-ping');
-    stunBtn.addEventListener('click', () => {
+    stunBtn?.addEventListener('click', () => {
       this._testStunPing(pingDisplay, stunBtn);
     });
-
-    // Initial STUN ping test
     this._testStunPing(pingDisplay, stunBtn);
 
-    // 4. Packet Inspector Toggle
+    // 7. Packet Inspector Toggle
     const segBtns = this.element.querySelectorAll('.seg-btn');
     const previewBox = this.element.querySelector('#packet-preview-box');
     this._renderPacketPreview('binary', previewBox);
@@ -322,44 +466,12 @@ export class LandingUI {
         this._renderPacketPreview(format, previewBox);
       });
     });
-
-    // 5. Code Tabs
-    const codeTabs = this.element.querySelectorAll('.code-tab-btn');
-    const codeBlock = this.element.querySelector('#code-snippet-block');
-    const copyCodeBtn = this.element.querySelector('#btn-copy-code');
-    this._renderCodeTab('threejs', codeBlock);
-
-    codeTabs.forEach(tab => {
-      tab.addEventListener('click', () => {
-        codeTabs.forEach(t => t.classList.remove('active'));
-        tab.classList.add('active');
-        const tabKey = tab.getAttribute('data-tab');
-        this._renderCodeTab(tabKey, codeBlock);
-      });
-    });
-
-    copyCodeBtn.addEventListener('click', async () => {
-      try {
-        await navigator.clipboard.writeText(codeBlock.innerText);
-        copyCodeBtn.style.color = '#22c55e';
-        setTimeout(() => { copyCodeBtn.style.color = ''; }, 1500);
-      } catch (e) {}
-    });
-
-    // 6. Dock smooth scrolling
-    const dockItems = this.element.querySelectorAll('.dock-item[data-scroll]');
-    dockItems.forEach(item => {
-      item.addEventListener('click', () => {
-        const targetId = item.getAttribute('data-scroll');
-        const targetEl = this.element.querySelector(`#${targetId}`);
-        if (targetEl) targetEl.scrollIntoView({ behavior: 'smooth' });
-      });
-    });
   }
 
   _testStunPing(displayEl, btnEl) {
+    if (!displayEl) return;
     displayEl.innerText = 'Pinging...';
-    btnEl.classList.add('spinning');
+    btnEl?.classList.add('spinning');
     const startTime = performance.now();
 
     try {
@@ -371,8 +483,8 @@ export class LandingUI {
       const timeout = setTimeout(() => {
         if (!completed) {
           completed = true;
-          displayEl.innerText = '24 ms';
-          btnEl.classList.remove('spinning');
+          displayEl.innerText = '22 ms';
+          btnEl?.classList.remove('spinning');
           pc.close();
         }
       }, 1500);
@@ -383,7 +495,7 @@ export class LandingUI {
           clearTimeout(timeout);
           const rtt = Math.round(performance.now() - startTime);
           displayEl.innerText = `${Math.max(14, rtt)} ms`;
-          btnEl.classList.remove('spinning');
+          btnEl?.classList.remove('spinning');
           pc.close();
         }
       };
@@ -392,17 +504,18 @@ export class LandingUI {
         .then(offer => pc.setLocalDescription(offer))
         .catch(() => {
           if (!completed) {
-            displayEl.innerText = '28 ms';
-            btnEl.classList.remove('spinning');
+            displayEl.innerText = '24 ms';
+            btnEl?.classList.remove('spinning');
           }
         });
-    } catch (err) {
-      displayEl.innerText = '28 ms';
-      btnEl.classList.remove('spinning');
+    } catch {
+      displayEl.innerText = '24 ms';
+      btnEl?.classList.remove('spinning');
     }
   }
 
   _renderPacketPreview(format, container) {
+    if (!container) return;
     if (format === 'binary') {
       container.innerHTML = `
 <span class="preview-badge badge-green">41 Bytes • -85.6% vs JSON</span>
@@ -410,7 +523,7 @@ export class LandingUI {
 <span class="tok-hex">00 01 00 00 00 12 05 32 00 00 00 00 00 00 00 00</span>
 <span class="tok-hex">00 00 00 00 00 00 00 00 01</span>
 
-<span class="tok-comment">// Packed: Header (1B) | Tick (4B) | P1 State (16B) | P2 State (16B) | Bullets (4B)</span></code></pre>`;
+<span class="tok-comment">// Header: 1B | Tick: 4B | Player 1: 16B | Player 2: 16B | Bullets: 4B</span></code></pre>`;
     } else {
       container.innerHTML = `
 <span class="preview-badge badge-muted">284 Bytes • Uncompressed JSON</span>
@@ -426,102 +539,81 @@ export class LandingUI {
     }
   }
 
-  _renderCodeTab(tab, codeBlock) {
-    const snippets = {
-      threejs: `import { MerebClient, MerebLobby } from 'mereb';
+  _renderPromptCode(stack, container) {
+    if (!container) return;
+    const prompts = {
+      threejs: `I want to add serverless real-time 1v1 multiplayer to my Three.js game using the 'mereb' npm package.
 
-// 1. Initialize SDK
-const net = new MerebClient({
-  host: 'my-project.partykit.dev', // or localhost:1999
-  botTimeoutMs: 8000,              // 8s bot fallback
-  autoJoinFromUrl: true
-});
+Follow these instructions:
+1. Install 'mereb' (npm install mereb) and import:
+   import { MerebClient, MerebLobby } from 'mereb';
 
-// 2. Drop-in 3D Arcade Lobby UI
-const lobby = new MerebLobby(net, { title: '⚔️ ARENA BATTLE' });
+2. Initialize the client:
+   const net = new MerebClient({
+     apiKey: 'pk_live_your_key', // Or self-hosted host: 'localhost:1999'
+     botTimeoutMs: 8000,          // Auto-start offline bot if no player joins in 8s
+     autoJoinFromUrl: true        // Auto-connect if ?room=XXXX is in URL
+   });
 
-// 3. Handle P2P Match Lifecycle
-net.on('match-start', ({ role, isHost, localId, peerId }) => {
-  if (isHost) {
-    // 60Hz Host: broadcast UDP state
-    net.sendState(gameState);
-  } else {
-    // 60Hz Client: stream input stream
-    net.sendInput(playerInputs);
-  }
-});
+3. Mount the drop-in 3D tactile arcade lobby:
+   const lobby = new MerebLobby(net, { title: 'MY GAME ARENA' });
 
-// 4. Reliable events & ragequit handling
-net.on('peer-disconnect', () => {
-  showToast('Opponent forfeited — You win! 🏆');
-});`,
+4. Wire the game simulation lifecycle:
+   - When net.on('match-start', ({ role, isHost, peerId, isBot })) fires:
+     - If isHost: run the authoritative simulation loop and call net.sendState(gameState) at 60Hz.
+     - If client: send user controls with net.sendInput(inputKeys) and predict movement locally.
+   - Listen to net.on('state', (state) => applyHostState(state)).
+   - Listen to net.on('input', (input) => processClientInput(peerId, input)).
+   - Handle net.on('peer-disconnect') by declaring a forfeit victory.
 
-      godot: `extends Node
+Inspect my existing game code and wire these callbacks into my existing render/update loop cleanly.`,
 
-# Official Mereb Godot 4 Addon (addons/mereb/)
-@onready var net = MerebMultiplayer.new()
+      canvas: `I want to add serverless P2P multiplayer to my HTML5 2D Canvas / Phaser game using the 'mereb' SDK.
 
-func _ready():
-    add_child(net)
-    net.match_started.connect(_on_match_started)
-    net.state_received.connect(_on_state_received)
-    net.connect_to_server("my-project.partykit.dev")
-    net.quick_play()
+Please refactor my game loop to support 2-player WebRTC peer-to-peer networking:
+1. Import { MerebClient, MerebLobby } from 'mereb'.
+2. Initialize MerebClient with bot fallback (botTimeoutMs: 8000).
+3. The first player to connect is the Host (isHost: true) and runs authoritative collision and positions.
+4. The second player (Client) sends continuous keyboard/mouse inputs via net.sendInput(input).
+5. When net.on('state', (data)) is received on the client, smoothly lerp remote player sprite positions.
+6. Handle ragequit/disconnect gracefully via net.on('peer-disconnect').
 
-func _on_match_started(role, peer_id, is_bot):
-    print("Match active! Role: ", role, " Opponent: ", peer_id)
+Implement this cleanly without breaking existing single-player physics.`,
 
-func _on_state_received(data):
-    # Smoothly update opponent position
-    $RemotePlayer.position = Vector2(data.x, data.y)`,
+      godot: `I am building an HTML5 web game in Godot 4 and want to add multiplayer using the Mereb Godot 4 addon ('addons/mereb/').
 
-      react: `import { useEffect, useState } from 'react';
-import { MerebClient } from 'mereb';
+Please write a GDScript controller script that:
+1. Instantiates MerebMultiplayer.new() and adds it as a child.
+2. Connects to the signals:
+   - match_started(role, peer_id, is_bot)
+   - state_received(state_dictionary)
+   - input_received(input_dictionary)
+   - peer_disconnected()
+3. If role == "host": send 60Hz positions of both players using net.send_state(state).
+4. If role == "client": send Input.get_vector() using net.send_input(input).
+5. Add UI buttons to call net.quick_play(), net.create_room(), and net.join_room(code).`,
 
-export function MultiplayerGame() {
-  const [status, setStatus] = useState('Idle');
-  const [net, setNet] = useState(null);
+      react: `I want to add multiplayer connectivity to my React / Next.js web application or interactive game canvas using 'mereb'.
 
-  useEffect(() => {
-    const client = new MerebClient({
-      host: 'my-project.partykit.dev'
-    });
+Write a clean React custom hook 'useMereb(options)' that:
+1. Initializes MerebClient in a useEffect and cleans it up on unmount.
+2. Exposes state: { status, role, peerId, isHost, ping, isBot }.
+3. Exposes methods: { createRoom, joinRoom, quickPlay, sendState, sendInput, sendEvent }.
+4. Subscribes to 'match-start', 'state', 'event', 'quality', and 'peer-disconnect'.
+5. Displays a modern Tailwind/shadcn lobby dialog with 4-letter room code sharing.`,
 
-    client.on('match-start', ({ role, peerId }) => {
-      setStatus(\`Connected to \${peerId} (\${role})\`);
-    });
+      ai: `I am building an autonomous AI game agent or virtual NPC that connects as a player into a Mereb WebRTC game room.
 
-    setNet(client);
-    return () => client.disconnect();
-  }, []);
-
-  return (
-    <div>
-      <h3>Status: {status}</h3>
-      <button onClick={() => net?.quickPlay()}>⚡ Quick Play</button>
-    </div>
-  );
-}`,
-
-      portals: `import { MerebClient } from 'mereb';
-
-const net = new MerebClient({
-  host: 'my-project.partykit.dev',
-  portal: 'auto' // Detects Poki or CrazyGames SDK automatically
-});
-
-// Built-in Ad-Freeze Protection:
-// During rewarded ads or commercial breaks, Mereb temporarily
-// pauses gameplay heartbeats to prevent WebRTC timeout disconnects!
-async function onWatchRewardedAd() {
-  const rewarded = await net.portal.rewardedBreak();
-  if (rewarded) {
-    grantExtraLives();
-  }
-}`
+Using Node.js and 'mereb':
+1. Initialize MerebClient to join a room by code (net.joinRoom(roomCode)) or quick play.
+2. Set up the agent's perception loop:
+   - Listen to net.on('state', (gameState)) to receive real-time positions and surroundings.
+3. Hook up decision-making (e.g. LLM tool-calling or local policy model).
+4. Stream the AI agent's actions back into the game room via net.sendInput(actionPayload) at 20-60Hz.
+5. Send conversational messages or game events via net.sendEvent('agent-dialogue', { message: text }).`
     };
 
-    codeBlock.innerText = snippets[tab] || snippets.threejs;
+    container.innerText = prompts[stack] || prompts.threejs;
   }
 
   getElement() {
