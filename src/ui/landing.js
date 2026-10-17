@@ -793,11 +793,11 @@ export class LandingUI {
   _renderPromptCode(stack, container) {
     if (!container) return;
     const prompts = {
-      threejs: `I want to add serverless real-time 1v1 multiplayer to my Three.js game using the 'mereb' npm package.
+      threejs: `I want to add serverless real-time 1v1 multiplayer to my Three.js game using the 'mereb-netcode' npm package.
 
 Follow these instructions:
-1. Install 'mereb' (npm install mereb) and import:
-   import { MerebClient, MerebLobby } from 'mereb';
+1. Install 'mereb-netcode' (npm install mereb-netcode) and import:
+   import { MerebClient, MerebLobby } from 'mereb-netcode';
 
 2. Initialize the client:
    const net = new MerebClient({
@@ -819,10 +819,10 @@ Follow these instructions:
 
 Inspect my existing game code and wire these callbacks into my existing render/update loop cleanly.`,
 
-      canvas: `I want to add serverless P2P multiplayer to my HTML5 2D Canvas / Phaser game using the 'mereb' SDK.
+      canvas: `I want to add serverless P2P multiplayer to my HTML5 2D Canvas / Phaser game using the 'mereb-netcode' SDK.
 
 Please refactor my game loop to support 2-player WebRTC peer-to-peer networking:
-1. Import { MerebClient, MerebLobby } from 'mereb'.
+1. Import { MerebClient, MerebLobby } from 'mereb-netcode'.
 2. Initialize MerebClient with bot fallback (botTimeoutMs: 8000).
 3. The first player to connect is the Host (isHost: true) and runs authoritative collision and positions.
 4. The second player (Client) sends continuous keyboard/mouse inputs via net.sendInput(input).
@@ -844,7 +844,7 @@ Please write a GDScript controller script that:
 4. If role == "client": send Input.get_vector() using net.send_input(input).
 5. Add UI buttons to call net.quick_play(), net.create_room(), and net.join_room(code).`,
 
-      react: `I want to add multiplayer connectivity to my React / Next.js web application or interactive game canvas using 'mereb'.
+      react: `I want to add multiplayer connectivity to my React / Next.js web application or interactive game canvas using 'mereb-netcode'.
 
 Write a clean React custom hook 'useMereb(options)' that:
 1. Initializes MerebClient in a useEffect and cleans it up on unmount.
@@ -855,7 +855,7 @@ Write a clean React custom hook 'useMereb(options)' that:
 
       ai: `I am building an autonomous AI game agent or virtual NPC that connects as a player into a Mereb WebRTC game room.
 
-Using Node.js and 'mereb':
+Using Node.js and 'mereb-netcode':
 1. Initialize MerebClient to join a room by code (net.joinRoom(roomCode)) or quick play.
 2. Set up the agent's perception loop:
    - Listen to net.on('state', (gameState)) to receive real-time positions and surroundings.
