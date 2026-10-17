@@ -6,9 +6,10 @@ import { DashboardUI } from './ui/dashboard.js';
 import { auth } from './ui/auth.js';
 import { MAX_HEALTH } from './network/protocol.js';
 
-const PARTY_HOST = window.location.hostname === 'localhost'
-  ? 'localhost:1999'
-  : window.location.host;
+const urlParams = new URLSearchParams(window.location.search);
+const PARTY_HOST = urlParams.get('server')
+  || import.meta.env.VITE_PARTY_HOST
+  || (window.location.hostname === 'localhost' ? 'localhost:1999' : window.location.host);
 
 class App {
   constructor() {

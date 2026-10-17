@@ -1,7 +1,7 @@
 import { createServer } from 'http';
 import { WebSocketServer, WebSocket } from 'ws';
 
-const PORT = 1999;
+const PORT = process.env.PORT || 1999;
 const server = createServer((req, res) => {
   res.writeHead(200, { 'Content-Type': 'application/json' });
   res.end(JSON.stringify({ status: 'ok', server: 'Mereb Local Signaling Server' }));
