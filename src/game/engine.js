@@ -25,13 +25,16 @@ export class GameEngine {
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color(0x0a0a1a);
     
-    this.camera = new THREE.PerspectiveCamera(50, container.clientWidth / container.clientHeight, 0.1, 1000);
+    const width = container.clientWidth || window.innerWidth;
+    const height = container.clientHeight || window.innerHeight;
+
+    this.camera = new THREE.PerspectiveCamera(50, width / height, 0.1, 1000);
     this.camera.position.set(0, 18, 10);
     this.camera.lookAt(0, 0, 0);
 
     this.renderer = new THREE.WebGLRenderer({ antialias: true });
-    this.renderer.setPixelRatio(window.devicePixelRatio);
-    this.renderer.setSize(container.clientWidth, container.clientHeight);
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    this.renderer.setSize(width, height);
     this.renderer.shadowMap.enabled = true;
     this.container.appendChild(this.renderer.domElement);
 
@@ -50,9 +53,13 @@ export class GameEngine {
 
     // Handle resize
     this.onWindowResize = () => {
-      this.camera.aspect = this.container.clientWidth / this.container.clientHeight;
-      this.camera.updateProjectionMatrix();
-      this.renderer.setSize(this.container.clientWidth, this.container.clientHeight);
+      const w = this.container.clientWidth || window.innerWidth;
+      const h = this.container.clientHeight || window.innerHeight;
+      if (w > 0 && h > 0) {
+        this.camera.aspect = w / h;
+        this.camera.updateProjectionMatrix();
+        this.renderer.setSize(w, h);
+      }
     };
     window.addEventListener('resize', this.onWindowResize);
 
@@ -134,6 +141,7 @@ export class GameEngine {
     this.isHost = isHost;
     this.hostPlayerId = isHost ? localId : remoteId;
     this.interpolator.clear();
+    this.onWindowResize();
 
     this.inputManager = new InputManager(this.renderer.domElement);
 

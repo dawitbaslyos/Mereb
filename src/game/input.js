@@ -4,7 +4,7 @@ export class InputManager {
     this.keys = { up: false, down: false, left: false, right: false };
     this.keyShoot = false;
     this.mouseShoot = false;
-    this.mouseX = 0;
+    this.mouseX = (canvas.clientWidth || window.innerWidth) / 2;
     this.mouseY = 0;
 
     this.onKeyDown = (e) => {
@@ -13,7 +13,10 @@ export class InputManager {
       if (k === 's' || e.key === 'ArrowDown') this.keys.down = true;
       if (k === 'a' || e.key === 'ArrowLeft') this.keys.left = true;
       if (k === 'd' || e.key === 'ArrowRight') this.keys.right = true;
-      if (e.key === ' ') this.keyShoot = true;
+      if (e.key === ' ') {
+        e.preventDefault();
+        this.keyShoot = true;
+      }
     };
 
     this.onKeyUp = (e) => {
@@ -108,9 +111,9 @@ export class InputManager {
 
     window.addEventListener('keydown', this.onKeyDown);
     window.addEventListener('keyup', this.onKeyUp);
-    this.canvas.addEventListener('mousemove', this.onMouseMove);
+    window.addEventListener('mousemove', this.onMouseMove);
     this.canvas.addEventListener('mousedown', this.onMouseDown);
-    this.canvas.addEventListener('mouseup', this.onMouseUp);
+    window.addEventListener('mouseup', this.onMouseUp);
     this.canvas.addEventListener('touchstart', this.onTouchStart, { passive: false });
     this.canvas.addEventListener('touchmove', this.onTouchMove, { passive: false });
     this.canvas.addEventListener('touchend', this.onTouchEnd);
@@ -118,8 +121,8 @@ export class InputManager {
   }
 
   getInput() {
-    const cw = this.canvas.clientWidth / 2;
-    const ch = this.canvas.clientHeight / 2;
+    const cw = (this.canvas.clientWidth || window.innerWidth) / 2;
+    const ch = (this.canvas.clientHeight || window.innerHeight) / 2;
     
     const aimAngle = Math.atan2(this.mouseX - cw, -(this.mouseY - ch));
 
@@ -136,9 +139,9 @@ export class InputManager {
   destroy() {
     window.removeEventListener('keydown', this.onKeyDown);
     window.removeEventListener('keyup', this.onKeyUp);
-    this.canvas.removeEventListener('mousemove', this.onMouseMove);
+    window.removeEventListener('mousemove', this.onMouseMove);
     this.canvas.removeEventListener('mousedown', this.onMouseDown);
-    this.canvas.removeEventListener('mouseup', this.onMouseUp);
+    window.removeEventListener('mouseup', this.onMouseUp);
     this.canvas.removeEventListener('touchstart', this.onTouchStart);
     this.canvas.removeEventListener('touchmove', this.onTouchMove);
     this.canvas.removeEventListener('touchend', this.onTouchEnd);

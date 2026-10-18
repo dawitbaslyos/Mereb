@@ -96,12 +96,15 @@ class App {
       this._initGame();
       this.gameInitialized = true;
     } else {
-      this.engine?.onWindowResize?.();
       this.hud?.hide();
       this.hud?.hideMatchEnd();
       this.lobby?.resetToMenu();
       this.lobby?.show();
     }
+
+    requestAnimationFrame(() => {
+      this.engine?.onWindowResize?.();
+    });
   }
 
   _cleanupGame() {
