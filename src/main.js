@@ -9,7 +9,7 @@ import { MAX_HEALTH } from './network/protocol.js';
 const urlParams = new URLSearchParams(window.location.search);
 const PARTY_HOST = urlParams.get('server')
   || import.meta.env.VITE_PARTY_HOST
-  || (window.location.hostname === 'localhost' ? 'localhost:1999' : window.location.host);
+  || (window.location.hostname === 'localhost' ? 'localhost:1999' : 'mereb-signaling.onrender.com');
 
 class App {
   constructor() {
