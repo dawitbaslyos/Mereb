@@ -187,6 +187,17 @@ export class MerebClient extends EventTarget {
       this.role = ROLE.CLIENT;
       await this._initPeerConnection(false);
     }
+
+    if (signal.type === 'ice-candidate') {
+      if (this.peer) {
+        await this.peer.addIceCandidate(signal.candidate);
+      } else {
+        if (!this._earlyCandidates) this._earlyCandidates = [];
+        this._earlyCandidates.push(signal.candidate);
+      }
+      return;
+    }
+
     if (!this.peer) return;
 
     if (signal.type === 'offer') {
@@ -195,10 +206,22 @@ export class MerebClient extends EventTarget {
         type: 'answer',
         sdp: answer
       });
+
+      if (this._earlyCandidates && this._earlyCandidates.length > 0) {
+        for (const cand of this._earlyCandidates) {
+          await this.peer.addIceCandidate(cand);
+        }
+        this._earlyCandidates = [];
+      }
     } else if (signal.type === 'answer') {
       await this.peer.handleAnswer(signal.sdp);
-    } else if (signal.type === 'ice-candidate') {
-      await this.peer.addIceCandidate(signal.candidate);
+
+      if (this._earlyCandidates && this._earlyCandidates.length > 0) {
+        for (const cand of this._earlyCandidates) {
+          await this.peer.addIceCandidate(cand);
+        }
+        this._earlyCandidates = [];
+      }
     }
   }
 

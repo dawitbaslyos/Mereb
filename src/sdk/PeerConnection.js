@@ -17,6 +17,7 @@ export class PeerConnection extends EventTarget {
     this.latency = 0;
     this.quality = new NetworkQuality();
     this._pingInterval = null;
+    this.pendingCandidates = [];
 
     this.quality.addEventListener('update', (e) => {
       this.dispatchEvent(new CustomEvent('quality', { detail: e.detail }));
@@ -98,7 +99,7 @@ export class PeerConnection extends EventTarget {
     const unOpen = this.unreliableChannel && this.unreliableChannel.readyState === 'open';
     const relOpen = this.reliableChannel && this.reliableChannel.readyState === 'open';
 
-    if (unOpen && relOpen && !this._connected) {
+    if ((unOpen || relOpen) && !this._connected) {
       this._connected = true;
       this._startPing();
       this.dispatchEvent(new CustomEvent('open'));
@@ -148,6 +149,15 @@ export class PeerConnection extends EventTarget {
         return null;
       }
       await this.pc.setRemoteDescription(new RTCSessionDescription(offer));
+
+      // Drain any early buffered candidates now that remote description is set
+      while (this.pendingCandidates.length > 0) {
+        const cand = this.pendingCandidates.shift();
+        try {
+          await this.pc.addIceCandidate(new RTCIceCandidate(cand));
+        } catch (e) {}
+      }
+
       const answer = await this.pc.createAnswer();
       await this.pc.setLocalDescription(answer);
       return this.pc.localDescription;
@@ -161,6 +171,14 @@ export class PeerConnection extends EventTarget {
     try {
       if (this.pc.signalingState === 'have-local-offer') {
         await this.pc.setRemoteDescription(new RTCSessionDescription(answer));
+
+        // Drain any early buffered candidates
+        while (this.pendingCandidates.length > 0) {
+          const cand = this.pendingCandidates.shift();
+          try {
+            await this.pc.addIceCandidate(new RTCIceCandidate(cand));
+          } catch (e) {}
+        }
       }
     } catch (err) {
       console.warn('[Mereb:RTC] Handled answer race condition:', err.message);
@@ -168,12 +186,16 @@ export class PeerConnection extends EventTarget {
   }
 
   async addIceCandidate(candidate) {
+    if (!candidate) return;
+    if (!this.pc.remoteDescription || !this.pc.remoteDescription.type) {
+      // Buffer candidate until remote description is set
+      this.pendingCandidates.push(candidate);
+      return;
+    }
     try {
-      if (candidate) {
-        await this.pc.addIceCandidate(new RTCIceCandidate(candidate));
-      }
+      await this.pc.addIceCandidate(new RTCIceCandidate(candidate));
     } catch (e) {
-      // Ignored if candidate comes late or during teardown
+      console.warn('[Mereb:RTC] addIceCandidate error:', e.message);
     }
   }
 

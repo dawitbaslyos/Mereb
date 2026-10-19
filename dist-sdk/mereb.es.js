@@ -487,7 +487,7 @@ var A = class extends EventTarget {
 	}
 }, M = class extends EventTarget {
 	constructor(e = {}) {
-		super(), this.iceServers = e.iceServers || w, this.pc = new RTCPeerConnection({ iceServers: this.iceServers }), this.unreliableChannel = null, this.reliableChannel = null, this._connected = !1, this.latency = 0, this.quality = new j(), this._pingInterval = null, this.quality.addEventListener("update", (e) => {
+		super(), this.iceServers = e.iceServers || w, this.pc = new RTCPeerConnection({ iceServers: this.iceServers }), this.unreliableChannel = null, this.reliableChannel = null, this._connected = !1, this.latency = 0, this.quality = new j(), this._pingInterval = null, this.pendingCandidates = [], this.quality.addEventListener("update", (e) => {
 			this.dispatchEvent(new CustomEvent("quality", { detail: e.detail }));
 		}), this.pc.onicecandidate = (e) => {
 			e.candidate && this.dispatchEvent(new CustomEvent("ice-candidate", { detail: { candidate: e.candidate } }));
@@ -529,7 +529,7 @@ var A = class extends EventTarget {
 	}
 	_checkChannelsOpen() {
 		let e = this.unreliableChannel && this.unreliableChannel.readyState === "open", t = this.reliableChannel && this.reliableChannel.readyState === "open";
-		e && t && !this._connected && (this._connected = !0, this._startPing(), this.dispatchEvent(new CustomEvent("open")));
+		(e || t) && !this._connected && (this._connected = !0, this._startPing(), this.dispatchEvent(new CustomEvent("open")));
 	}
 	_startPing() {
 		this._pingInterval && clearInterval(this._pingInterval), this._pingInterval = setInterval(() => {
@@ -560,7 +560,12 @@ var A = class extends EventTarget {
 	async handleOffer(e) {
 		try {
 			if (this.pc.signalingState !== "stable") return null;
-			await this.pc.setRemoteDescription(new RTCSessionDescription(e));
+			for (await this.pc.setRemoteDescription(new RTCSessionDescription(e)); this.pendingCandidates.length > 0;) {
+				let e = this.pendingCandidates.shift();
+				try {
+					await this.pc.addIceCandidate(new RTCIceCandidate(e));
+				} catch {}
+			}
 			let t = await this.pc.createAnswer();
 			return await this.pc.setLocalDescription(t), this.pc.localDescription;
 		} catch (e) {
@@ -569,15 +574,28 @@ var A = class extends EventTarget {
 	}
 	async handleAnswer(e) {
 		try {
-			this.pc.signalingState === "have-local-offer" && await this.pc.setRemoteDescription(new RTCSessionDescription(e));
+			if (this.pc.signalingState === "have-local-offer") for (await this.pc.setRemoteDescription(new RTCSessionDescription(e)); this.pendingCandidates.length > 0;) {
+				let e = this.pendingCandidates.shift();
+				try {
+					await this.pc.addIceCandidate(new RTCIceCandidate(e));
+				} catch {}
+			}
 		} catch (e) {
 			console.warn("[Mereb:RTC] Handled answer race condition:", e.message);
 		}
 	}
 	async addIceCandidate(e) {
-		try {
-			e && await this.pc.addIceCandidate(new RTCIceCandidate(e));
-		} catch {}
+		if (e) {
+			if (!this.pc.remoteDescription || !this.pc.remoteDescription.type) {
+				this.pendingCandidates.push(e);
+				return;
+			}
+			try {
+				await this.pc.addIceCandidate(new RTCIceCandidate(e));
+			} catch (e) {
+				console.warn("[Mereb:RTC] addIceCandidate error:", e.message);
+			}
+		}
 	}
 	sendBinary(e) {
 		if (this.unreliableChannel && this.unreliableChannel.readyState === "open") {
@@ -772,14 +790,24 @@ var A = class extends EventTarget {
 	}
 	async _handleSignal(e) {
 		let t = e.signal;
-		if (!this.peer && t.type === "offer" && (this.role = T.CLIENT, await this._initPeerConnection(!1)), this.peer) {
+		if (!this.peer && t.type === "offer" && (this.role = T.CLIENT, await this._initPeerConnection(!1)), t.type === "ice-candidate") {
+			this.peer ? await this.peer.addIceCandidate(t.candidate) : (this._earlyCandidates ||= [], this._earlyCandidates.push(t.candidate));
+			return;
+		}
+		if (this.peer) {
 			if (t.type === "offer") {
 				let n = await this.peer.handleOffer(t.sdp);
-				this.signaling.sendSignal(e.from, {
+				if (this.signaling.sendSignal(e.from, {
 					type: "answer",
 					sdp: n
-				});
-			} else t.type === "answer" ? await this.peer.handleAnswer(t.sdp) : t.type === "ice-candidate" && await this.peer.addIceCandidate(t.candidate);
+				}), this._earlyCandidates && this._earlyCandidates.length > 0) {
+					for (let e of this._earlyCandidates) await this.peer.addIceCandidate(e);
+					this._earlyCandidates = [];
+				}
+			} else if (t.type === "answer" && (await this.peer.handleAnswer(t.sdp), this._earlyCandidates && this._earlyCandidates.length > 0)) {
+				for (let e of this._earlyCandidates) await this.peer.addIceCandidate(e);
+				this._earlyCandidates = [];
+			}
 		}
 	}
 	_handlePeerLeft(e) {
@@ -906,7 +934,9 @@ var A = class extends EventTarget {
 		});
 		let e = () => {
 			let e = this.codeInput.value.trim().toUpperCase();
-			e.length === 4 ? (this.setStatus("Joining room..."), this.client.joinRoom(e)) : this.showError("Code must be 4 characters");
+			e.length === 4 ? (this.setStatus("Connecting to room...", !0), this.client.joinRoom(e).catch(() => {
+				this.showError("Could not connect to room");
+			})) : this.showError("Code must be 4 characters");
 		};
 		this.element.querySelector("#mereb-btn-submit").addEventListener("click", e), this.codeInput.addEventListener("keypress", (t) => {
 			t.key === "Enter" && e();

@@ -163,8 +163,10 @@ export class MerebLobby {
     const submitJoin = () => {
       const code = this.codeInput.value.trim().toUpperCase();
       if (code.length === 4) {
-        this.setStatus('Joining room...');
-        this.client.joinRoom(code);
+        this.setStatus('Connecting to room...', true);
+        this.client.joinRoom(code).catch(() => {
+          this.showError('Could not connect to room');
+        });
       } else {
         this.showError('Code must be 4 characters');
       }
