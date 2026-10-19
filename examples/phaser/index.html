@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mereb + Phaser 3 Multiplayer Space Duel</title>
+  <style>
+    body {
+      margin: 0;
+      background: #060709;
+      color: #fff;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+    }
+    #game-container {
+      border: 2px solid rgba(255, 255, 255, 0.15);
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.8);
+    }
+    #ui-hud {
+      position: absolute;
+      top: 16px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      gap: 16px;
+      font-family: monospace;
+      font-size: 14px;
+      background: rgba(0, 0, 0, 0.7);
+      padding: 8px 16px;
+      border-radius: 20px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    .status-badge { color: #4ade80; }
+  </style>
+  <script src="https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.min.js"></script>
+  <script src="/dist-sdk/mereb.umd.js"></script>
+</head>
+<body>
+  <div id="ui-hud">
+    <div>ROOM: <span id="room-code" style="color: #facc15;">----</span></div>
+    <div>PING: <span id="ping-text" class="status-badge">0ms</span></div>
+  </div>
+  <div id="game-container"></div>
+
+  <script>
+    const { MerebClient, MerebLobby } = window.Mereb;
+
+    // 1. Initialize Mereb Netcode SDK
+    const net = new MerebClient({
+      host: window.location.hostname === 'localhost' ? 'localhost:1999' : 'mereb-signaling.onrender.com',
+      botTimeoutMs: 6000,
+      autoJoinFromUrl: true
+    });
+
+    // 2. Mount Arcade Lobby
+    const lobby = new MerebLobby(net, { title: '🚀 STAR DUEL' });
+
+    // 3. Phaser 3 Game Scene
+    class SpaceDuelScene extends Phaser.Scene {
+      constructor() {
+        super('SpaceDuelScene');
+        this.player = null;
+        this.opponent = null;
+        this.cursors = null;
+        this.lastStateTime = 0;
+      }
+
+      preload() {
+        // Draw simple procedural ship textures
+        const g = this.add.graphics();
+        // Blue player ship
+        g.fillStyle(0x38bdf8);
+        g.beginPath();
+        g.moveTo(0, -16);
+        g.lineTo(12, 16);
+        g.lineTo(-12, 16);
+        g.closePath();
+        g.fillPath();
+        g.generateTexture('ship-blue', 24, 32);
+
+        // Red opponent ship
+        g.clear();
+        g.fillStyle(0xf87171);
+        g.beginPath();
+        g.moveTo(0, -16);
+        g.lineTo(12, 16);
+        g.lineTo(-12, 16);
+        g.closePath();
+        g.fillPath();
+        g.generateTexture('ship-red', 24, 32);
+        g.destroy();
+      }
+
+      create() {
+        this.player = this.physics.add.sprite(200, 300, 'ship-blue').setCollideWorldBounds(true);
+        this.opponent = this.physics.add.sprite(600, 300, 'ship-red').setCollideWorldBounds(true);
+        this.cursors = this.input.keyboard.createCursorKeys();
+        this.wasd = this.input.keyboard.addKeys('W,A,S,D');
+
+        // Listen for remote state from opponent
+        net.on('state', (state) => {
+          if (this.opponent && state) {
+            this.opponent.setPosition(state.x, state.y);
+            this.opponent.setRotation(state.rot);
+          }
+        });
+
+        net.on('quality', (q) => {
+          document.getElementById('ping-text').innerText = `${q.ping}ms • ${q.rating.toUpperCase()}`;
+        });
+
+        net.on('room-created', ({ roomCode }) => {
+          document.getElementById('room-code').innerText = roomCode;
+        });
+
+        net.on('match-start', ({ isHost, role }) => {
+          console.log(`[Phaser] Match started as ${role}!`);
+          if (!isHost) {
+            // Swap colors if client
+            this.player.setTexture('ship-red');
+            this.opponent.setTexture('ship-blue');
+          }
+        });
+      }
+
+      update(time, delta) {
+        if (!net.connected) return;
+
+        // Player controls
+        let vx = 0;
+        let vy = 0;
+        if (this.cursors.left.isDown || this.wasd.A.isDown) vx -= 250;
+        if (this.cursors.right.isDown || this.wasd.D.isDown) vx += 250;
+        if (this.cursors.up.isDown || this.wasd.W.isDown) vy -= 250;
+        if (this.cursors.down.isDown || this.wasd.S.isDown) vy += 250;
+
+        this.player.setVelocity(vx, vy);
+
+        // Rotate ship towards cursor
+        const pointer = this.input.activePointer;
+        const angle = Phaser.Math.Angle.Between(this.player.x, this.player.y, pointer.x, pointer.y);
+        this.player.rotation = angle + Math.PI / 2;
+
+        // Stream state 30 times per second
+        if (time - this.lastStateTime >= 33) {
+          this.lastStateTime = time;
+          net.sendState({
+            x: Math.round(this.player.x),
+            y: Math.round(this.player.y),
+            rot: Number(this.player.rotation.toFixed(2))
+          });
+        }
+      }
+    }
+
+    // Phaser Config
+    const config = {
+      type: Phaser.AUTO,
+      parent: 'game-container',
+      width: 800,
+      height: 600,
+      physics: {
+        default: 'arcade',
+        arcade: { gravity: { y: 0 } }
+      },
+      scene: SpaceDuelScene
+    };
+
+    new Phaser.Game(config);
+  </script>
+</body>
+</html>

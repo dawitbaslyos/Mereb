@@ -1,10 +1,11 @@
 # ⚔️ Mereb — Multiplayer Netcode & Matchmaking SDK
 
-[![npm version](https://img.shields.io/npm/v/mereb.svg?color=38bdf8)](https://www.npmjs.com/package/mereb)
+[![npm version](https://img.shields.io/npm/v/mereb-netcode.svg?color=38bdf8)](https://www.npmjs.com/package/mereb-netcode)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
-[![Bundle Size](https://img.shields.io/badge/bundle-13_kB_gzip-blue.svg)](https://unpkg.com/mereb/dist-sdk/mereb.es.js)
+[![Bundle Size](https://img.shields.io/badge/bundle-13_kB_gzip-blue.svg)](https://unpkg.com/mereb-netcode/dist-sdk/mereb.es.js)
 [![WebRTC P2P](https://img.shields.io/badge/WebRTC-DataChannels-orange.svg)]()
 [![Godot 4](https://img.shields.io/badge/Godot_4-Web_Addon-478cbf.svg)](./addons/mereb)
+[![Cloudflare Workers](https://img.shields.io/badge/Cloudflare_Workers-Signaling-F38020.svg)](./cloudflare)
 
 > **Zero-cost, serverless WebRTC P2P multiplayer netcode & matchmaking SDK for web & indie games** (Three.js, Godot 4, React, Phaser, Poki, CrazyGames).
 
@@ -18,6 +19,7 @@ Eliminate expensive dedicated game servers ($100s/mo). **Mereb** routes gameplay
 * 📦 **Binary Packing & Compression** — Built-in `BinaryWriter` / `BinaryReader` packs full game state into tiny ~35–50 byte `ArrayBuffer` packets (85% bandwidth reduction vs JSON).
 * 🎯 **Hermite Snapshot Interpolation** — `SnapshotInterpolator` eliminates jitter and delivers buttery 60/120fps remote entity movement.
 * 🤖 **Smart Bot Fallback** — Automatic 8-second matchmaking timeout pairs waiting players with local bots so queues never feel empty.
+* ⚛️ **React Hook** — `useMereb()` hook for reactive lobby, match status, and netcode controls in React.
 * 🛡️ **Poki & CrazyGames Portal Hooks** — `PortalManager` prevents WebRTC socket drops during rewarded breaks and commercial ads.
 * 🕹️ **Godot 4 Addon** — Includes a ready-to-use GDScript wrapper (`addons/mereb/`) for exporting HTML5 games from Godot.
 * 🎨 **Drop-in Arcade Lobby** — Optional 3D tactile UI with 4-letter room codes, shareable invite links, and Quick Play buttons.
@@ -29,12 +31,12 @@ Eliminate expensive dedicated game servers ($100s/mo). **Mereb** routes gameplay
 
 ### NPM
 ```bash
-npm install mereb
+npm install mereb-netcode
 ```
 
 ### CDN / Direct Script Tag
 ```html
-<script src="https://unpkg.com/mereb/dist-sdk/mereb.umd.js"></script>
+<script src="https://unpkg.com/mereb-netcode/dist-sdk/mereb.umd.js"></script>
 ```
 
 ---
@@ -137,24 +139,58 @@ func _on_state_received(data):
 
 ---
 
-## 🌍 Zero-Cost Cloudflare Signaling Deployment
+## ⚛️ React Hook (`useMereb`)
 
-Deploy your own worldwide serverless signaling & matchmaking server in 60 seconds:
+Drop multiplayer into any React web game with a single hook:
+
+```jsx
+import { useMereb } from 'mereb-netcode/react';
+
+function GameLobby() {
+  const { status, roomCode, isHost, quality, createRoom, joinRoom, quickPlay } = useMereb({
+    host: 'mereb-signaling.onrender.com'
+  });
+
+  return (
+    <div>
+      <div>Status: {status} ({quality.ping}ms)</div>
+      {roomCode && <h2>Room: {roomCode}</h2>}
+      <button onClick={createRoom}>Create Room</button>
+      <button onClick={quickPlay}>Quick Play</button>
+    </div>
+  );
+}
+```
+
+---
+
+## 🌍 Zero-Cost Cloudflare Workers Signaling
+
+Deploy your own worldwide serverless signaling & matchmaking server in **60 seconds** on Cloudflare ($0/month):
 
 ```bash
-# 1. Login to PartyKit (powered by Cloudflare Workers)
-npx partykit login
-
-# 2. Deploy your signaling server ($0/month on free tier)
-npx partykit deploy
+# Deploy to Cloudflare Workers (300+ edge locations)
+cd cloudflare
+npx wrangler deploy
 ```
 
-Then point `MerebClient` to your deployed URL:
+Then point `MerebClient` to your worker:
 ```javascript
 const net = new MerebClient({
-  host: 'mereb-arena.your-name.partykit.dev'
+  host: 'mereb-signaling.<your-subdomain>.workers.dev'
 });
 ```
+
+See the [Cloudflare Deployment Guide](./cloudflare/README.md) for full instructions.
+
+---
+
+## 🎮 Framework Examples & Starters
+
+* [👾 Phaser 3 Space Duel Example](./examples/phaser/index.html)
+* [🧊 Minimal Three.js P2P Example](./examples/threejs-minimal/index.html)
+* [🕹️ Godot 4 Addon & Sample Game](./addons/mereb/README.md)
+* [⚔️ Live 3D Tank Arena Demo](./src/game/)
 
 ---
 
@@ -162,10 +198,11 @@ const net = new MerebClient({
 
 * [Full Architecture & API Reference](./MEREB_SDK_GUIDE.md)
 * [Godot 4 Integration Guide](./addons/mereb/README.md)
-* [Live 3D Tank Arena Demo](./src/game/)
+* [Cloudflare Workers Deployment](./cloudflare/README.md)
 
 ---
 
 ## 📄 License
 
 MIT © [Dawit Baslyos](https://github.com/dawitbaslyos)
+

@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Minimal Three.js + Mereb P2P Example</title>
+  <style>
+    body { margin: 0; overflow: hidden; background: #0b0f19; font-family: monospace; color: #fff; }
+    #hud { position: absolute; top: 12px; left: 12px; z-index: 10; background: rgba(0,0,0,0.7); padding: 10px; border-radius: 6px; }
+  </style>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="/dist-sdk/mereb.umd.js"></script>
+</head>
+<body>
+  <div id="hud">
+    <div>Mereb Minimal Three.js P2P Demo</div>
+    <div>Status: <span id="status" style="color: #38bdf8;">Connecting...</span></div>
+    <div>Use Arrow Keys / WASD to move your cube.</div>
+  </div>
+
+  <script>
+    const { MerebClient } = window.Mereb;
+
+    // 1. Setup Three.js Scene
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 100);
+    camera.position.set(0, 8, 12);
+    camera.lookAt(0, 0, 0);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    document.body.appendChild(renderer.domElement);
+
+    const light = new THREE.DirectionalLight(0xffffff, 1);
+    light.position.set(5, 10, 5);
+    scene.add(light);
+    scene.add(new THREE.AmbientLight(0x404040));
+    scene.add(new THREE.GridHelper(20, 20, 0x334155, 0x1e293b));
+
+    // Local & Remote Cubes
+    const geom = new THREE.BoxGeometry(1, 1, 1);
+    const myCube = new THREE.Mesh(geom, new THREE.MeshStandardMaterial({ color: 0x38bdf8 }));
+    const remoteCube = new THREE.Mesh(geom, new THREE.MeshStandardMaterial({ color: 0xf87171 }));
+    scene.add(myCube);
+    scene.add(remoteCube);
+
+    // 2. Connect Mereb SDK
+    const net = new MerebClient({
+      host: window.location.hostname === 'localhost' ? 'localhost:1999' : 'mereb-signaling.onrender.com',
+      autoJoinFromUrl: true
+    });
+
+    net.on('match-start', ({ role, peerId }) => {
+      document.getElementById('status').innerText = `Matched with ${peerId} as ${role}!`;
+    });
+
+    net.on('state', (data) => {
+      remoteCube.position.set(data.x, 0.5, data.z);
+    });
+
+    net.quickPlay();
+
+    // 3. Simple WASD Controls & Game Loop
+    const keys = {};
+    window.addEventListener('keydown', (e) => keys[e.key.toLowerCase()] = true);
+    window.addEventListener('keyup', (e) => keys[e.key.toLowerCase()] = false);
+
+    function animate() {
+      requestAnimationFrame(animate);
+
+      if (keys['w'] || keys['arrowup']) myCube.position.z -= 0.1;
+      if (keys['s'] || keys['arrowdown']) myCube.position.z += 0.1;
+      if (keys['a'] || keys['arrowleft']) myCube.position.x -= 0.1;
+      if (keys['d'] || keys['arrowright']) myCube.position.x += 0.1;
+
+      if (net.connected) {
+        net.sendState({ x: myCube.position.x, z: myCube.position.z });
+      }
+
+      renderer.render(scene, camera);
+    }
+    animate();
+
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+  </script>
+</body>
+</html>

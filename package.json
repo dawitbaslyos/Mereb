@@ -11,12 +11,17 @@
       "types": "./dist-sdk/index.d.ts",
       "import": "./dist-sdk/mereb.es.js",
       "require": "./dist-sdk/mereb.umd.js"
+    },
+    "./react": {
+      "import": "./src/sdk/react/index.js"
     }
   },
   "files": [
     "dist-sdk",
     "src/sdk",
     "addons/mereb",
+    "cloudflare",
+    "examples",
     "README.md",
     "LICENSE"
   ],
@@ -29,6 +34,7 @@
     "typecheck": "tsc --noEmit",
     "prepack": "npm run build:sdk",
     "preview": "vite preview",
+    "deploy:cloudflare": "cd cloudflare && npx wrangler deploy",
     "deploy:party": "npx partykit deploy"
   },
   "repository": {
