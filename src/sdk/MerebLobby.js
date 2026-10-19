@@ -140,7 +140,7 @@ export class MerebLobby {
 
     // Create Room
     this.element.querySelector('#mereb-btn-create').addEventListener('click', async () => {
-      this.setStatus('Creating room...');
+      this.setStatus('Connecting to server...', true);
       try {
         const { roomCode } = await this.client.createRoom();
         this.mainMenu.style.display = 'none';
@@ -148,7 +148,7 @@ export class MerebLobby {
         this.codeText.innerText = roomCode;
         this.setStatus('Waiting for opponent...', true);
       } catch (err) {
-        this.showError('Failed to create room');
+        this.showError('Server waking up... Click again in a moment');
       }
     });
 

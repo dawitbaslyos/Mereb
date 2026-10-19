@@ -11,6 +11,13 @@ const PARTY_HOST = urlParams.get('server')
   || import.meta.env.VITE_PARTY_HOST
   || (window.location.hostname === 'localhost' ? 'localhost:1999' : 'mereb-signaling.onrender.com');
 
+// Pre-warm signaling server from cold sleep in background
+if (typeof window !== 'undefined' && PARTY_HOST && !PARTY_HOST.includes('localhost')) {
+  try {
+    fetch(`https://${PARTY_HOST}/`, { mode: 'no-cors' }).catch(() => {});
+  } catch (e) {}
+}
+
 class App {
   constructor() {
     this.landingContainer = document.getElementById('landing-container');

@@ -12,9 +12,17 @@ export class SignalingClient extends EventTarget {
     this.roomId = null;
   }
 
-  connect(roomId) {
+  connect(roomId, timeoutMs = 15000) {
     this.roomId = roomId;
     return new Promise((resolve, reject) => {
+      let resolved = false;
+      const timeoutTimer = setTimeout(() => {
+        if (!resolved) {
+          resolved = true;
+          reject(new Error('Connection timed out. Server may still be waking up.'));
+        }
+      }, timeoutMs);
+
       try {
         if (this.ws) {
           this.ws.close();
@@ -26,8 +34,12 @@ export class SignalingClient extends EventTarget {
         });
 
         this.ws.addEventListener('open', () => {
-          this.dispatchEvent(new CustomEvent('open', { detail: { id: this.playerId } }));
-          resolve();
+          if (!resolved) {
+            resolved = true;
+            clearTimeout(timeoutTimer);
+            this.dispatchEvent(new CustomEvent('open', { detail: { id: this.playerId } }));
+            resolve();
+          }
         });
 
         this.ws.addEventListener('message', (e) => {
@@ -45,10 +57,12 @@ export class SignalingClient extends EventTarget {
 
         this.ws.addEventListener('error', (e) => {
           this.dispatchEvent(new CustomEvent('error', { detail: e }));
-          reject(e);
+          // Do not instantly reject: PartySocket auto-retries while server wakes up.
+          // Rejection will only trigger if the full timeout expires.
         });
 
       } catch (err) {
+        clearTimeout(timeoutTimer);
         reject(err);
       }
     });

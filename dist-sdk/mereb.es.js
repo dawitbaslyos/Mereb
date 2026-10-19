@@ -396,14 +396,17 @@ var A = class extends EventTarget {
 	constructor(e) {
 		super(), this.host = e, this.ws = null, this.roomId = null;
 	}
-	connect(e) {
-		return this.roomId = e, new Promise((t, n) => {
+	connect(e, t = 15e3) {
+		return this.roomId = e, new Promise((n, r) => {
+			let i = !1, a = setTimeout(() => {
+				i || (i = !0, r(/* @__PURE__ */ Error("Connection timed out. Server may still be waking up.")));
+			}, t);
 			try {
 				this.ws && this.ws.close(), this.ws = new v({
 					host: this.host,
 					room: e
 				}), this.ws.addEventListener("open", () => {
-					this.dispatchEvent(new CustomEvent("open", { detail: { id: this.playerId } })), t();
+					i || (i = !0, clearTimeout(a), this.dispatchEvent(new CustomEvent("open", { detail: { id: this.playerId } })), n());
 				}), this.ws.addEventListener("message", (e) => {
 					try {
 						let t = JSON.parse(e.data);
@@ -414,10 +417,10 @@ var A = class extends EventTarget {
 				}), this.ws.addEventListener("close", () => {
 					this.dispatchEvent(new CustomEvent("close"));
 				}), this.ws.addEventListener("error", (e) => {
-					this.dispatchEvent(new CustomEvent("error", { detail: e })), n(e);
+					this.dispatchEvent(new CustomEvent("error", { detail: e }));
 				});
 			} catch (e) {
-				n(e);
+				clearTimeout(a), r(e);
 			}
 		});
 	}
@@ -891,12 +894,12 @@ var A = class extends EventTarget {
 			});
 		}
 		this.element.querySelector("#mereb-btn-create").addEventListener("click", async () => {
-			this.setStatus("Creating room...");
+			this.setStatus("Connecting to server...", !0);
 			try {
 				let { roomCode: e } = await this.client.createRoom();
 				this.mainMenu.style.display = "none", this.roomView.style.display = "block", this.codeText.innerText = e, this.setStatus("Waiting for opponent...", !0);
 			} catch {
-				this.showError("Failed to create room");
+				this.showError("Server waking up... Click again in a moment");
 			}
 		}), this.element.querySelector("#mereb-btn-join").addEventListener("click", () => {
 			this.mainMenu.style.display = "none", this.joinMenu.style.display = "flex", this.codeInput.focus();
