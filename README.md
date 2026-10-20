@@ -148,7 +148,7 @@ import { useMereb } from 'mereb-netcode/react';
 
 function GameLobby() {
   const { status, roomCode, isHost, quality, createRoom, joinRoom, quickPlay } = useMereb({
-    host: 'mereb-signaling.onrender.com'
+    host: 'mereb-signaling.dawitbaslyos.workers.dev'
   });
 
   return (
