@@ -153,16 +153,17 @@ export class GameEngine {
     this.tanks[localId].setPosition(localSpawn.x, localSpawn.z);
     this.tanks[remoteId].setPosition(remoteSpawn.x, remoteSpawn.z);
 
-    if (this.isHost) {
-      this.playerStates[localId] = {
-        x: localSpawn.x, z: localSpawn.z, rotation: 0, turretRotation: 0,
-        health: MAX_HEALTH, score: 0, lastShoot: 0, respawnUntil: 0
-      };
-      this.playerStates[remoteId] = {
-        x: remoteSpawn.x, z: remoteSpawn.z, rotation: 0, turretRotation: 0,
-        health: MAX_HEALTH, score: 0, lastShoot: 0, respawnUntil: 0
-      };
+    // Initialize player states for BOTH host and client
+    this.playerStates[localId] = {
+      x: localSpawn.x, z: localSpawn.z, rotation: 0, turretRotation: 0,
+      health: MAX_HEALTH, score: 0, lastShoot: 0, respawnUntil: 0
+    };
+    this.playerStates[remoteId] = {
+      x: remoteSpawn.x, z: remoteSpawn.z, rotation: 0, turretRotation: 0,
+      health: MAX_HEALTH, score: 0, lastShoot: 0, respawnUntil: 0
+    };
 
+    if (this.isHost) {
       this.hostTick = this.hostTick.bind(this);
       this.tickInterval = setInterval(this.hostTick, TICK_RATE);
     }
@@ -336,7 +337,7 @@ export class GameEngine {
   }
 
   applyBinaryState(arrayBuffer) {
-    if (!this.running) return;
+    if (!this.running || !this.remoteId || !this.localId) return;
     const state = this.binaryProtocol.decodeState(arrayBuffer, this.remoteId, this.localId);
     if (!state) return;
 
@@ -349,18 +350,47 @@ export class GameEngine {
       if (this.playerStates[this.remoteId]) {
         this.playerStates[this.remoteId].health = remote.health;
         this.playerStates[this.remoteId].score = remote.score;
+        this.playerStates[this.remoteId].x = remote.x;
+        this.playerStates[this.remoteId].z = remote.z;
         this.tanks[this.remoteId]?.setInvulnerable(remote.isInvuln);
       } else {
         this.playerStates[this.remoteId] = { ...remote };
       }
     }
 
-    // Local player health/score authoritative confirmation
+    // Local player authoritative confirmation & position reconciliation
     const local = state.players[this.localId];
-    if (local && this.playerStates[this.localId]) {
-      this.playerStates[this.localId].health = local.health;
-      this.playerStates[this.localId].score = local.score;
-      this.tanks[this.localId]?.setInvulnerable(local.isInvuln);
+    if (local) {
+      if (this.playerStates[this.localId]) {
+        const ps = this.playerStates[this.localId];
+        ps.health = local.health;
+        ps.score = local.score;
+        this.tanks[this.localId]?.setInvulnerable(local.isInvuln);
+
+        // If respawning (invulnerable) or large position desync (> 2.5m), snap to server position
+        const dx = local.x - ps.x;
+        const dz = local.z - ps.z;
+        if (local.isInvuln || (dx * dx + dz * dz > 6.25)) {
+          ps.x = local.x;
+          ps.z = local.z;
+          this.tanks[this.localId]?.setPosition(local.x, local.z);
+        } else {
+          // Smooth reconciliation for minor prediction error
+          ps.x += dx * 0.2;
+          ps.z += dz * 0.2;
+        }
+      } else {
+        this.playerStates[this.localId] = {
+          x: local.x,
+          z: local.z,
+          rotation: local.rotation || 0,
+          turretRotation: local.turretRotation || 0,
+          health: local.health,
+          score: local.score,
+          lastShoot: 0,
+          respawnUntil: 0
+        };
+      }
     }
 
     this.bulletStates = state.bullets || [];

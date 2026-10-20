@@ -150,8 +150,13 @@ class App {
   }
 
   _setupClientEvents() {
+    let lastLocalScore = 0;
+    let lastRemoteScore = 0;
+
     this.client.on('match-start', ({ role, localId, peerId, isBot, isHost }) => {
       console.log(`[Game] Match started as ${role} vs ${peerId} (bot: ${isBot})`);
+      lastLocalScore = 0;
+      lastRemoteScore = 0;
       this.hud.show();
       this.hud.updateHealth(MAX_HEALTH, MAX_HEALTH);
       this.hud.updateScore(0, 0);
@@ -171,6 +176,15 @@ class App {
           if (local && remote) {
             this.hud.updateHealth(local.health, remote.health);
             this.hud.updateScore(local.score, remote.score);
+
+            if (local.score > lastLocalScore) {
+              this.hud.showMessage('🎯 POINT SCORED!', 1500);
+              lastLocalScore = local.score;
+            }
+            if (remote.score > lastRemoteScore) {
+              this.hud.showMessage('💥 FOE SCORED!', 1500);
+              lastRemoteScore = remote.score;
+            }
           }
         };
 
@@ -198,11 +212,20 @@ class App {
 
     this.client.on('binary', (arrayBuffer) => {
       this.engine.applyBinaryState(arrayBuffer);
-      const local = this.engine.playerStates[this.client.localId];
-      const remote = this.engine.playerStates[this.client.peerId];
+      const local = this.engine.playerStates[this.client.localId] || this.engine.playerStates[this.engine.localId];
+      const remote = this.engine.playerStates[this.client.peerId] || this.engine.playerStates[this.engine.remoteId];
       if (local && remote) {
         this.hud.updateHealth(local.health, remote.health);
         this.hud.updateScore(local.score, remote.score);
+
+        if (local.score > lastLocalScore) {
+          this.hud.showMessage('🎯 POINT SCORED!', 1500);
+          lastLocalScore = local.score;
+        }
+        if (remote.score > lastRemoteScore) {
+          this.hud.showMessage('💥 FOE SCORED!', 1500);
+          lastRemoteScore = remote.score;
+        }
       }
     });
 
@@ -213,6 +236,15 @@ class App {
       if (local && remote) {
         this.hud.updateHealth(local.health, remote.health);
         this.hud.updateScore(local.score, remote.score);
+
+        if (local.score > lastLocalScore) {
+          this.hud.showMessage('🎯 POINT SCORED!', 1500);
+          lastLocalScore = local.score;
+        }
+        if (remote.score > lastRemoteScore) {
+          this.hud.showMessage('💥 FOE SCORED!', 1500);
+          lastRemoteScore = remote.score;
+        }
       }
     });
 
