@@ -1208,6 +1208,357 @@ var H = class {
 	}
 };
 //#endregion
+//#region src/sdk/netcode/Schema.js
+function U(e) {
+	let t = Object.entries(e).map(([e, t]) => typeof t == "string" ? {
+		name: e,
+		type: t,
+		scale: t === "fixed16" ? 100 : 1
+	} : {
+		name: e,
+		type: t.type || "fixed16",
+		scale: t.scale || 100
+	}), n = new R(512);
+	return {
+		fields: t,
+		encode(e, r = null) {
+			let i = r || n.reset();
+			for (let n = 0; n < t.length; n++) {
+				let { name: r, type: a, scale: o } = t[n], s = e ? e[r] : 0;
+				switch (a) {
+					case "uint8":
+						i.writeUint8(s || 0);
+						break;
+					case "int8":
+						i.writeInt8(s || 0);
+						break;
+					case "uint16":
+						i.writeUint16(s || 0);
+						break;
+					case "int16":
+						i.writeInt16(s || 0);
+						break;
+					case "uint32":
+						i.writeUint32(s || 0);
+						break;
+					case "int32":
+						i.writeInt32(s || 0);
+						break;
+					case "float32":
+						i.writeFloat32(s || 0);
+						break;
+					case "fixed16":
+						i.writeFixed16(s || 0, o);
+						break;
+					case "boolean":
+					case "bool":
+						i.writeBoolean(!!s);
+						break;
+					case "string":
+						i.writeString(s || "");
+						break;
+					default: i.writeFloat32(s || 0);
+				}
+			}
+			return r ? i : i.getView();
+		},
+		decode(e) {
+			let n = e instanceof z ? e : new z(e), r = {};
+			for (let e = 0; e < t.length; e++) {
+				let { name: i, type: a, scale: o } = t[e];
+				switch (a) {
+					case "uint8":
+						r[i] = n.readUint8();
+						break;
+					case "int8":
+						r[i] = n.readInt8();
+						break;
+					case "uint16":
+						r[i] = n.readUint16();
+						break;
+					case "int16":
+						r[i] = n.readInt16();
+						break;
+					case "uint32":
+						r[i] = n.readUint32();
+						break;
+					case "int32":
+						r[i] = n.readInt32();
+						break;
+					case "float32":
+						r[i] = n.readFloat32();
+						break;
+					case "fixed16":
+						r[i] = n.readFixed16(o);
+						break;
+					case "boolean":
+					case "bool":
+						r[i] = n.readBoolean();
+						break;
+					case "string":
+						r[i] = n.readString();
+						break;
+					default: r[i] = n.readFloat32();
+				}
+			}
+			return r;
+		}
+	};
+}
+//#endregion
+//#region src/sdk/controls/TouchControls.js
+var W = class {
+	constructor(e = {}) {
+		this.container = e.container || document.body, this.forceShow = e.forceShow || !1, this.onMove = e.onMove || null, this.onAim = e.onAim || null, this.onFire = e.onFire || null, this.isTouchDevice = this.forceShow || "ontouchstart" in window || navigator.maxTouchPoints > 0, this.maxRadius = e.maxRadius || 55, this.deadzone = e.deadzone || .15, this.state = {
+			move: {
+				x: 0,
+				y: 0,
+				up: !1,
+				down: !1,
+				left: !1,
+				right: !1,
+				angle: 0,
+				active: !1
+			},
+			aim: {
+				x: 0,
+				y: 0,
+				angle: 0,
+				active: !1
+			},
+			fire: !1
+		}, this.leftTouchId = null, this.leftCenter = {
+			x: 0,
+			y: 0
+		}, this.rightTouchId = null, this.rightCenter = {
+			x: 0,
+			y: 0
+		}, this.dom = null, this.isTouchDevice && (this._buildDOM(), this._attachEvents());
+	}
+	_buildDOM() {
+		this._injectStyles(), this.dom = document.createElement("div"), this.dom.className = "mereb-touch-overlay", this.leftZone = document.createElement("div"), this.leftZone.className = "mereb-touch-zone left-zone", this.leftBase = document.createElement("div"), this.leftBase.className = "mereb-joystick-base left-base", this.leftKnob = document.createElement("div"), this.leftKnob.className = "mereb-joystick-knob left-knob", this.leftBase.appendChild(this.leftKnob), this.leftZone.appendChild(this.leftBase), this.rightZone = document.createElement("div"), this.rightZone.className = "mereb-touch-zone right-zone", this.rightBase = document.createElement("div"), this.rightBase.className = "mereb-joystick-base right-base", this.rightKnob = document.createElement("div"), this.rightKnob.className = "mereb-joystick-knob right-knob", this.rightBase.appendChild(this.rightKnob), this.rightZone.appendChild(this.rightBase), this.fireBtn = document.createElement("button"), this.fireBtn.className = "mereb-fire-btn", this.fireBtn.innerHTML = "\n      <span class=\"fire-icon\">💥</span>\n      <span class=\"fire-text\">FIRE</span>\n    ", this.rightZone.appendChild(this.fireBtn), this.dom.appendChild(this.leftZone), this.dom.appendChild(this.rightZone), this.container.appendChild(this.dom);
+	}
+	_injectStyles() {
+		if (document.getElementById("mereb-touch-styles")) return;
+		let e = document.createElement("style");
+		e.id = "mereb-touch-styles", e.textContent = "\n      .mereb-touch-overlay {\n        position: absolute;\n        top: 0; left: 0; width: 100%; height: 100%;\n        pointer-events: none;\n        z-index: 25;\n        user-select: none;\n        -webkit-user-select: none;\n        touch-action: none;\n      }\n      .mereb-touch-zone {\n        position: absolute;\n        top: 25%;\n        bottom: 0;\n        width: 50%;\n        pointer-events: auto;\n        touch-action: none;\n      }\n      .left-zone {\n        left: 0;\n      }\n      .right-zone {\n        right: 0;\n      }\n\n      /* Joystick Base */\n      .mereb-joystick-base {\n        position: absolute;\n        width: 120px;\n        height: 120px;\n        border-radius: 50%;\n        background: radial-gradient(circle, rgba(15, 23, 42, 0.7) 0%, rgba(30, 41, 59, 0.4) 100%);\n        border: 2px solid rgba(255, 255, 255, 0.2);\n        box-shadow: 0 0 15px rgba(0, 0, 0, 0.5), inset 0 0 10px rgba(255, 255, 255, 0.05);\n        pointer-events: none;\n        opacity: 0.45;\n        transition: opacity 0.15s ease, border-color 0.15s ease;\n        margin-left: -60px;\n        margin-top: -60px;\n      }\n      .mereb-joystick-base.active {\n        opacity: 0.9;\n        border-color: #38bdf8;\n        box-shadow: 0 0 20px rgba(56, 189, 248, 0.4), inset 0 0 15px rgba(56, 189, 248, 0.2);\n      }\n\n      .left-base {\n        left: 80px;\n        bottom: 80px;\n      }\n      .right-base {\n        right: 170px;\n        bottom: 80px;\n      }\n\n      /* Joystick Knob */\n      .mereb-joystick-knob {\n        position: absolute;\n        width: 50px;\n        height: 50px;\n        border-radius: 50%;\n        background: linear-gradient(135deg, #38bdf8, #0284c7);\n        border: 2px solid #ffffff;\n        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4);\n        left: 35px;\n        top: 35px;\n        pointer-events: none;\n        transition: transform 0.06s cubic-bezier(0.1, 0.9, 0.2, 1);\n      }\n      .right-knob {\n        background: linear-gradient(135deg, #f87171, #dc2626);\n      }\n\n      /* Fire Button (Chunky Arcade 3D) */\n      .mereb-fire-btn {\n        position: absolute;\n        right: 28px;\n        bottom: 50px;\n        width: 90px;\n        height: 90px;\n        border-radius: 50%;\n        background: linear-gradient(180deg, #ef4444 0%, #b91c1c 100%);\n        border: 3px solid #fecaca;\n        border-bottom: 6px solid #7f1d1d;\n        color: #ffffff;\n        display: flex;\n        flex-direction: column;\n        align-items: center;\n        justify-content: center;\n        box-shadow: 0 8px 20px rgba(239, 68, 68, 0.45);\n        font-family: 'Fredoka', system-ui, sans-serif;\n        font-weight: 700;\n        cursor: pointer;\n        pointer-events: auto;\n        touch-action: none;\n        user-select: none;\n        transition: transform 0.05s, border-bottom-width 0.05s, box-shadow 0.05s;\n        z-index: 30;\n      }\n      .mereb-fire-btn .fire-icon {\n        font-size: 24px;\n        line-height: 1;\n        pointer-events: none;\n      }\n      .mereb-fire-btn .fire-text {\n        font-size: 13px;\n        letter-spacing: 0.5px;\n        pointer-events: none;\n      }\n      .mereb-fire-btn:active, .mereb-fire-btn.pressed {\n        transform: translateY(4px);\n        border-bottom-width: 2px;\n        box-shadow: 0 2px 10px rgba(239, 68, 68, 0.6);\n        background: #dc2626;\n      }\n    ", document.head.appendChild(e);
+	}
+	_attachEvents() {
+		let e = (e) => {
+			e.preventDefault();
+			let t = this.container.getBoundingClientRect(), n = t.left + t.width / 2;
+			for (let r = 0; r < e.changedTouches.length; r++) {
+				let i = e.changedTouches[r], a = i.clientX, o = i.clientY, s = this.fireBtn.getBoundingClientRect();
+				if (a >= s.left && a <= s.right && o >= s.top && o <= s.bottom) {
+					this.state.fire = !0, this.fireBtn.classList.add("pressed"), this.onFire && this.onFire(!0);
+					continue;
+				}
+				a < n && this.leftTouchId === null ? (this.leftTouchId = i.identifier, this.leftCenter = {
+					x: a - t.left,
+					y: o - t.top
+				}, this.leftBase.style.left = `${this.leftCenter.x}px`, this.leftBase.style.top = `${this.leftCenter.y}px`, this.leftBase.style.bottom = "auto", this.leftBase.classList.add("active"), this.state.move.active = !0) : a >= n && this.rightTouchId === null && (this.rightTouchId = i.identifier, this.rightCenter = {
+					x: a - t.left,
+					y: o - t.top
+				}, this.rightBase.style.left = `${this.rightCenter.x}px`, this.rightBase.style.top = `${this.rightCenter.y}px`, this.rightBase.style.right = "auto", this.rightBase.style.bottom = "auto", this.rightBase.classList.add("active"), this.state.aim.active = !0);
+			}
+		}, t = (e) => {
+			e.preventDefault();
+			let t = this.container.getBoundingClientRect();
+			for (let n = 0; n < e.changedTouches.length; n++) {
+				let r = e.changedTouches[n], i = r.clientX - t.left, a = r.clientY - t.top;
+				if (r.identifier === this.leftTouchId) {
+					let e = i - this.leftCenter.x, t = a - this.leftCenter.y, n = Math.sqrt(e * e + t * t), r = Math.atan2(t, e), o = Math.min(n, this.maxRadius), s = o / this.maxRadius, c = Math.cos(r) * o, l = Math.sin(r) * o;
+					if (this.leftKnob.style.transform = `translate(${c}px, ${l}px)`, s > this.deadzone) {
+						let i = e / n * s, a = t / n * s;
+						this.state.move.x = i, this.state.move.y = a, this.state.move.angle = r, this.state.move.left = i < -.3, this.state.move.right = i > .3, this.state.move.up = a < -.3, this.state.move.down = a > .3;
+					} else this.state.move.x = 0, this.state.move.y = 0, this.state.move.left = !1, this.state.move.right = !1, this.state.move.up = !1, this.state.move.down = !1;
+					this.onMove && this.onMove(this.state.move);
+				}
+				if (r.identifier === this.rightTouchId) {
+					let e = i - this.rightCenter.x, t = a - this.rightCenter.y, n = Math.sqrt(e * e + t * t), r = Math.atan2(e, -t), o = Math.min(n, this.maxRadius), s = o / this.maxRadius, c = Math.sin(r) * o, l = -Math.cos(r) * o;
+					this.rightKnob.style.transform = `translate(${c}px, ${l}px)`, s > this.deadzone && (this.state.aim.x = Math.sin(r) * s, this.state.aim.y = -Math.cos(r) * s, this.state.aim.angle = r, s > .4 && (this.state.fire = !0)), this.onAim && this.onAim(this.state.aim);
+				}
+			}
+		}, n = (e) => {
+			this.container.getBoundingClientRect();
+			for (let t = 0; t < e.changedTouches.length; t++) {
+				let n = e.changedTouches[t], r = n.clientX, i = n.clientY, a = this.fireBtn.getBoundingClientRect();
+				r >= a.left && r <= a.right && i >= a.top && i <= a.bottom && (this.state.fire = !1, this.fireBtn.classList.remove("pressed"), this.onFire && this.onFire(!1)), n.identifier === this.leftTouchId && (this.leftTouchId = null, this.leftKnob.style.transform = "translate(0px, 0px)", this.leftBase.classList.remove("active"), this.state.move = {
+					x: 0,
+					y: 0,
+					up: !1,
+					down: !1,
+					left: !1,
+					right: !1,
+					angle: 0,
+					active: !1
+				}, this.onMove && this.onMove(this.state.move)), n.identifier === this.rightTouchId && (this.rightTouchId = null, this.rightKnob.style.transform = "translate(0px, 0px)", this.rightBase.classList.remove("active"), this.state.aim.active = !1, this.fireBtn.classList.contains("pressed") || (this.state.fire = !1), this.onAim && this.onAim(this.state.aim));
+			}
+		};
+		this.dom.addEventListener("touchstart", e, { passive: !1 }), this.dom.addEventListener("touchmove", t, { passive: !1 }), this.dom.addEventListener("touchend", n, { passive: !1 }), this.dom.addEventListener("touchcancel", n, { passive: !1 }), this.fireBtn.addEventListener("touchstart", (e) => {
+			e.stopPropagation(), e.preventDefault(), this.state.fire = !0, this.fireBtn.classList.add("pressed"), this.onFire && this.onFire(!0);
+		}, { passive: !1 });
+		let r = (e) => {
+			e.stopPropagation(), this.state.fire = !1, this.fireBtn.classList.remove("pressed"), this.onFire && this.onFire(!1);
+		};
+		this.fireBtn.addEventListener("touchend", r), this.fireBtn.addEventListener("touchcancel", r);
+	}
+	show() {
+		this.dom && (this.dom.style.display = "block");
+	}
+	hide() {
+		this.dom && (this.dom.style.display = "none");
+	}
+	getState() {
+		return {
+			move: { ...this.state.move },
+			aim: { ...this.state.aim },
+			fire: this.state.fire
+		};
+	}
+	destroy() {
+		this.dom && this.dom.parentNode && this.dom.parentNode.removeChild(this.dom);
+	}
+}, G = class {
+	constructor(e, t = {}) {
+		this.client = e, this.container = t.container || document.body, this.engine = t.engine || null, this.visible = !1, this.activeTab = "console", this.artificialLagMs = 0, this.artificialDropRate = 0, this.logs = [], this.maxLogs = 100, this._buildDOM(), this._attachGlobalHotkey(), this._hookClientEvents();
+	}
+	_buildDOM() {
+		this._injectStyles(), this.pill = document.createElement("button"), this.pill.className = "mereb-terminal-pill", this.pill.innerHTML = "⚡ <span class=\"pill-text\">MEREB DEV</span>", this.pill.title = "Toggle Mereb Netcode Terminal (` or ~)", this.pill.addEventListener("click", () => this.toggle()), this.container.appendChild(this.pill), this.element = document.createElement("div"), this.element.className = "mereb-terminal-modal", this.element.style.display = "none", this.element.innerHTML = "\n      <div class=\"terminal-header\">\n        <div class=\"terminal-title\">\n          <span class=\"terminal-badge\">⚡ MEREB NETCODE v1.0</span>\n          <span class=\"terminal-status-dot\"></span>\n          <span class=\"terminal-room-id\">OFFLINE</span>\n        </div>\n        <div class=\"terminal-tabs\">\n          <button class=\"terminal-tab-btn active\" data-tab=\"console\">💻 CONSOLE</button>\n          <button class=\"terminal-tab-btn\" data-tab=\"telemetry\">📊 TELEMETRY</button>\n          <button class=\"terminal-tab-btn\" data-tab=\"chaos\">🧪 CHAOS SIM</button>\n          <button class=\"terminal-tab-btn\" data-tab=\"entities\">📦 ENTITIES</button>\n        </div>\n        <button class=\"terminal-close-btn\" title=\"Close\">✕</button>\n      </div>\n\n      <div class=\"terminal-body\">\n        <!-- Tab 1: Console -->\n        <div class=\"terminal-tab-content tab-console active\">\n          <div class=\"terminal-output\"></div>\n          <form class=\"terminal-input-bar\">\n            <span class=\"terminal-prompt\">&gt;</span>\n            <input type=\"text\" class=\"terminal-input\" placeholder=\"Type a command (or 'help')...\" />\n            <button type=\"submit\" class=\"terminal-send-btn\">RUN</button>\n          </form>\n        </div>\n\n        <!-- Tab 2: Telemetry -->\n        <div class=\"terminal-tab-content tab-telemetry\">\n          <div class=\"telemetry-grid\">\n            <div class=\"telemetry-card\">\n              <div class=\"telemetry-label\">RTT / PING</div>\n              <div class=\"telemetry-value telemetry-ping\">-- ms</div>\n            </div>\n            <div class=\"telemetry-card\">\n              <div class=\"telemetry-label\">JITTER</div>\n              <div class=\"telemetry-value telemetry-jitter\">-- ms</div>\n            </div>\n            <div class=\"telemetry-card\">\n              <div class=\"telemetry-label\">PACKET LOSS</div>\n              <div class=\"telemetry-value telemetry-loss\">0%</div>\n            </div>\n            <div class=\"telemetry-card\">\n              <div class=\"telemetry-label\">WEBRTC STATE</div>\n              <div class=\"telemetry-value telemetry-rtc\">DISCONNECTED</div>\n            </div>\n            <div class=\"telemetry-card\">\n              <div class=\"telemetry-label\">PEER ROLE</div>\n              <div class=\"telemetry-value telemetry-role\">NONE</div>\n            </div>\n            <div class=\"telemetry-card\">\n              <div class=\"telemetry-label\">ROOM CODE</div>\n              <div class=\"telemetry-value telemetry-room\">--</div>\n            </div>\n          </div>\n          <div class=\"telemetry-details\"></div>\n        </div>\n\n        <!-- Tab 3: Chaos Simulator -->\n        <div class=\"terminal-tab-content tab-chaos\">\n          <div class=\"chaos-desc\">\n            Simulate real-world mobile network conditions (3G/4G lag and packet drops) to test client prediction and snapshot interpolation.\n          </div>\n          <div class=\"chaos-controls\">\n            <div class=\"chaos-field\">\n              <label>Artificial Latency: <span class=\"chaos-lag-val\">0ms</span></label>\n              <input type=\"range\" class=\"chaos-lag-slider\" min=\"0\" max=\"600\" step=\"25\" value=\"0\" />\n            </div>\n            <div class=\"chaos-field\">\n              <label>Packet Drop Rate: <span class=\"chaos-drop-val\">0%</span></label>\n              <input type=\"range\" class=\"chaos-drop-slider\" min=\"0\" max=\"50\" step=\"5\" value=\"0\" />\n            </div>\n            <div class=\"chaos-presets\">\n              <button class=\"chaos-preset-btn\" data-lag=\"0\" data-drop=\"0\">🟢 Perfect (0ms)</button>\n              <button class=\"chaos-preset-btn\" data-lag=\"60\" data-drop=\"0\">🟡 4G LTE (60ms)</button>\n              <button class=\"chaos-preset-btn\" data-lag=\"180\" data-drop=\"5\">🟠 Slow 3G (180ms + 5%)</button>\n              <button class=\"chaos-preset-btn\" data-lag=\"400\" data-drop=\"20\">🔴 Extreme (400ms + 20%)</button>\n            </div>\n          </div>\n        </div>\n\n        <!-- Tab 4: Entities -->\n        <div class=\"terminal-tab-content tab-entities\">\n          <pre class=\"entities-json\">No active game state to inspect.</pre>\n        </div>\n      </div>\n    ", this.container.appendChild(this.element), this.closeBtn = this.element.querySelector(".terminal-close-btn"), this.closeBtn.addEventListener("click", () => this.hide()), this.output = this.element.querySelector(".terminal-output"), this.input = this.element.querySelector(".terminal-input"), this.form = this.element.querySelector(".terminal-input-bar"), this.form.addEventListener("submit", (e) => {
+			e.preventDefault();
+			let t = this.input.value.trim();
+			t && (this.executeCommand(t), this.input.value = "");
+		}), this.tabBtns = this.element.querySelectorAll(".terminal-tab-btn"), this.tabBtns.forEach((e) => {
+			e.addEventListener("click", () => {
+				let t = e.dataset.tab;
+				this.switchTab(t);
+			});
+		});
+		let e = this.element.querySelector(".chaos-lag-slider"), t = this.element.querySelector(".chaos-lag-val");
+		e.addEventListener("input", (e) => {
+			this.artificialLagMs = parseInt(e.target.value, 10), t.innerText = `${this.artificialLagMs}ms`, this.log(`[Chaos] Injected artificial latency: ${this.artificialLagMs}ms`, "warn");
+		});
+		let n = this.element.querySelector(".chaos-drop-slider"), r = this.element.querySelector(".chaos-drop-val");
+		n.addEventListener("input", (e) => {
+			this.artificialDropRate = parseInt(e.target.value, 10) / 100, r.innerText = `${e.target.value}%`, this.log(`[Chaos] Injected packet drop rate: ${e.target.value}%`, "warn");
+		}), this.element.querySelectorAll(".chaos-preset-btn").forEach((i) => {
+			i.addEventListener("click", () => {
+				let a = parseInt(i.dataset.lag, 10), o = parseInt(i.dataset.drop, 10);
+				e.value = a, n.value = o, this.artificialLagMs = a, this.artificialDropRate = o / 100, t.innerText = `${a}ms`, r.innerText = `${o}%`, this.log(`[Chaos] Preset applied: Lag ${a}ms, Drop ${o}%`, "info");
+			});
+		}), this.log("Mereb Terminal Initialized. Type \"help\" for commands.", "system");
+	}
+	_injectStyles() {
+		if (document.getElementById("mereb-terminal-styles")) return;
+		let e = document.createElement("style");
+		e.id = "mereb-terminal-styles", e.textContent = "\n      .mereb-terminal-pill {\n        position: fixed;\n        bottom: 16px;\n        left: 16px;\n        background: rgba(15, 23, 42, 0.85);\n        border: 1px solid rgba(56, 189, 248, 0.5);\n        color: #38bdf8;\n        border-radius: 9999px;\n        padding: 6px 14px;\n        font-family: 'Fredoka', ui-monospace, monospace;\n        font-size: 12px;\n        font-weight: 700;\n        cursor: pointer;\n        z-index: 1000;\n        display: flex;\n        align-items: center;\n        gap: 6px;\n        backdrop-filter: blur(10px);\n        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);\n        transition: transform 0.1s, background 0.15s;\n      }\n      .mereb-terminal-pill:hover {\n        transform: scale(1.05);\n        background: rgba(56, 189, 248, 0.15);\n      }\n\n      .mereb-terminal-modal {\n        position: fixed;\n        top: 50%;\n        left: 50%;\n        transform: translate(-50%, -50%);\n        width: min(850px, 92vw);\n        height: min(520px, 85vh);\n        background: rgba(10, 15, 30, 0.94);\n        border: 1px solid rgba(56, 189, 248, 0.35);\n        border-radius: 14px;\n        box-shadow: 0 25px 60px rgba(0, 0, 0, 0.85), 0 0 30px rgba(56, 189, 248, 0.15);\n        backdrop-filter: blur(16px);\n        z-index: 2000;\n        display: flex;\n        flex-direction: column;\n        overflow: hidden;\n        font-family: 'JetBrains Mono', 'Fira Code', ui-monospace, monospace;\n        color: #e2e8f0;\n      }\n\n      .terminal-header {\n        display: flex;\n        align-items: center;\n        justify-content: space-between;\n        padding: 10px 16px;\n        background: rgba(15, 23, 42, 0.9);\n        border-bottom: 1px solid rgba(255, 255, 255, 0.1);\n      }\n      .terminal-title {\n        display: flex;\n        align-items: center;\n        gap: 8px;\n        font-size: 12px;\n      }\n      .terminal-badge {\n        color: #38bdf8;\n        font-weight: 700;\n      }\n      .terminal-status-dot {\n        width: 8px;\n        height: 8px;\n        border-radius: 50%;\n        background: #ef4444;\n      }\n      .terminal-status-dot.connected {\n        background: #22c55e;\n      }\n      .terminal-room-id {\n        font-size: 11px;\n        color: #94a3b8;\n      }\n\n      .terminal-tabs {\n        display: flex;\n        gap: 4px;\n      }\n      .terminal-tab-btn {\n        background: transparent;\n        border: none;\n        color: #94a3b8;\n        font-family: inherit;\n        font-size: 11px;\n        font-weight: 600;\n        padding: 6px 12px;\n        border-radius: 6px;\n        cursor: pointer;\n        transition: color 0.15s, background 0.15s;\n      }\n      .terminal-tab-btn:hover {\n        color: #fff;\n        background: rgba(255, 255, 255, 0.05);\n      }\n      .terminal-tab-btn.active {\n        color: #38bdf8;\n        background: rgba(56, 189, 248, 0.15);\n      }\n\n      .terminal-close-btn {\n        background: transparent;\n        border: none;\n        color: #94a3b8;\n        font-size: 16px;\n        cursor: pointer;\n        padding: 4px 8px;\n        border-radius: 4px;\n      }\n      .terminal-close-btn:hover {\n        color: #fff;\n        background: rgba(239, 68, 68, 0.3);\n      }\n\n      .terminal-body {\n        flex: 1;\n        display: flex;\n        flex-direction: column;\n        overflow: hidden;\n      }\n      .terminal-tab-content {\n        flex: 1;\n        display: none;\n        flex-direction: column;\n        padding: 14px;\n        overflow-y: auto;\n      }\n      .terminal-tab-content.active {\n        display: flex;\n      }\n\n      /* Console Tab */\n      .terminal-output {\n        flex: 1;\n        overflow-y: auto;\n        font-size: 12px;\n        line-height: 1.6;\n        display: flex;\n        flex-direction: column;\n        gap: 3px;\n        margin-bottom: 10px;\n        word-break: break-all;\n      }\n      .terminal-log-line {\n        display: flex;\n        gap: 8px;\n      }\n      .terminal-log-time {\n        color: #64748b;\n        font-size: 11px;\n      }\n      .log-info { color: #38bdf8; }\n      .log-warn { color: #facc15; }\n      .log-error { color: #f87171; }\n      .log-system { color: #a855f7; }\n      .log-success { color: #4ade80; }\n\n      .terminal-input-bar {\n        display: flex;\n        align-items: center;\n        background: rgba(15, 23, 42, 0.8);\n        border: 1px solid rgba(255, 255, 255, 0.15);\n        border-radius: 8px;\n        padding: 4px 10px;\n        gap: 8px;\n      }\n      .terminal-prompt {\n        color: #38bdf8;\n        font-weight: 700;\n      }\n      .terminal-input {\n        flex: 1;\n        background: transparent;\n        border: none;\n        outline: none;\n        color: #f1f5f9;\n        font-family: inherit;\n        font-size: 13px;\n      }\n      .terminal-send-btn {\n        background: #0284c7;\n        color: #fff;\n        border: none;\n        border-radius: 6px;\n        padding: 4px 12px;\n        font-family: inherit;\n        font-size: 11px;\n        font-weight: 700;\n        cursor: pointer;\n      }\n\n      /* Telemetry Tab */\n      .telemetry-grid {\n        display: grid;\n        grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));\n        gap: 12px;\n        margin-bottom: 16px;\n      }\n      .telemetry-card {\n        background: rgba(15, 23, 42, 0.6);\n        border: 1px solid rgba(255, 255, 255, 0.08);\n        border-radius: 10px;\n        padding: 12px;\n        text-align: center;\n      }\n      .telemetry-label {\n        font-size: 10px;\n        color: #94a3b8;\n        margin-bottom: 6px;\n        letter-spacing: 0.5px;\n      }\n      .telemetry-value {\n        font-size: 16px;\n        font-weight: 700;\n        color: #38bdf8;\n      }\n\n      /* Chaos Tab */\n      .chaos-desc {\n        font-size: 12px;\n        color: #94a3b8;\n        line-height: 1.5;\n        margin-bottom: 18px;\n      }\n      .chaos-controls {\n        display: flex;\n        flex-direction: column;\n        gap: 16px;\n      }\n      .chaos-field label {\n        display: flex;\n        justify-content: space-between;\n        font-size: 12px;\n        font-weight: 600;\n        margin-bottom: 6px;\n      }\n      .chaos-field input[type=\"range\"] {\n        width: 100%;\n        accent-color: #38bdf8;\n      }\n      .chaos-presets {\n        display: flex;\n        flex-wrap: wrap;\n        gap: 8px;\n        margin-top: 10px;\n      }\n      .chaos-preset-btn {\n        background: rgba(30, 41, 59, 0.7);\n        border: 1px solid rgba(255, 255, 255, 0.1);\n        color: #cbd5e1;\n        font-family: inherit;\n        font-size: 11px;\n        padding: 8px 14px;\n        border-radius: 8px;\n        cursor: pointer;\n        transition: background 0.1s;\n      }\n      .chaos-preset-btn:hover {\n        background: rgba(56, 189, 248, 0.2);\n        color: #fff;\n      }\n\n      /* Entities Tab */\n      .entities-json {\n        background: rgba(15, 23, 42, 0.6);\n        border: 1px solid rgba(255, 255, 255, 0.08);\n        border-radius: 10px;\n        padding: 14px;\n        font-size: 12px;\n        line-height: 1.5;\n        overflow-x: auto;\n        color: #38bdf8;\n      }\n    ", document.head.appendChild(e);
+	}
+	_attachGlobalHotkey() {
+		window.addEventListener("keydown", (e) => {
+			(e.key === "`" || e.key === "~") && e.target.tagName !== "INPUT" && e.target.tagName !== "TEXTAREA" && (e.preventDefault(), this.toggle());
+		});
+	}
+	_hookClientEvents() {
+		this.client && (this.client.on("status", (e) => {
+			this.log(`[Status] ${e}`, "info"), this._updateHeader();
+		}), this.client.on("quality", (e) => {
+			this._updateTelemetry(e);
+		}), this.client.on("match-start", (e) => {
+			this.log(`[Match] Started as ${e.role} vs ${e.peerId}`, "success"), this._updateHeader();
+		}), this.client.on("event", (e) => {
+			this.log(`[Event] ${e.name}: ${JSON.stringify(e.data || {})}`, "info");
+		}), this.client.on("error", (e) => {
+			this.log(`[Error] ${e.message || e}`, "error");
+		}));
+	}
+	toggle() {
+		this.visible ? this.hide() : this.show();
+	}
+	show() {
+		this.visible = !0, this.element.style.display = "flex", this.input.focus(), this._refreshEntities();
+	}
+	hide() {
+		this.visible = !1, this.element.style.display = "none";
+	}
+	switchTab(e) {
+		this.activeTab = e, this.tabBtns.forEach((t) => {
+			t.classList.toggle("active", t.dataset.tab === e);
+		}), this.element.querySelectorAll(".terminal-tab-content").forEach((t) => {
+			t.classList.toggle("active", t.classList.contains(`tab-${e}`));
+		}), e === "entities" && this._refreshEntities();
+	}
+	log(e, t = "info") {
+		let n = (/* @__PURE__ */ new Date()).toLocaleTimeString(), r = {
+			time: n,
+			message: e,
+			type: t
+		};
+		if (this.logs.push(r), this.logs.length > this.maxLogs && this.logs.shift(), this.output) {
+			let r = document.createElement("div");
+			r.className = `terminal-log-line log-${t}`, r.innerHTML = `<span class="terminal-log-time">[${n}]</span> <span class="terminal-log-msg">${this._escapeHTML(e)}</span>`, this.output.appendChild(r), this.output.scrollTop = this.output.scrollHeight;
+		}
+	}
+	executeCommand(e) {
+		this.log(`> ${e}`, "system");
+		let [t, ...n] = e.trim().split(/\s+/), r = t.toLowerCase();
+		switch (r) {
+			case "help":
+				this.log("Available Commands:", "info"), this.log("  help                 - Show this help list", "info"), this.log("  status               - Dump connection & room status", "info"), this.log("  state                - Inspect player/bullet entities", "info"), this.log("  lag <ms>             - Simulate network latency (e.g. lag 150)", "info"), this.log("  drop <percent>       - Simulate packet loss (e.g. drop 10)", "info"), this.log("  kick                 - Forfeit / leave current match", "info"), this.log("  clear                - Clear console output", "info");
+				break;
+			case "status":
+				let e = this.client?.roomCode || "None", t = this.client?.role || "None", i = this.client?.peerId || "None", a = this.client?.localId || "None";
+				this.log(`Status Report: Room=${e} | Role=${t} | Local=${a} | Peer=${i}`, "success");
+				break;
+			case "state":
+				this._refreshEntities(), this.switchTab("entities");
+				break;
+			case "lag":
+				let o = parseInt(n[0], 10) || 0;
+				this.artificialLagMs = o, this.log(`Simulated lag set to ${o}ms`, "warn");
+				break;
+			case "drop":
+				let s = parseInt(n[0], 10) || 0;
+				this.artificialDropRate = s / 100, this.log(`Simulated packet drop rate set to ${s}%`, "warn");
+				break;
+			case "kick":
+			case "leave":
+				this.client && (this.client.leave(), this.log("Forfeited and disconnected.", "warn"));
+				break;
+			case "clear":
+				this.output && (this.output.innerHTML = ""), this.logs = [];
+				break;
+			default: this.log(`Unknown command: "${r}". Type "help" for options.`, "error");
+		}
+	}
+	_updateHeader() {
+		let e = this.element.querySelector(".terminal-room-id"), t = this.element.querySelector(".terminal-status-dot"), n = this.client && this.client.peer && this.client.peer.connected;
+		t && t.classList.toggle("connected", n), e && (e.innerText = this.client?.roomCode ? `ROOM: ${this.client.roomCode}` : "OFFLINE");
+		let r = this.element.querySelector(".telemetry-rtc"), i = this.element.querySelector(".telemetry-role"), a = this.element.querySelector(".telemetry-room");
+		r && (r.innerText = n ? "CONNECTED" : this.client?.status || "IDLE"), i && (i.innerText = this.client?.role || "NONE"), a && (a.innerText = this.client?.roomCode || "--");
+	}
+	_updateTelemetry(e) {
+		if (!e) return;
+		let t = this.element.querySelector(".telemetry-ping"), n = this.element.querySelector(".telemetry-jitter"), r = this.element.querySelector(".telemetry-loss");
+		t && (t.innerText = `${e.ping || 0} ms`), n && (n.innerText = `${e.jitter || 0} ms`), r && (r.innerText = `${e.packetLoss || 0}%`);
+	}
+	_refreshEntities() {
+		let e = this.element.querySelector(".entities-json");
+		e && (e.innerText = this.engine && this.engine.playerStates ? JSON.stringify({
+			players: this.engine.playerStates,
+			bullets: this.engine.bulletStates || []
+		}, null, 2) : "No entity states available.");
+	}
+	_escapeHTML(e) {
+		return e.replace(/[&<>'"]/g, (e) => ({
+			"&": "&amp;",
+			"<": "&lt;",
+			">": "&gt;",
+			"'": "&#39;",
+			"\"": "&quot;"
+		})[e] || e);
+	}
+};
+//#endregion
 //#region src/sdk/index.js
 typeof window < "u" && (window.Mereb = {
 	MerebClient: P,
@@ -1217,6 +1568,9 @@ typeof window < "u" && (window.Mereb = {
 	BinaryWriter: R,
 	BinaryReader: z,
 	SnapshotInterpolator: H,
+	defineSchema: U,
+	TouchControls: W,
+	MerebTerminal: G,
 	TurnPool: S,
 	NetworkQuality: j,
 	PortalManager: N,
@@ -1225,4 +1579,4 @@ typeof window < "u" && (window.Mereb = {
 	...C
 });
 //#endregion
-export { z as BinaryReader, R as BinaryWriter, O as DC, w as DEFAULT_ICE_SERVERS, b as DEFAULT_STUN_SERVERS, x as DEFAULT_TURN_SERVERS, P as MerebClient, F as MerebLobby, j as NetworkQuality, M as PeerConnection, N as PortalManager, T as ROLE, E as STATUS, A as SignalingClient, H as SnapshotInterpolator, S as TurnPool, D as WS, k as generateRoomCode };
+export { z as BinaryReader, R as BinaryWriter, O as DC, w as DEFAULT_ICE_SERVERS, b as DEFAULT_STUN_SERVERS, x as DEFAULT_TURN_SERVERS, P as MerebClient, F as MerebLobby, G as MerebTerminal, j as NetworkQuality, M as PeerConnection, N as PortalManager, T as ROLE, E as STATUS, A as SignalingClient, H as SnapshotInterpolator, W as TouchControls, S as TurnPool, D as WS, U as defineSchema, k as generateRoomCode };

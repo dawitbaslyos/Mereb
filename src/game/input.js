@@ -1,3 +1,5 @@
+import { TouchControls } from '../sdk/controls/TouchControls.js';
+
 export class InputManager {
   constructor(canvas) {
     this.canvas = canvas;
@@ -6,6 +8,12 @@ export class InputManager {
     this.mouseShoot = false;
     this.mouseX = (canvas.clientWidth || window.innerWidth) / 2;
     this.mouseY = 0;
+    this.lastAimAngle = 0;
+
+    // Attach Mobile Dual Virtual Joystick overlay
+    this.touch = new TouchControls({
+      container: document.getElementById('ui-layer') || canvas.parentElement || document.body
+    });
 
     this.onKeyDown = (e) => {
       const k = e.key.toLowerCase();
@@ -42,89 +50,41 @@ export class InputManager {
       if (e.button === 0) this.mouseShoot = false;
     };
 
-    this.touchLeftId = null;
-    this.touchRightId = null;
-    this.touchLeftStart = { x: 0, y: 0 };
-    this.touchLeftCurrent = { x: 0, y: 0 };
-
-    this.onTouchStart = (e) => {
-      const rect = this.canvas.getBoundingClientRect();
-      const midX = rect.width / 2;
-      for (let i = 0; i < e.changedTouches.length; i++) {
-        const t = e.changedTouches[i];
-        const tx = t.clientX - rect.left;
-        const ty = t.clientY - rect.top;
-
-        if (tx < midX && this.touchLeftId === null) {
-          // Left side: movement touch
-          this.touchLeftId = t.identifier;
-          this.touchLeftStart = { x: tx, y: ty };
-          this.touchLeftCurrent = { x: tx, y: ty };
-        } else if (tx >= midX && this.touchRightId === null) {
-          // Right side: aim & shoot touch
-          this.touchRightId = t.identifier;
-          this.mouseX = tx;
-          this.mouseY = ty;
-          this.mouseShoot = true;
-        }
-      }
-    };
-
-    this.onTouchMove = (e) => {
-      const rect = this.canvas.getBoundingClientRect();
-      for (let i = 0; i < e.changedTouches.length; i++) {
-        const t = e.changedTouches[i];
-        const tx = t.clientX - rect.left;
-        const ty = t.clientY - rect.top;
-
-        if (t.identifier === this.touchLeftId) {
-          this.touchLeftCurrent = { x: tx, y: ty };
-          const dx = tx - this.touchLeftStart.x;
-          const dy = ty - this.touchLeftStart.y;
-          const threshold = 15;
-          this.keys.left = dx < -threshold;
-          this.keys.right = dx > threshold;
-          this.keys.up = dy < -threshold;
-          this.keys.down = dy > threshold;
-        } else if (t.identifier === this.touchRightId) {
-          this.mouseX = tx;
-          this.mouseY = ty;
-        }
-      }
-    };
-
-    this.onTouchEnd = (e) => {
-      for (let i = 0; i < e.changedTouches.length; i++) {
-        const t = e.changedTouches[i];
-        if (t.identifier === this.touchLeftId) {
-          this.touchLeftId = null;
-          this.keys.left = false;
-          this.keys.right = false;
-          this.keys.up = false;
-          this.keys.down = false;
-        } else if (t.identifier === this.touchRightId) {
-          this.touchRightId = null;
-          this.mouseShoot = false;
-        }
-      }
-    };
-
     window.addEventListener('keydown', this.onKeyDown);
     window.addEventListener('keyup', this.onKeyUp);
     window.addEventListener('mousemove', this.onMouseMove);
     this.canvas.addEventListener('mousedown', this.onMouseDown);
     window.addEventListener('mouseup', this.onMouseUp);
-    this.canvas.addEventListener('touchstart', this.onTouchStart, { passive: false });
-    this.canvas.addEventListener('touchmove', this.onTouchMove, { passive: false });
-    this.canvas.addEventListener('touchend', this.onTouchEnd);
-    this.canvas.addEventListener('touchcancel', this.onTouchEnd);
   }
 
   getInput() {
+    // 1. Mobile Touch Joystick Priority
+    const ts = this.touch?.getState();
+    const isTouchActive = ts && (ts.move.active || ts.aim.active || ts.fire);
+
+    if (isTouchActive) {
+      if (ts.aim.active) {
+        this.lastAimAngle = ts.aim.angle;
+      } else if (ts.move.active) {
+        // If aiming stick isn't touched, aim in movement direction
+        this.lastAimAngle = Math.atan2(ts.move.x, -ts.move.y);
+      }
+
+      return {
+        up: ts.move.up,
+        down: ts.move.down,
+        left: ts.move.left,
+        right: ts.move.right,
+        shoot: ts.fire,
+        aimAngle: this.lastAimAngle
+      };
+    }
+
+    // 2. Desktop Keyboard & Mouse Fallback
     const cw = (this.canvas.clientWidth || window.innerWidth) / 2;
     const ch = (this.canvas.clientHeight || window.innerHeight) / 2;
-    
     const aimAngle = Math.atan2(this.mouseX - cw, -(this.mouseY - ch));
+    this.lastAimAngle = aimAngle;
 
     return {
       up: this.keys.up,
@@ -137,14 +97,14 @@ export class InputManager {
   }
 
   destroy() {
+    if (this.touch) {
+      this.touch.destroy();
+      this.touch = null;
+    }
     window.removeEventListener('keydown', this.onKeyDown);
     window.removeEventListener('keyup', this.onKeyUp);
     window.removeEventListener('mousemove', this.onMouseMove);
     this.canvas.removeEventListener('mousedown', this.onMouseDown);
     window.removeEventListener('mouseup', this.onMouseUp);
-    this.canvas.removeEventListener('touchstart', this.onTouchStart);
-    this.canvas.removeEventListener('touchmove', this.onTouchMove);
-    this.canvas.removeEventListener('touchend', this.onTouchEnd);
-    this.canvas.removeEventListener('touchcancel', this.onTouchEnd);
   }
 }

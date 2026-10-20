@@ -1,4 +1,4 @@
-import { MerebClient, MerebLobby } from './sdk/index.js';
+import { MerebClient, MerebLobby, MerebTerminal } from './sdk/index.js';
 import { GameEngine } from './game/engine.js';
 import { HudUI } from './ui/hud.js';
 import { LandingUI } from './ui/landing.js';
@@ -143,6 +143,12 @@ class App {
       title: '⚔️ MEREB ARENA',
       container: this.uiLayer,
       onHome: () => this.navigate('landing')
+    });
+
+    // In-Game Developer & Netcode Terminal
+    this.terminal = new MerebTerminal(this.client, {
+      container: document.body,
+      engine: this.engine
     });
 
     this._setupClientEvents();

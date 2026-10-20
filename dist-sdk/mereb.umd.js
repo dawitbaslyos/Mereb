@@ -103,4 +103,485 @@ const partysocket = new PartySocket({
 
       <div class="mereb-status-text" id="mereb-status-text"></div>
       <div class="mereb-error-text" id="mereb-error-text"></div>
-    `,this.mainMenu=this.element.querySelector(`#mereb-main-menu`),this.joinMenu=this.element.querySelector(`#mereb-join-menu`),this.roomView=this.element.querySelector(`#mereb-room-view`),this.codeInput=this.element.querySelector(`#mereb-input-code`),this.codeText=this.element.querySelector(`#mereb-code-text`),this.statusText=this.element.querySelector(`#mereb-status-text`),this.errorText=this.element.querySelector(`#mereb-error-text`)}_setupHandlers(){if(this.options.onHome){let e=this.element.querySelector(`#mereb-btn-home`);e&&e.addEventListener(`click`,()=>{this.options.onHome()})}this.element.querySelector(`#mereb-btn-create`).addEventListener(`click`,async()=>{this.setStatus(`Connecting to server...`,!0);try{let{roomCode:e}=await this.client.createRoom();this.mainMenu.style.display=`none`,this.roomView.style.display=`block`,this.codeText.innerText=e,this.setStatus(`Waiting for opponent...`,!0)}catch{this.showError(`Server waking up... Click again in a moment`)}}),this.element.querySelector(`#mereb-btn-join`).addEventListener(`click`,()=>{this.mainMenu.style.display=`none`,this.joinMenu.style.display=`flex`,this.codeInput.focus()});let e=()=>{let e=this.codeInput.value.trim().toUpperCase();e.length===4?(this.setStatus(`Connecting to room...`,!0),this.client.joinRoom(e).catch(()=>{this.showError(`Could not connect to room`)})):this.showError(`Code must be 4 characters`)};this.element.querySelector(`#mereb-btn-submit`).addEventListener(`click`,e),this.codeInput.addEventListener(`keypress`,t=>{t.key===`Enter`&&e()}),this.element.querySelector(`#mereb-btn-quick`).addEventListener(`click`,()=>{this.setStatus(`Finding opponent...`,!0),this.client.quickPlay()});let t=this.element.querySelector(`#mereb-btn-copy`);t.addEventListener(`click`,()=>{let e=this.codeText.innerText,n=`${window.location.origin}${window.location.pathname}?room=${e}`;navigator.clipboard.writeText(n).then(()=>{let e=t.innerText;t.innerText=`COPIED! ✅`,setTimeout(()=>{t.innerText=e},2e3)}).catch(()=>{this.showError(`Failed to copy`)})});let n=()=>{this.client.disconnect(),this.resetToMenu()};this.element.querySelector(`#mereb-btn-join-back`).addEventListener(`click`,n),this.element.querySelector(`#mereb-btn-room-back`).addEventListener(`click`,n),this.client.on(`match-start`,()=>{this.hide()}),this.client.on(`error`,e=>{this.showError(e.message||`Network error`)}),this.client.on(`peer-disconnect`,()=>{this.show(),this.resetToMenu(),this.showError(`Opponent disconnected`)})}setStatus(e,t=!1){this.statusText.innerText=e,t?this.statusText.classList.add(`mereb-dots`):this.statusText.classList.remove(`mereb-dots`)}showError(e){this.errorText.innerText=e,setTimeout(()=>{this.errorText.innerText=``},3500)}resetToMenu(){this.mainMenu.style.display=`flex`,this.joinMenu.style.display=`none`,this.roomView.style.display=`none`,this.codeInput.value=``,this.statusText.innerText=``,this.statusText.classList.remove(`mereb-dots`)}show(){this.element.style.display=`flex`}hide(){this.element.style.display=`none`}},L=typeof TextEncoder<`u`?new TextEncoder:null,R=typeof TextDecoder<`u`?new TextDecoder:null,z=class{constructor(e=512){this.capacity=e,this.buffer=new ArrayBuffer(this.capacity),this.view=new DataView(this.buffer),this.offset=0}_ensureCapacity(e){if(this.offset+e>this.capacity){let t=this.capacity*2;for(;this.offset+e>t;)t*=2;let n=new ArrayBuffer(t);new Uint8Array(n).set(new Uint8Array(this.buffer)),this.buffer=n,this.view=new DataView(this.buffer),this.capacity=t}}reset(){return this.offset=0,this}writeUint8(e){return this._ensureCapacity(1),this.view.setUint8(this.offset,e),this.offset+=1,this}writeInt8(e){return this._ensureCapacity(1),this.view.setInt8(this.offset,e),this.offset+=1,this}writeBoolean(e){return this.writeUint8(+!!e)}writeUint16(e){return this._ensureCapacity(2),this.view.setUint16(this.offset,e,!0),this.offset+=2,this}writeInt16(e){return this._ensureCapacity(2),this.view.setInt16(this.offset,e,!0),this.offset+=2,this}writeUint32(e){return this._ensureCapacity(4),this.view.setUint32(this.offset,e,!0),this.offset+=4,this}writeInt32(e){return this._ensureCapacity(4),this.view.setInt32(this.offset,e,!0),this.offset+=4,this}writeFloat32(e){return this._ensureCapacity(4),this.view.setFloat32(this.offset,e,!0),this.offset+=4,this}writeFloat64(e){return this._ensureCapacity(8),this.view.setFloat64(this.offset,e,!0),this.offset+=8,this}writeFixed16(e,t=100){let n=Math.max(-32768,Math.min(32767,Math.round(e*t)));return this.writeInt16(n)}writeFixed8(e,t=10){let n=Math.max(-128,Math.min(127,Math.round(e*t)));return this.writeInt8(n)}writeString(e){if(!L){let t=e.length;this.writeUint16(t);for(let n=0;n<t;n++)this.writeUint8(e.charCodeAt(n));return this}let t=L.encode(e);return this.writeUint16(t.length),this._ensureCapacity(t.length),new Uint8Array(this.buffer,this.offset,t.length).set(t),this.offset+=t.length,this}writeBytes(e){return this._ensureCapacity(e.length),new Uint8Array(this.buffer,this.offset,e.length).set(e),this.offset+=e.length,this}getBuffer(){return this.buffer.slice(0,this.offset)}getView(){return new Uint8Array(this.buffer,0,this.offset)}get length(){return this.offset}},B=class{constructor(e){if(e instanceof ArrayBuffer)this.buffer=e,this.view=new DataView(this.buffer),this.byteLength=this.buffer.byteLength;else if(ArrayBuffer.isView(e))this.buffer=e.buffer,this.view=new DataView(this.buffer,e.byteOffset,e.byteLength),this.byteLength=e.byteLength;else throw Error(`BinaryReader requires an ArrayBuffer or TypedArray view`);this.offset=0}seek(e){return this.offset=Math.max(0,Math.min(this.byteLength,e)),this}readUint8(){let e=this.view.getUint8(this.offset);return this.offset+=1,e}readInt8(){let e=this.view.getInt8(this.offset);return this.offset+=1,e}readBoolean(){return this.readUint8()!==0}readUint16(){let e=this.view.getUint16(this.offset,!0);return this.offset+=2,e}writeInt16(){let e=this.view.getInt16(this.offset,!0);return this.offset+=2,e}readInt16(){let e=this.view.getInt16(this.offset,!0);return this.offset+=2,e}readUint32(){let e=this.view.getUint32(this.offset,!0);return this.offset+=4,e}readInt32(){let e=this.view.getInt32(this.offset,!0);return this.offset+=4,e}readFloat32(){let e=this.view.getFloat32(this.offset,!0);return this.offset+=4,e}readFloat64(){let e=this.view.getFloat64(this.offset,!0);return this.offset+=8,e}readFixed16(e=100){return this.readInt16()/e}readFixed8(e=10){return this.readInt8()/e}readString(){let e=this.readUint16();if(!R){let t=``;for(let n=0;n<e;n++)t+=String.fromCharCode(this.readUint8());return t}let t=new Uint8Array(this.buffer,this.view.byteOffset+this.offset,e);return this.offset+=e,R.decode(t)}readBytes(e){let t=new Uint8Array(this.buffer,this.view.byteOffset+this.offset,e);return this.offset+=e,t}get bytesRemaining(){return this.byteLength-this.offset}};function V(e,t,n){return e+(t-e)*n}function H(e,t,n){let r=(t-e)%(Math.PI*2);return r<-Math.PI&&(r+=Math.PI*2),r>Math.PI&&(r-=Math.PI*2),e+r*n}var U=class{constructor(e={}){this.bufferTime=e.bufferTime??100,this.maxExtrapolation=e.maxExtrapolation??120,this.maxSnapshots=e.maxSnapshots??30,this.snapshots=[],this.angleProperties=new Set(e.angleProperties||[`rotation`,`turretRotation`,`angle`,`yaw`,`pitch`]),this.snapProperties=new Set(e.snapProperties||[`health`,`score`,`team`,`state`,`invulnerable`,`isShooting`])}pushSnapshot(e,t){let n=performance.now(),r={clientRecvTime:n,serverTime:e||n,entities:t};this.snapshots.length>0&&r.serverTime<this.snapshots[0].serverTime||(this.snapshots.push(r),this.snapshots.sort((e,t)=>e.serverTime-t.serverTime),this.snapshots.length>this.maxSnapshots&&this.snapshots.shift())}getInterpolated(){if(this.snapshots.length===0)return{};if(this.snapshots.length===1)return this.snapshots[0].entities;performance.now();let e=this.snapshots[this.snapshots.length-1].serverTime-this.bufferTime,t=null,n=null;for(let r=0;r<this.snapshots.length-1;r++)if(this.snapshots[r].serverTime<=e&&this.snapshots[r+1].serverTime>=e){t=this.snapshots[r],n=this.snapshots[r+1];break}if(!t&&e<this.snapshots[0].serverTime)return this.snapshots[0].entities;if(!t){t=this.snapshots[this.snapshots.length-2],n=this.snapshots[this.snapshots.length-1];let r=n.serverTime-t.serverTime;if(r<=0)return n.entities;let i=e-n.serverTime,a=1+Math.min(i,this.maxExtrapolation)/r;return this._interpolateEntities(t.entities,n.entities,a)}let r=n.serverTime-t.serverTime,i=r>0?(e-t.serverTime)/r:1;return this._interpolateEntities(t.entities,n.entities,Math.max(0,Math.min(1,i)))}_interpolateEntities(e,t,n){let r={},i=new Set([...Object.keys(e||{}),...Object.keys(t||{})]);for(let a of i){let i=e[a],o=t[a];if(!i&&o){r[a]={...o};continue}if(i&&!o){r[a]={...i};continue}let s={};for(let e of Object.keys(o)){let t=i[e],r=o[e];s[e]=typeof r==`number`&&typeof t==`number`?this.snapProperties.has(e)?r:this.angleProperties.has(e)?H(t,r,n):V(t,r,n):r===void 0?t:r}r[a]=s}return r}clear(){this.snapshots=[]}};typeof window<`u`&&(window.Mereb={MerebClient:F,MerebLobby:I,PeerConnection:N,SignalingClient:j,BinaryWriter:z,BinaryReader:B,SnapshotInterpolator:U,TurnPool:C,NetworkQuality:M,PortalManager:P,DEFAULT_STUN_SERVERS:x,DEFAULT_TURN_SERVERS:S,...w}),e.BinaryReader=B,e.BinaryWriter=z,e.DC=k,e.DEFAULT_ICE_SERVERS=T,e.DEFAULT_STUN_SERVERS=x,e.DEFAULT_TURN_SERVERS=S,e.MerebClient=F,e.MerebLobby=I,e.NetworkQuality=M,e.PeerConnection=N,e.PortalManager=P,e.ROLE=E,e.STATUS=D,e.SignalingClient=j,e.SnapshotInterpolator=U,e.TurnPool=C,e.WS=O,e.generateRoomCode=A});
+    `,this.mainMenu=this.element.querySelector(`#mereb-main-menu`),this.joinMenu=this.element.querySelector(`#mereb-join-menu`),this.roomView=this.element.querySelector(`#mereb-room-view`),this.codeInput=this.element.querySelector(`#mereb-input-code`),this.codeText=this.element.querySelector(`#mereb-code-text`),this.statusText=this.element.querySelector(`#mereb-status-text`),this.errorText=this.element.querySelector(`#mereb-error-text`)}_setupHandlers(){if(this.options.onHome){let e=this.element.querySelector(`#mereb-btn-home`);e&&e.addEventListener(`click`,()=>{this.options.onHome()})}this.element.querySelector(`#mereb-btn-create`).addEventListener(`click`,async()=>{this.setStatus(`Connecting to server...`,!0);try{let{roomCode:e}=await this.client.createRoom();this.mainMenu.style.display=`none`,this.roomView.style.display=`block`,this.codeText.innerText=e,this.setStatus(`Waiting for opponent...`,!0)}catch{this.showError(`Server waking up... Click again in a moment`)}}),this.element.querySelector(`#mereb-btn-join`).addEventListener(`click`,()=>{this.mainMenu.style.display=`none`,this.joinMenu.style.display=`flex`,this.codeInput.focus()});let e=()=>{let e=this.codeInput.value.trim().toUpperCase();e.length===4?(this.setStatus(`Connecting to room...`,!0),this.client.joinRoom(e).catch(()=>{this.showError(`Could not connect to room`)})):this.showError(`Code must be 4 characters`)};this.element.querySelector(`#mereb-btn-submit`).addEventListener(`click`,e),this.codeInput.addEventListener(`keypress`,t=>{t.key===`Enter`&&e()}),this.element.querySelector(`#mereb-btn-quick`).addEventListener(`click`,()=>{this.setStatus(`Finding opponent...`,!0),this.client.quickPlay()});let t=this.element.querySelector(`#mereb-btn-copy`);t.addEventListener(`click`,()=>{let e=this.codeText.innerText,n=`${window.location.origin}${window.location.pathname}?room=${e}`;navigator.clipboard.writeText(n).then(()=>{let e=t.innerText;t.innerText=`COPIED! ✅`,setTimeout(()=>{t.innerText=e},2e3)}).catch(()=>{this.showError(`Failed to copy`)})});let n=()=>{this.client.disconnect(),this.resetToMenu()};this.element.querySelector(`#mereb-btn-join-back`).addEventListener(`click`,n),this.element.querySelector(`#mereb-btn-room-back`).addEventListener(`click`,n),this.client.on(`match-start`,()=>{this.hide()}),this.client.on(`error`,e=>{this.showError(e.message||`Network error`)}),this.client.on(`peer-disconnect`,()=>{this.show(),this.resetToMenu(),this.showError(`Opponent disconnected`)})}setStatus(e,t=!1){this.statusText.innerText=e,t?this.statusText.classList.add(`mereb-dots`):this.statusText.classList.remove(`mereb-dots`)}showError(e){this.errorText.innerText=e,setTimeout(()=>{this.errorText.innerText=``},3500)}resetToMenu(){this.mainMenu.style.display=`flex`,this.joinMenu.style.display=`none`,this.roomView.style.display=`none`,this.codeInput.value=``,this.statusText.innerText=``,this.statusText.classList.remove(`mereb-dots`)}show(){this.element.style.display=`flex`}hide(){this.element.style.display=`none`}},L=typeof TextEncoder<`u`?new TextEncoder:null,R=typeof TextDecoder<`u`?new TextDecoder:null,z=class{constructor(e=512){this.capacity=e,this.buffer=new ArrayBuffer(this.capacity),this.view=new DataView(this.buffer),this.offset=0}_ensureCapacity(e){if(this.offset+e>this.capacity){let t=this.capacity*2;for(;this.offset+e>t;)t*=2;let n=new ArrayBuffer(t);new Uint8Array(n).set(new Uint8Array(this.buffer)),this.buffer=n,this.view=new DataView(this.buffer),this.capacity=t}}reset(){return this.offset=0,this}writeUint8(e){return this._ensureCapacity(1),this.view.setUint8(this.offset,e),this.offset+=1,this}writeInt8(e){return this._ensureCapacity(1),this.view.setInt8(this.offset,e),this.offset+=1,this}writeBoolean(e){return this.writeUint8(+!!e)}writeUint16(e){return this._ensureCapacity(2),this.view.setUint16(this.offset,e,!0),this.offset+=2,this}writeInt16(e){return this._ensureCapacity(2),this.view.setInt16(this.offset,e,!0),this.offset+=2,this}writeUint32(e){return this._ensureCapacity(4),this.view.setUint32(this.offset,e,!0),this.offset+=4,this}writeInt32(e){return this._ensureCapacity(4),this.view.setInt32(this.offset,e,!0),this.offset+=4,this}writeFloat32(e){return this._ensureCapacity(4),this.view.setFloat32(this.offset,e,!0),this.offset+=4,this}writeFloat64(e){return this._ensureCapacity(8),this.view.setFloat64(this.offset,e,!0),this.offset+=8,this}writeFixed16(e,t=100){let n=Math.max(-32768,Math.min(32767,Math.round(e*t)));return this.writeInt16(n)}writeFixed8(e,t=10){let n=Math.max(-128,Math.min(127,Math.round(e*t)));return this.writeInt8(n)}writeString(e){if(!L){let t=e.length;this.writeUint16(t);for(let n=0;n<t;n++)this.writeUint8(e.charCodeAt(n));return this}let t=L.encode(e);return this.writeUint16(t.length),this._ensureCapacity(t.length),new Uint8Array(this.buffer,this.offset,t.length).set(t),this.offset+=t.length,this}writeBytes(e){return this._ensureCapacity(e.length),new Uint8Array(this.buffer,this.offset,e.length).set(e),this.offset+=e.length,this}getBuffer(){return this.buffer.slice(0,this.offset)}getView(){return new Uint8Array(this.buffer,0,this.offset)}get length(){return this.offset}},B=class{constructor(e){if(e instanceof ArrayBuffer)this.buffer=e,this.view=new DataView(this.buffer),this.byteLength=this.buffer.byteLength;else if(ArrayBuffer.isView(e))this.buffer=e.buffer,this.view=new DataView(this.buffer,e.byteOffset,e.byteLength),this.byteLength=e.byteLength;else throw Error(`BinaryReader requires an ArrayBuffer or TypedArray view`);this.offset=0}seek(e){return this.offset=Math.max(0,Math.min(this.byteLength,e)),this}readUint8(){let e=this.view.getUint8(this.offset);return this.offset+=1,e}readInt8(){let e=this.view.getInt8(this.offset);return this.offset+=1,e}readBoolean(){return this.readUint8()!==0}readUint16(){let e=this.view.getUint16(this.offset,!0);return this.offset+=2,e}writeInt16(){let e=this.view.getInt16(this.offset,!0);return this.offset+=2,e}readInt16(){let e=this.view.getInt16(this.offset,!0);return this.offset+=2,e}readUint32(){let e=this.view.getUint32(this.offset,!0);return this.offset+=4,e}readInt32(){let e=this.view.getInt32(this.offset,!0);return this.offset+=4,e}readFloat32(){let e=this.view.getFloat32(this.offset,!0);return this.offset+=4,e}readFloat64(){let e=this.view.getFloat64(this.offset,!0);return this.offset+=8,e}readFixed16(e=100){return this.readInt16()/e}readFixed8(e=10){return this.readInt8()/e}readString(){let e=this.readUint16();if(!R){let t=``;for(let n=0;n<e;n++)t+=String.fromCharCode(this.readUint8());return t}let t=new Uint8Array(this.buffer,this.view.byteOffset+this.offset,e);return this.offset+=e,R.decode(t)}readBytes(e){let t=new Uint8Array(this.buffer,this.view.byteOffset+this.offset,e);return this.offset+=e,t}get bytesRemaining(){return this.byteLength-this.offset}};function V(e,t,n){return e+(t-e)*n}function H(e,t,n){let r=(t-e)%(Math.PI*2);return r<-Math.PI&&(r+=Math.PI*2),r>Math.PI&&(r-=Math.PI*2),e+r*n}var U=class{constructor(e={}){this.bufferTime=e.bufferTime??100,this.maxExtrapolation=e.maxExtrapolation??120,this.maxSnapshots=e.maxSnapshots??30,this.snapshots=[],this.angleProperties=new Set(e.angleProperties||[`rotation`,`turretRotation`,`angle`,`yaw`,`pitch`]),this.snapProperties=new Set(e.snapProperties||[`health`,`score`,`team`,`state`,`invulnerable`,`isShooting`])}pushSnapshot(e,t){let n=performance.now(),r={clientRecvTime:n,serverTime:e||n,entities:t};this.snapshots.length>0&&r.serverTime<this.snapshots[0].serverTime||(this.snapshots.push(r),this.snapshots.sort((e,t)=>e.serverTime-t.serverTime),this.snapshots.length>this.maxSnapshots&&this.snapshots.shift())}getInterpolated(){if(this.snapshots.length===0)return{};if(this.snapshots.length===1)return this.snapshots[0].entities;performance.now();let e=this.snapshots[this.snapshots.length-1].serverTime-this.bufferTime,t=null,n=null;for(let r=0;r<this.snapshots.length-1;r++)if(this.snapshots[r].serverTime<=e&&this.snapshots[r+1].serverTime>=e){t=this.snapshots[r],n=this.snapshots[r+1];break}if(!t&&e<this.snapshots[0].serverTime)return this.snapshots[0].entities;if(!t){t=this.snapshots[this.snapshots.length-2],n=this.snapshots[this.snapshots.length-1];let r=n.serverTime-t.serverTime;if(r<=0)return n.entities;let i=e-n.serverTime,a=1+Math.min(i,this.maxExtrapolation)/r;return this._interpolateEntities(t.entities,n.entities,a)}let r=n.serverTime-t.serverTime,i=r>0?(e-t.serverTime)/r:1;return this._interpolateEntities(t.entities,n.entities,Math.max(0,Math.min(1,i)))}_interpolateEntities(e,t,n){let r={},i=new Set([...Object.keys(e||{}),...Object.keys(t||{})]);for(let a of i){let i=e[a],o=t[a];if(!i&&o){r[a]={...o};continue}if(i&&!o){r[a]={...i};continue}let s={};for(let e of Object.keys(o)){let t=i[e],r=o[e];s[e]=typeof r==`number`&&typeof t==`number`?this.snapProperties.has(e)?r:this.angleProperties.has(e)?H(t,r,n):V(t,r,n):r===void 0?t:r}r[a]=s}return r}clear(){this.snapshots=[]}};function W(e){let t=Object.entries(e).map(([e,t])=>typeof t==`string`?{name:e,type:t,scale:t===`fixed16`?100:1}:{name:e,type:t.type||`fixed16`,scale:t.scale||100}),n=new z(512);return{fields:t,encode(e,r=null){let i=r||n.reset();for(let n=0;n<t.length;n++){let{name:r,type:a,scale:o}=t[n],s=e?e[r]:0;switch(a){case`uint8`:i.writeUint8(s||0);break;case`int8`:i.writeInt8(s||0);break;case`uint16`:i.writeUint16(s||0);break;case`int16`:i.writeInt16(s||0);break;case`uint32`:i.writeUint32(s||0);break;case`int32`:i.writeInt32(s||0);break;case`float32`:i.writeFloat32(s||0);break;case`fixed16`:i.writeFixed16(s||0,o);break;case`boolean`:case`bool`:i.writeBoolean(!!s);break;case`string`:i.writeString(s||``);break;default:i.writeFloat32(s||0)}}return r?i:i.getView()},decode(e){let n=e instanceof B?e:new B(e),r={};for(let e=0;e<t.length;e++){let{name:i,type:a,scale:o}=t[e];switch(a){case`uint8`:r[i]=n.readUint8();break;case`int8`:r[i]=n.readInt8();break;case`uint16`:r[i]=n.readUint16();break;case`int16`:r[i]=n.readInt16();break;case`uint32`:r[i]=n.readUint32();break;case`int32`:r[i]=n.readInt32();break;case`float32`:r[i]=n.readFloat32();break;case`fixed16`:r[i]=n.readFixed16(o);break;case`boolean`:case`bool`:r[i]=n.readBoolean();break;case`string`:r[i]=n.readString();break;default:r[i]=n.readFloat32()}}return r}}}var G=class{constructor(e={}){this.container=e.container||document.body,this.forceShow=e.forceShow||!1,this.onMove=e.onMove||null,this.onAim=e.onAim||null,this.onFire=e.onFire||null,this.isTouchDevice=this.forceShow||`ontouchstart`in window||navigator.maxTouchPoints>0,this.maxRadius=e.maxRadius||55,this.deadzone=e.deadzone||.15,this.state={move:{x:0,y:0,up:!1,down:!1,left:!1,right:!1,angle:0,active:!1},aim:{x:0,y:0,angle:0,active:!1},fire:!1},this.leftTouchId=null,this.leftCenter={x:0,y:0},this.rightTouchId=null,this.rightCenter={x:0,y:0},this.dom=null,this.isTouchDevice&&(this._buildDOM(),this._attachEvents())}_buildDOM(){this._injectStyles(),this.dom=document.createElement(`div`),this.dom.className=`mereb-touch-overlay`,this.leftZone=document.createElement(`div`),this.leftZone.className=`mereb-touch-zone left-zone`,this.leftBase=document.createElement(`div`),this.leftBase.className=`mereb-joystick-base left-base`,this.leftKnob=document.createElement(`div`),this.leftKnob.className=`mereb-joystick-knob left-knob`,this.leftBase.appendChild(this.leftKnob),this.leftZone.appendChild(this.leftBase),this.rightZone=document.createElement(`div`),this.rightZone.className=`mereb-touch-zone right-zone`,this.rightBase=document.createElement(`div`),this.rightBase.className=`mereb-joystick-base right-base`,this.rightKnob=document.createElement(`div`),this.rightKnob.className=`mereb-joystick-knob right-knob`,this.rightBase.appendChild(this.rightKnob),this.rightZone.appendChild(this.rightBase),this.fireBtn=document.createElement(`button`),this.fireBtn.className=`mereb-fire-btn`,this.fireBtn.innerHTML=`
+      <span class="fire-icon">💥</span>
+      <span class="fire-text">FIRE</span>
+    `,this.rightZone.appendChild(this.fireBtn),this.dom.appendChild(this.leftZone),this.dom.appendChild(this.rightZone),this.container.appendChild(this.dom)}_injectStyles(){if(document.getElementById(`mereb-touch-styles`))return;let e=document.createElement(`style`);e.id=`mereb-touch-styles`,e.textContent=`
+      .mereb-touch-overlay {
+        position: absolute;
+        top: 0; left: 0; width: 100%; height: 100%;
+        pointer-events: none;
+        z-index: 25;
+        user-select: none;
+        -webkit-user-select: none;
+        touch-action: none;
+      }
+      .mereb-touch-zone {
+        position: absolute;
+        top: 25%;
+        bottom: 0;
+        width: 50%;
+        pointer-events: auto;
+        touch-action: none;
+      }
+      .left-zone {
+        left: 0;
+      }
+      .right-zone {
+        right: 0;
+      }
+
+      /* Joystick Base */
+      .mereb-joystick-base {
+        position: absolute;
+        width: 120px;
+        height: 120px;
+        border-radius: 50%;
+        background: radial-gradient(circle, rgba(15, 23, 42, 0.7) 0%, rgba(30, 41, 59, 0.4) 100%);
+        border: 2px solid rgba(255, 255, 255, 0.2);
+        box-shadow: 0 0 15px rgba(0, 0, 0, 0.5), inset 0 0 10px rgba(255, 255, 255, 0.05);
+        pointer-events: none;
+        opacity: 0.45;
+        transition: opacity 0.15s ease, border-color 0.15s ease;
+        margin-left: -60px;
+        margin-top: -60px;
+      }
+      .mereb-joystick-base.active {
+        opacity: 0.9;
+        border-color: #38bdf8;
+        box-shadow: 0 0 20px rgba(56, 189, 248, 0.4), inset 0 0 15px rgba(56, 189, 248, 0.2);
+      }
+
+      .left-base {
+        left: 80px;
+        bottom: 80px;
+      }
+      .right-base {
+        right: 170px;
+        bottom: 80px;
+      }
+
+      /* Joystick Knob */
+      .mereb-joystick-knob {
+        position: absolute;
+        width: 50px;
+        height: 50px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #38bdf8, #0284c7);
+        border: 2px solid #ffffff;
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4);
+        left: 35px;
+        top: 35px;
+        pointer-events: none;
+        transition: transform 0.06s cubic-bezier(0.1, 0.9, 0.2, 1);
+      }
+      .right-knob {
+        background: linear-gradient(135deg, #f87171, #dc2626);
+      }
+
+      /* Fire Button (Chunky Arcade 3D) */
+      .mereb-fire-btn {
+        position: absolute;
+        right: 28px;
+        bottom: 50px;
+        width: 90px;
+        height: 90px;
+        border-radius: 50%;
+        background: linear-gradient(180deg, #ef4444 0%, #b91c1c 100%);
+        border: 3px solid #fecaca;
+        border-bottom: 6px solid #7f1d1d;
+        color: #ffffff;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 8px 20px rgba(239, 68, 68, 0.45);
+        font-family: 'Fredoka', system-ui, sans-serif;
+        font-weight: 700;
+        cursor: pointer;
+        pointer-events: auto;
+        touch-action: none;
+        user-select: none;
+        transition: transform 0.05s, border-bottom-width 0.05s, box-shadow 0.05s;
+        z-index: 30;
+      }
+      .mereb-fire-btn .fire-icon {
+        font-size: 24px;
+        line-height: 1;
+        pointer-events: none;
+      }
+      .mereb-fire-btn .fire-text {
+        font-size: 13px;
+        letter-spacing: 0.5px;
+        pointer-events: none;
+      }
+      .mereb-fire-btn:active, .mereb-fire-btn.pressed {
+        transform: translateY(4px);
+        border-bottom-width: 2px;
+        box-shadow: 0 2px 10px rgba(239, 68, 68, 0.6);
+        background: #dc2626;
+      }
+    `,document.head.appendChild(e)}_attachEvents(){let e=e=>{e.preventDefault();let t=this.container.getBoundingClientRect(),n=t.left+t.width/2;for(let r=0;r<e.changedTouches.length;r++){let i=e.changedTouches[r],a=i.clientX,o=i.clientY,s=this.fireBtn.getBoundingClientRect();if(a>=s.left&&a<=s.right&&o>=s.top&&o<=s.bottom){this.state.fire=!0,this.fireBtn.classList.add(`pressed`),this.onFire&&this.onFire(!0);continue}a<n&&this.leftTouchId===null?(this.leftTouchId=i.identifier,this.leftCenter={x:a-t.left,y:o-t.top},this.leftBase.style.left=`${this.leftCenter.x}px`,this.leftBase.style.top=`${this.leftCenter.y}px`,this.leftBase.style.bottom=`auto`,this.leftBase.classList.add(`active`),this.state.move.active=!0):a>=n&&this.rightTouchId===null&&(this.rightTouchId=i.identifier,this.rightCenter={x:a-t.left,y:o-t.top},this.rightBase.style.left=`${this.rightCenter.x}px`,this.rightBase.style.top=`${this.rightCenter.y}px`,this.rightBase.style.right=`auto`,this.rightBase.style.bottom=`auto`,this.rightBase.classList.add(`active`),this.state.aim.active=!0)}},t=e=>{e.preventDefault();let t=this.container.getBoundingClientRect();for(let n=0;n<e.changedTouches.length;n++){let r=e.changedTouches[n],i=r.clientX-t.left,a=r.clientY-t.top;if(r.identifier===this.leftTouchId){let e=i-this.leftCenter.x,t=a-this.leftCenter.y,n=Math.sqrt(e*e+t*t),r=Math.atan2(t,e),o=Math.min(n,this.maxRadius),s=o/this.maxRadius,c=Math.cos(r)*o,l=Math.sin(r)*o;if(this.leftKnob.style.transform=`translate(${c}px, ${l}px)`,s>this.deadzone){let i=e/n*s,a=t/n*s;this.state.move.x=i,this.state.move.y=a,this.state.move.angle=r,this.state.move.left=i<-.3,this.state.move.right=i>.3,this.state.move.up=a<-.3,this.state.move.down=a>.3}else this.state.move.x=0,this.state.move.y=0,this.state.move.left=!1,this.state.move.right=!1,this.state.move.up=!1,this.state.move.down=!1;this.onMove&&this.onMove(this.state.move)}if(r.identifier===this.rightTouchId){let e=i-this.rightCenter.x,t=a-this.rightCenter.y,n=Math.sqrt(e*e+t*t),r=Math.atan2(e,-t),o=Math.min(n,this.maxRadius),s=o/this.maxRadius,c=Math.sin(r)*o,l=-Math.cos(r)*o;this.rightKnob.style.transform=`translate(${c}px, ${l}px)`,s>this.deadzone&&(this.state.aim.x=Math.sin(r)*s,this.state.aim.y=-Math.cos(r)*s,this.state.aim.angle=r,s>.4&&(this.state.fire=!0)),this.onAim&&this.onAim(this.state.aim)}}},n=e=>{this.container.getBoundingClientRect();for(let t=0;t<e.changedTouches.length;t++){let n=e.changedTouches[t],r=n.clientX,i=n.clientY,a=this.fireBtn.getBoundingClientRect();r>=a.left&&r<=a.right&&i>=a.top&&i<=a.bottom&&(this.state.fire=!1,this.fireBtn.classList.remove(`pressed`),this.onFire&&this.onFire(!1)),n.identifier===this.leftTouchId&&(this.leftTouchId=null,this.leftKnob.style.transform=`translate(0px, 0px)`,this.leftBase.classList.remove(`active`),this.state.move={x:0,y:0,up:!1,down:!1,left:!1,right:!1,angle:0,active:!1},this.onMove&&this.onMove(this.state.move)),n.identifier===this.rightTouchId&&(this.rightTouchId=null,this.rightKnob.style.transform=`translate(0px, 0px)`,this.rightBase.classList.remove(`active`),this.state.aim.active=!1,this.fireBtn.classList.contains(`pressed`)||(this.state.fire=!1),this.onAim&&this.onAim(this.state.aim))}};this.dom.addEventListener(`touchstart`,e,{passive:!1}),this.dom.addEventListener(`touchmove`,t,{passive:!1}),this.dom.addEventListener(`touchend`,n,{passive:!1}),this.dom.addEventListener(`touchcancel`,n,{passive:!1}),this.fireBtn.addEventListener(`touchstart`,e=>{e.stopPropagation(),e.preventDefault(),this.state.fire=!0,this.fireBtn.classList.add(`pressed`),this.onFire&&this.onFire(!0)},{passive:!1});let r=e=>{e.stopPropagation(),this.state.fire=!1,this.fireBtn.classList.remove(`pressed`),this.onFire&&this.onFire(!1)};this.fireBtn.addEventListener(`touchend`,r),this.fireBtn.addEventListener(`touchcancel`,r)}show(){this.dom&&(this.dom.style.display=`block`)}hide(){this.dom&&(this.dom.style.display=`none`)}getState(){return{move:{...this.state.move},aim:{...this.state.aim},fire:this.state.fire}}destroy(){this.dom&&this.dom.parentNode&&this.dom.parentNode.removeChild(this.dom)}},K=class{constructor(e,t={}){this.client=e,this.container=t.container||document.body,this.engine=t.engine||null,this.visible=!1,this.activeTab=`console`,this.artificialLagMs=0,this.artificialDropRate=0,this.logs=[],this.maxLogs=100,this._buildDOM(),this._attachGlobalHotkey(),this._hookClientEvents()}_buildDOM(){this._injectStyles(),this.pill=document.createElement(`button`),this.pill.className=`mereb-terminal-pill`,this.pill.innerHTML=`⚡ <span class="pill-text">MEREB DEV</span>`,this.pill.title="Toggle Mereb Netcode Terminal (` or ~)",this.pill.addEventListener(`click`,()=>this.toggle()),this.container.appendChild(this.pill),this.element=document.createElement(`div`),this.element.className=`mereb-terminal-modal`,this.element.style.display=`none`,this.element.innerHTML=`
+      <div class="terminal-header">
+        <div class="terminal-title">
+          <span class="terminal-badge">⚡ MEREB NETCODE v1.0</span>
+          <span class="terminal-status-dot"></span>
+          <span class="terminal-room-id">OFFLINE</span>
+        </div>
+        <div class="terminal-tabs">
+          <button class="terminal-tab-btn active" data-tab="console">💻 CONSOLE</button>
+          <button class="terminal-tab-btn" data-tab="telemetry">📊 TELEMETRY</button>
+          <button class="terminal-tab-btn" data-tab="chaos">🧪 CHAOS SIM</button>
+          <button class="terminal-tab-btn" data-tab="entities">📦 ENTITIES</button>
+        </div>
+        <button class="terminal-close-btn" title="Close">✕</button>
+      </div>
+
+      <div class="terminal-body">
+        <!-- Tab 1: Console -->
+        <div class="terminal-tab-content tab-console active">
+          <div class="terminal-output"></div>
+          <form class="terminal-input-bar">
+            <span class="terminal-prompt">&gt;</span>
+            <input type="text" class="terminal-input" placeholder="Type a command (or 'help')..." />
+            <button type="submit" class="terminal-send-btn">RUN</button>
+          </form>
+        </div>
+
+        <!-- Tab 2: Telemetry -->
+        <div class="terminal-tab-content tab-telemetry">
+          <div class="telemetry-grid">
+            <div class="telemetry-card">
+              <div class="telemetry-label">RTT / PING</div>
+              <div class="telemetry-value telemetry-ping">-- ms</div>
+            </div>
+            <div class="telemetry-card">
+              <div class="telemetry-label">JITTER</div>
+              <div class="telemetry-value telemetry-jitter">-- ms</div>
+            </div>
+            <div class="telemetry-card">
+              <div class="telemetry-label">PACKET LOSS</div>
+              <div class="telemetry-value telemetry-loss">0%</div>
+            </div>
+            <div class="telemetry-card">
+              <div class="telemetry-label">WEBRTC STATE</div>
+              <div class="telemetry-value telemetry-rtc">DISCONNECTED</div>
+            </div>
+            <div class="telemetry-card">
+              <div class="telemetry-label">PEER ROLE</div>
+              <div class="telemetry-value telemetry-role">NONE</div>
+            </div>
+            <div class="telemetry-card">
+              <div class="telemetry-label">ROOM CODE</div>
+              <div class="telemetry-value telemetry-room">--</div>
+            </div>
+          </div>
+          <div class="telemetry-details"></div>
+        </div>
+
+        <!-- Tab 3: Chaos Simulator -->
+        <div class="terminal-tab-content tab-chaos">
+          <div class="chaos-desc">
+            Simulate real-world mobile network conditions (3G/4G lag and packet drops) to test client prediction and snapshot interpolation.
+          </div>
+          <div class="chaos-controls">
+            <div class="chaos-field">
+              <label>Artificial Latency: <span class="chaos-lag-val">0ms</span></label>
+              <input type="range" class="chaos-lag-slider" min="0" max="600" step="25" value="0" />
+            </div>
+            <div class="chaos-field">
+              <label>Packet Drop Rate: <span class="chaos-drop-val">0%</span></label>
+              <input type="range" class="chaos-drop-slider" min="0" max="50" step="5" value="0" />
+            </div>
+            <div class="chaos-presets">
+              <button class="chaos-preset-btn" data-lag="0" data-drop="0">🟢 Perfect (0ms)</button>
+              <button class="chaos-preset-btn" data-lag="60" data-drop="0">🟡 4G LTE (60ms)</button>
+              <button class="chaos-preset-btn" data-lag="180" data-drop="5">🟠 Slow 3G (180ms + 5%)</button>
+              <button class="chaos-preset-btn" data-lag="400" data-drop="20">🔴 Extreme (400ms + 20%)</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tab 4: Entities -->
+        <div class="terminal-tab-content tab-entities">
+          <pre class="entities-json">No active game state to inspect.</pre>
+        </div>
+      </div>
+    `,this.container.appendChild(this.element),this.closeBtn=this.element.querySelector(`.terminal-close-btn`),this.closeBtn.addEventListener(`click`,()=>this.hide()),this.output=this.element.querySelector(`.terminal-output`),this.input=this.element.querySelector(`.terminal-input`),this.form=this.element.querySelector(`.terminal-input-bar`),this.form.addEventListener(`submit`,e=>{e.preventDefault();let t=this.input.value.trim();t&&(this.executeCommand(t),this.input.value=``)}),this.tabBtns=this.element.querySelectorAll(`.terminal-tab-btn`),this.tabBtns.forEach(e=>{e.addEventListener(`click`,()=>{let t=e.dataset.tab;this.switchTab(t)})});let e=this.element.querySelector(`.chaos-lag-slider`),t=this.element.querySelector(`.chaos-lag-val`);e.addEventListener(`input`,e=>{this.artificialLagMs=parseInt(e.target.value,10),t.innerText=`${this.artificialLagMs}ms`,this.log(`[Chaos] Injected artificial latency: ${this.artificialLagMs}ms`,`warn`)});let n=this.element.querySelector(`.chaos-drop-slider`),r=this.element.querySelector(`.chaos-drop-val`);n.addEventListener(`input`,e=>{this.artificialDropRate=parseInt(e.target.value,10)/100,r.innerText=`${e.target.value}%`,this.log(`[Chaos] Injected packet drop rate: ${e.target.value}%`,`warn`)}),this.element.querySelectorAll(`.chaos-preset-btn`).forEach(i=>{i.addEventListener(`click`,()=>{let a=parseInt(i.dataset.lag,10),o=parseInt(i.dataset.drop,10);e.value=a,n.value=o,this.artificialLagMs=a,this.artificialDropRate=o/100,t.innerText=`${a}ms`,r.innerText=`${o}%`,this.log(`[Chaos] Preset applied: Lag ${a}ms, Drop ${o}%`,`info`)})}),this.log(`Mereb Terminal Initialized. Type "help" for commands.`,`system`)}_injectStyles(){if(document.getElementById(`mereb-terminal-styles`))return;let e=document.createElement(`style`);e.id=`mereb-terminal-styles`,e.textContent=`
+      .mereb-terminal-pill {
+        position: fixed;
+        bottom: 16px;
+        left: 16px;
+        background: rgba(15, 23, 42, 0.85);
+        border: 1px solid rgba(56, 189, 248, 0.5);
+        color: #38bdf8;
+        border-radius: 9999px;
+        padding: 6px 14px;
+        font-family: 'Fredoka', ui-monospace, monospace;
+        font-size: 12px;
+        font-weight: 700;
+        cursor: pointer;
+        z-index: 1000;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        backdrop-filter: blur(10px);
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
+        transition: transform 0.1s, background 0.15s;
+      }
+      .mereb-terminal-pill:hover {
+        transform: scale(1.05);
+        background: rgba(56, 189, 248, 0.15);
+      }
+
+      .mereb-terminal-modal {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: min(850px, 92vw);
+        height: min(520px, 85vh);
+        background: rgba(10, 15, 30, 0.94);
+        border: 1px solid rgba(56, 189, 248, 0.35);
+        border-radius: 14px;
+        box-shadow: 0 25px 60px rgba(0, 0, 0, 0.85), 0 0 30px rgba(56, 189, 248, 0.15);
+        backdrop-filter: blur(16px);
+        z-index: 2000;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        font-family: 'JetBrains Mono', 'Fira Code', ui-monospace, monospace;
+        color: #e2e8f0;
+      }
+
+      .terminal-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 10px 16px;
+        background: rgba(15, 23, 42, 0.9);
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      }
+      .terminal-title {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 12px;
+      }
+      .terminal-badge {
+        color: #38bdf8;
+        font-weight: 700;
+      }
+      .terminal-status-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: #ef4444;
+      }
+      .terminal-status-dot.connected {
+        background: #22c55e;
+      }
+      .terminal-room-id {
+        font-size: 11px;
+        color: #94a3b8;
+      }
+
+      .terminal-tabs {
+        display: flex;
+        gap: 4px;
+      }
+      .terminal-tab-btn {
+        background: transparent;
+        border: none;
+        color: #94a3b8;
+        font-family: inherit;
+        font-size: 11px;
+        font-weight: 600;
+        padding: 6px 12px;
+        border-radius: 6px;
+        cursor: pointer;
+        transition: color 0.15s, background 0.15s;
+      }
+      .terminal-tab-btn:hover {
+        color: #fff;
+        background: rgba(255, 255, 255, 0.05);
+      }
+      .terminal-tab-btn.active {
+        color: #38bdf8;
+        background: rgba(56, 189, 248, 0.15);
+      }
+
+      .terminal-close-btn {
+        background: transparent;
+        border: none;
+        color: #94a3b8;
+        font-size: 16px;
+        cursor: pointer;
+        padding: 4px 8px;
+        border-radius: 4px;
+      }
+      .terminal-close-btn:hover {
+        color: #fff;
+        background: rgba(239, 68, 68, 0.3);
+      }
+
+      .terminal-body {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+      }
+      .terminal-tab-content {
+        flex: 1;
+        display: none;
+        flex-direction: column;
+        padding: 14px;
+        overflow-y: auto;
+      }
+      .terminal-tab-content.active {
+        display: flex;
+      }
+
+      /* Console Tab */
+      .terminal-output {
+        flex: 1;
+        overflow-y: auto;
+        font-size: 12px;
+        line-height: 1.6;
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
+        margin-bottom: 10px;
+        word-break: break-all;
+      }
+      .terminal-log-line {
+        display: flex;
+        gap: 8px;
+      }
+      .terminal-log-time {
+        color: #64748b;
+        font-size: 11px;
+      }
+      .log-info { color: #38bdf8; }
+      .log-warn { color: #facc15; }
+      .log-error { color: #f87171; }
+      .log-system { color: #a855f7; }
+      .log-success { color: #4ade80; }
+
+      .terminal-input-bar {
+        display: flex;
+        align-items: center;
+        background: rgba(15, 23, 42, 0.8);
+        border: 1px solid rgba(255, 255, 255, 0.15);
+        border-radius: 8px;
+        padding: 4px 10px;
+        gap: 8px;
+      }
+      .terminal-prompt {
+        color: #38bdf8;
+        font-weight: 700;
+      }
+      .terminal-input {
+        flex: 1;
+        background: transparent;
+        border: none;
+        outline: none;
+        color: #f1f5f9;
+        font-family: inherit;
+        font-size: 13px;
+      }
+      .terminal-send-btn {
+        background: #0284c7;
+        color: #fff;
+        border: none;
+        border-radius: 6px;
+        padding: 4px 12px;
+        font-family: inherit;
+        font-size: 11px;
+        font-weight: 700;
+        cursor: pointer;
+      }
+
+      /* Telemetry Tab */
+      .telemetry-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+        gap: 12px;
+        margin-bottom: 16px;
+      }
+      .telemetry-card {
+        background: rgba(15, 23, 42, 0.6);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 10px;
+        padding: 12px;
+        text-align: center;
+      }
+      .telemetry-label {
+        font-size: 10px;
+        color: #94a3b8;
+        margin-bottom: 6px;
+        letter-spacing: 0.5px;
+      }
+      .telemetry-value {
+        font-size: 16px;
+        font-weight: 700;
+        color: #38bdf8;
+      }
+
+      /* Chaos Tab */
+      .chaos-desc {
+        font-size: 12px;
+        color: #94a3b8;
+        line-height: 1.5;
+        margin-bottom: 18px;
+      }
+      .chaos-controls {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+      }
+      .chaos-field label {
+        display: flex;
+        justify-content: space-between;
+        font-size: 12px;
+        font-weight: 600;
+        margin-bottom: 6px;
+      }
+      .chaos-field input[type="range"] {
+        width: 100%;
+        accent-color: #38bdf8;
+      }
+      .chaos-presets {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 10px;
+      }
+      .chaos-preset-btn {
+        background: rgba(30, 41, 59, 0.7);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        color: #cbd5e1;
+        font-family: inherit;
+        font-size: 11px;
+        padding: 8px 14px;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: background 0.1s;
+      }
+      .chaos-preset-btn:hover {
+        background: rgba(56, 189, 248, 0.2);
+        color: #fff;
+      }
+
+      /* Entities Tab */
+      .entities-json {
+        background: rgba(15, 23, 42, 0.6);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 10px;
+        padding: 14px;
+        font-size: 12px;
+        line-height: 1.5;
+        overflow-x: auto;
+        color: #38bdf8;
+      }
+    `,document.head.appendChild(e)}_attachGlobalHotkey(){window.addEventListener(`keydown`,e=>{(e.key==="`"||e.key===`~`)&&e.target.tagName!==`INPUT`&&e.target.tagName!==`TEXTAREA`&&(e.preventDefault(),this.toggle())})}_hookClientEvents(){this.client&&(this.client.on(`status`,e=>{this.log(`[Status] ${e}`,`info`),this._updateHeader()}),this.client.on(`quality`,e=>{this._updateTelemetry(e)}),this.client.on(`match-start`,e=>{this.log(`[Match] Started as ${e.role} vs ${e.peerId}`,`success`),this._updateHeader()}),this.client.on(`event`,e=>{this.log(`[Event] ${e.name}: ${JSON.stringify(e.data||{})}`,`info`)}),this.client.on(`error`,e=>{this.log(`[Error] ${e.message||e}`,`error`)}))}toggle(){this.visible?this.hide():this.show()}show(){this.visible=!0,this.element.style.display=`flex`,this.input.focus(),this._refreshEntities()}hide(){this.visible=!1,this.element.style.display=`none`}switchTab(e){this.activeTab=e,this.tabBtns.forEach(t=>{t.classList.toggle(`active`,t.dataset.tab===e)}),this.element.querySelectorAll(`.terminal-tab-content`).forEach(t=>{t.classList.toggle(`active`,t.classList.contains(`tab-${e}`))}),e===`entities`&&this._refreshEntities()}log(e,t=`info`){let n=new Date().toLocaleTimeString(),r={time:n,message:e,type:t};if(this.logs.push(r),this.logs.length>this.maxLogs&&this.logs.shift(),this.output){let r=document.createElement(`div`);r.className=`terminal-log-line log-${t}`,r.innerHTML=`<span class="terminal-log-time">[${n}]</span> <span class="terminal-log-msg">${this._escapeHTML(e)}</span>`,this.output.appendChild(r),this.output.scrollTop=this.output.scrollHeight}}executeCommand(e){this.log(`> ${e}`,`system`);let[t,...n]=e.trim().split(/\s+/),r=t.toLowerCase();switch(r){case`help`:this.log(`Available Commands:`,`info`),this.log(`  help                 - Show this help list`,`info`),this.log(`  status               - Dump connection & room status`,`info`),this.log(`  state                - Inspect player/bullet entities`,`info`),this.log(`  lag <ms>             - Simulate network latency (e.g. lag 150)`,`info`),this.log(`  drop <percent>       - Simulate packet loss (e.g. drop 10)`,`info`),this.log(`  kick                 - Forfeit / leave current match`,`info`),this.log(`  clear                - Clear console output`,`info`);break;case`status`:let e=this.client?.roomCode||`None`,t=this.client?.role||`None`,i=this.client?.peerId||`None`,a=this.client?.localId||`None`;this.log(`Status Report: Room=${e} | Role=${t} | Local=${a} | Peer=${i}`,`success`);break;case`state`:this._refreshEntities(),this.switchTab(`entities`);break;case`lag`:let o=parseInt(n[0],10)||0;this.artificialLagMs=o,this.log(`Simulated lag set to ${o}ms`,`warn`);break;case`drop`:let s=parseInt(n[0],10)||0;this.artificialDropRate=s/100,this.log(`Simulated packet drop rate set to ${s}%`,`warn`);break;case`kick`:case`leave`:this.client&&(this.client.leave(),this.log(`Forfeited and disconnected.`,`warn`));break;case`clear`:this.output&&(this.output.innerHTML=``),this.logs=[];break;default:this.log(`Unknown command: "${r}". Type "help" for options.`,`error`)}}_updateHeader(){let e=this.element.querySelector(`.terminal-room-id`),t=this.element.querySelector(`.terminal-status-dot`),n=this.client&&this.client.peer&&this.client.peer.connected;t&&t.classList.toggle(`connected`,n),e&&(e.innerText=this.client?.roomCode?`ROOM: ${this.client.roomCode}`:`OFFLINE`);let r=this.element.querySelector(`.telemetry-rtc`),i=this.element.querySelector(`.telemetry-role`),a=this.element.querySelector(`.telemetry-room`);r&&(r.innerText=n?`CONNECTED`:this.client?.status||`IDLE`),i&&(i.innerText=this.client?.role||`NONE`),a&&(a.innerText=this.client?.roomCode||`--`)}_updateTelemetry(e){if(!e)return;let t=this.element.querySelector(`.telemetry-ping`),n=this.element.querySelector(`.telemetry-jitter`),r=this.element.querySelector(`.telemetry-loss`);t&&(t.innerText=`${e.ping||0} ms`),n&&(n.innerText=`${e.jitter||0} ms`),r&&(r.innerText=`${e.packetLoss||0}%`)}_refreshEntities(){let e=this.element.querySelector(`.entities-json`);e&&(e.innerText=this.engine&&this.engine.playerStates?JSON.stringify({players:this.engine.playerStates,bullets:this.engine.bulletStates||[]},null,2):`No entity states available.`)}_escapeHTML(e){return e.replace(/[&<>'"]/g,e=>({"&":`&amp;`,"<":`&lt;`,">":`&gt;`,"'":`&#39;`,'"':`&quot;`})[e]||e)}};typeof window<`u`&&(window.Mereb={MerebClient:F,MerebLobby:I,PeerConnection:N,SignalingClient:j,BinaryWriter:z,BinaryReader:B,SnapshotInterpolator:U,defineSchema:W,TouchControls:G,MerebTerminal:K,TurnPool:C,NetworkQuality:M,PortalManager:P,DEFAULT_STUN_SERVERS:x,DEFAULT_TURN_SERVERS:S,...w}),e.BinaryReader=B,e.BinaryWriter=z,e.DC=k,e.DEFAULT_ICE_SERVERS=T,e.DEFAULT_STUN_SERVERS=x,e.DEFAULT_TURN_SERVERS=S,e.MerebClient=F,e.MerebLobby=I,e.MerebTerminal=K,e.NetworkQuality=M,e.PeerConnection=N,e.PortalManager=P,e.ROLE=E,e.STATUS=D,e.SignalingClient=j,e.SnapshotInterpolator=U,e.TouchControls=G,e.TurnPool=C,e.WS=O,e.defineSchema=W,e.generateRoomCode=A});

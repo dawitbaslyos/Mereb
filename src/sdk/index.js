@@ -8,6 +8,9 @@ export { PeerConnection } from './PeerConnection.js';
 export { SignalingClient } from './SignalingClient.js';
 export { BinaryWriter, BinaryReader } from './netcode/BinaryStream.js';
 export { SnapshotInterpolator } from './netcode/SnapshotInterpolator.js';
+export { defineSchema } from './netcode/Schema.js';
+export { TouchControls } from './controls/TouchControls.js';
+export { MerebTerminal } from './terminal/MerebTerminal.js';
 export { TurnPool, DEFAULT_STUN_SERVERS, DEFAULT_TURN_SERVERS } from './netcode/TurnPool.js';
 export { NetworkQuality } from './netcode/NetworkQuality.js';
 export { PortalManager } from './portals/PortalManager.js';
@@ -26,6 +29,9 @@ import { PeerConnection } from './PeerConnection.js';
 import { SignalingClient } from './SignalingClient.js';
 import { BinaryWriter, BinaryReader } from './netcode/BinaryStream.js';
 import { SnapshotInterpolator } from './netcode/SnapshotInterpolator.js';
+import { defineSchema } from './netcode/Schema.js';
+import { TouchControls } from './controls/TouchControls.js';
+import { MerebTerminal } from './terminal/MerebTerminal.js';
 import { TurnPool, DEFAULT_STUN_SERVERS, DEFAULT_TURN_SERVERS } from './netcode/TurnPool.js';
 import { NetworkQuality } from './netcode/NetworkQuality.js';
 import { PortalManager } from './portals/PortalManager.js';
@@ -41,6 +47,9 @@ if (typeof window !== 'undefined') {
     BinaryWriter,
     BinaryReader,
     SnapshotInterpolator,
+    defineSchema,
+    TouchControls,
+    MerebTerminal,
     TurnPool,
     NetworkQuality,
     PortalManager,
