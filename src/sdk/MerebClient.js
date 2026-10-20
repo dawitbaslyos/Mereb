@@ -11,12 +11,13 @@ export class MerebClient extends EventTarget {
   constructor(options = {}) {
     super();
     this.host = options.host || (typeof window !== 'undefined' && window.location.hostname === 'localhost' ? 'localhost:1999' : '');
+    this.appId = options.appId || 'tank-arena';
     this.botTimeoutMs = options.botTimeoutMs ?? 8000;
     this.iceServers = options.iceServers;
     this.autoJoinFromUrl = options.autoJoinFromUrl ?? true;
 
     // State
-    this.signaling = new SignalingClient(this.host);
+    this.signaling = new SignalingClient(this.host, this.appId);
     this.peer = null;
     this.portal = new PortalManager(this);
     this.status = STATUS.IDLE;

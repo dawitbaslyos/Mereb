@@ -5,9 +5,10 @@ import PartySocket from 'partysocket';
 import { WS } from './constants.js';
 
 export class SignalingClient extends EventTarget {
-  constructor(host) {
+  constructor(host, appId = 'tank-arena') {
     super();
     this.host = host;
+    this.appId = appId;
     this.ws = null;
     this.roomId = null;
   }
@@ -30,7 +31,8 @@ export class SignalingClient extends EventTarget {
 
         this.ws = new PartySocket({
           host: this.host,
-          room: roomId
+          room: roomId,
+          query: { appId: this.appId }
         });
 
         this.ws.addEventListener('open', () => {

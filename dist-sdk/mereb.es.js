@@ -393,8 +393,8 @@ function k() {
 //#endregion
 //#region src/sdk/SignalingClient.js
 var A = class extends EventTarget {
-	constructor(e) {
-		super(), this.host = e, this.ws = null, this.roomId = null;
+	constructor(e, t = "tank-arena") {
+		super(), this.host = e, this.appId = t, this.ws = null, this.roomId = null;
 	}
 	connect(e, t = 15e3) {
 		return this.roomId = e, new Promise((n, r) => {
@@ -404,7 +404,8 @@ var A = class extends EventTarget {
 			try {
 				this.ws && this.ws.close(), this.ws = new v({
 					host: this.host,
-					room: e
+					room: e,
+					query: { appId: this.appId }
 				}), this.ws.addEventListener("open", () => {
 					i || (i = !0, clearTimeout(a), this.dispatchEvent(new CustomEvent("open", { detail: { id: this.playerId } })), n());
 				}), this.ws.addEventListener("message", (e) => {
@@ -707,7 +708,7 @@ var A = class extends EventTarget {
 	}
 }, P = class extends EventTarget {
 	constructor(e = {}) {
-		if (super(), this.host = e.host || (typeof window < "u" && window.location.hostname === "localhost" ? "localhost:1999" : ""), this.botTimeoutMs = e.botTimeoutMs ?? 8e3, this.iceServers = e.iceServers, this.autoJoinFromUrl = e.autoJoinFromUrl ?? !0, this.signaling = new A(this.host), this.peer = null, this.portal = new N(this), this.status = E.IDLE, this.role = null, this.localId = null, this.peerId = null, this.roomCode = null, this.isBot = !1, this.latency = 0, this._matchTimeout = null, e.onMatchStart && this.on("match-start", e.onMatchStart), e.onState && this.on("state", e.onState), e.onInput && this.on("input", e.onInput), e.onEvent && this.on("event", e.onEvent), e.onPeerDisconnect && this.on("peer-disconnect", e.onPeerDisconnect), e.onStatusChange && this.on("status-change", e.onStatusChange), e.onLatency && this.on("latency", e.onLatency), e.onQuality && this.on("quality", e.onQuality), this._setupSignalingListeners(), this.autoJoinFromUrl && typeof window < "u") {
+		if (super(), this.host = e.host || (typeof window < "u" && window.location.hostname === "localhost" ? "localhost:1999" : ""), this.appId = e.appId || "tank-arena", this.botTimeoutMs = e.botTimeoutMs ?? 8e3, this.iceServers = e.iceServers, this.autoJoinFromUrl = e.autoJoinFromUrl ?? !0, this.signaling = new A(this.host, this.appId), this.peer = null, this.portal = new N(this), this.status = E.IDLE, this.role = null, this.localId = null, this.peerId = null, this.roomCode = null, this.isBot = !1, this.latency = 0, this._matchTimeout = null, e.onMatchStart && this.on("match-start", e.onMatchStart), e.onState && this.on("state", e.onState), e.onInput && this.on("input", e.onInput), e.onEvent && this.on("event", e.onEvent), e.onPeerDisconnect && this.on("peer-disconnect", e.onPeerDisconnect), e.onStatusChange && this.on("status-change", e.onStatusChange), e.onLatency && this.on("latency", e.onLatency), e.onQuality && this.on("quality", e.onQuality), this._setupSignalingListeners(), this.autoJoinFromUrl && typeof window < "u") {
 			let e = new URLSearchParams(window.location.search).get("room");
 			e && setTimeout(() => this.joinRoom(e), 50);
 		}
@@ -1557,10 +1558,70 @@ var W = class {
 			"\"": "&quot;"
 		})[e] || e);
 	}
-};
+}, K = new class {
+	constructor() {
+		this.client = null, this.appId = "tank-arena", this.host = "mereb-signaling.dawitbaslyos.workers.dev", this.entities = /* @__PURE__ */ new Map(), this.interpolator = new H(), this.rpcHandlers = /* @__PURE__ */ new Map(), this.touch = null, this.isInitialized = !1;
+	}
+	async init(e = {}) {
+		return this.isInitialized && this.client ? this.client : (this.appId = e.appId || "tank-arena", this.host = e.host || "mereb-signaling.dawitbaslyos.workers.dev", this.client = new P({
+			appId: this.appId,
+			host: this.host,
+			botTimeoutMs: e.botTimeoutMs ?? 8e3,
+			autoJoinFromUrl: e.autoJoinFromUrl ?? !0
+		}), this.client.on("event", (e) => {
+			if (e.name === "mereb:rpc") {
+				let { rpcName: t, payload: n, senderId: r } = e.data || {}, i = this.rpcHandlers.get(t);
+				i && i(n, r);
+			}
+		}), this.isInitialized = !0, this.client);
+	}
+	async joinOrCreateRoom(e) {
+		return this.client || await this.init(), this.client.joinRoom(e);
+	}
+	async quickPlay() {
+		return this.client || await this.init(), this.client.quickPlay();
+	}
+	rpc(e, t = {}) {
+		this.client && this.client.sendEvent("mereb:rpc", {
+			rpcName: e,
+			payload: t,
+			senderId: this.client.localId
+		});
+	}
+	onRpc(e, t) {
+		this.rpcHandlers.set(e, t);
+	}
+	instantiate(e, t = {}) {
+		let n = t.isLocal ?? !0, r = t.schema ? U(t.schema) : null, i = t.id || `${e}_${this.client?.localId || "p"}`, a = {
+			id: i,
+			type: e,
+			isLocal: n,
+			schema: r,
+			state: {},
+			set(e) {
+				if (this.state = {
+					...this.state,
+					...e
+				}, this.isLocal && r && K.client) {
+					let e = r.encode(this.state);
+					K.client.sendBinary(e);
+				}
+			},
+			onUpdate(e) {
+				this._updateCallback = e;
+			}
+		};
+		return this.entities.set(i, a), a;
+	}
+	attachControls(e = {}) {
+		return this.touch ||= new W(e), this.touch;
+	}
+}();
 //#endregion
 //#region src/sdk/index.js
 typeof window < "u" && (window.Mereb = {
+	...K,
+	Engine: K,
 	MerebClient: P,
 	MerebLobby: F,
 	PeerConnection: M,
@@ -1579,4 +1640,4 @@ typeof window < "u" && (window.Mereb = {
 	...C
 });
 //#endregion
-export { z as BinaryReader, R as BinaryWriter, O as DC, w as DEFAULT_ICE_SERVERS, b as DEFAULT_STUN_SERVERS, x as DEFAULT_TURN_SERVERS, P as MerebClient, F as MerebLobby, G as MerebTerminal, j as NetworkQuality, M as PeerConnection, N as PortalManager, T as ROLE, E as STATUS, A as SignalingClient, H as SnapshotInterpolator, W as TouchControls, S as TurnPool, D as WS, U as defineSchema, k as generateRoomCode };
+export { z as BinaryReader, R as BinaryWriter, O as DC, w as DEFAULT_ICE_SERVERS, b as DEFAULT_STUN_SERVERS, x as DEFAULT_TURN_SERVERS, K as Mereb, P as MerebClient, F as MerebLobby, G as MerebTerminal, j as NetworkQuality, M as PeerConnection, N as PortalManager, T as ROLE, E as STATUS, A as SignalingClient, H as SnapshotInterpolator, W as TouchControls, S as TurnPool, D as WS, U as defineSchema, k as generateRoomCode };

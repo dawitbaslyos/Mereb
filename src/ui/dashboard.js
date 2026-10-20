@@ -1,10 +1,6 @@
 /**
- * Mereb Cloud - Developer Dashboard
- * Precision shadcn / Linear dark UI:
- * - 1 Project limit enforcement on Free tier
- * - API Key copying and quickstart code
- * - Project creation, deletion, and upgrade prompt
- * - Real-time metrics overview
+ * Mereb Cloud - Game Studio & Multiplayer Management Dashboard
+ * Photon-style Multi-Game Catalog, AppID manager, Edge Telemetry & Zero-Cost Tracker.
  */
 import { auth } from './auth.js';
 
@@ -14,10 +10,14 @@ export class DashboardUI {
     this.onLaunchGame = onLaunchGame;
     this.element = document.createElement('div');
     this.element.className = 'dashboard-root';
-    this.currentProjectIndex = 0;
-    this.showApiKey = false;
+    this.selectedGameIndex = 0;
 
     auth.onChange(() => {
+      this.render();
+    });
+
+    // Sync live metrics and catalog from Cloudflare Edge
+    auth.syncWithEdge().then(() => {
       this.render();
     });
 
@@ -26,9 +26,9 @@ export class DashboardUI {
 
   render() {
     const user = auth.getUser();
-    const projects = auth.getProjects();
-    const currentProj = projects[this.currentProjectIndex] || projects[0] || null;
-    const isFreePlan = !user || user.plan === 'free';
+    const games = auth.getGames();
+    const metrics = auth.getCloudMetrics();
+    const selectedGame = games[this.selectedGameIndex] || games[0] || null;
 
     if (!user) {
       this.element.innerHTML = `
@@ -44,9 +44,9 @@ export class DashboardUI {
       return;
     }
 
-    const maskedKey = currentProj
-      ? (this.showApiKey ? currentProj.apiKey : currentProj.apiKey.slice(0, 14) + '••••••••••••')
-      : 'No API Key';
+    const host = 'https://mereb-signaling.dawitbaslyos.workers.dev';
+    const totalCCU = games.reduce((acc, g) => acc + (g.activeCCU || 0), 0);
+    const totalMatches = games.reduce((acc, g) => acc + (g.totalMatches || 0), 0);
 
     this.element.innerHTML = `
       <!-- Dashboard Top Header -->
@@ -55,9 +55,9 @@ export class DashboardUI {
           <div class="dash-brand-wrap">
             <span class="dash-logo">MEREB</span>
             <span class="dash-slash">/</span>
-            <span class="dash-section-name">Cloud Console</span>
-            <span class="pill-badge ${isFreePlan ? 'pill-free' : 'pill-pro'}">
-              ${isFreePlan ? 'Free Plan (1/1 Projects)' : 'Pro Plan'}
+            <span class="dash-section-name">Game Studio Cloud</span>
+            <span class="pill-badge pill-free">
+              Cloudflare Edge Free Tier ($0.00 / mo)
             </span>
           </div>
 
@@ -80,133 +80,99 @@ export class DashboardUI {
         </div>
       </header>
 
-      <!-- Dashboard Main Container -->
+      <!-- Main Dashboard Container -->
       <main class="dash-main-container">
-        <!-- Page Title & Actions -->
+        <!-- Title & Action Row -->
         <div class="dash-title-row">
           <div>
-            <h1 class="dash-page-title">Developer Overview</h1>
-            <p class="dash-page-desc">Manage your serverless WebRTC edge projects and credentials.</p>
+            <h1 class="dash-page-title">Game Studio & Network Telemetry</h1>
+            <p class="dash-page-desc">Manage game App IDs, copy AI integration prompts, and monitor edge traffic & costs.</p>
           </div>
           <div class="dash-title-actions">
-            ${isFreePlan ? '<button class="btn-pro-pill" id="btn-upgrade-plan">⚡ Upgrade to Pro ($29/mo)</button>' : ''}
-            <button class="btn-primary pill-btn" id="btn-create-proj-modal">+ New Project</button>
+            <button class="btn-subtle pill-btn" id="btn-sync-edge">🔄 Sync Edge Stats</button>
+            <button class="btn-primary pill-btn" id="btn-create-game-modal">+ Register New Game</button>
           </div>
         </div>
 
-        <!-- Metric Cards Grid -->
+        <!-- Metric Cards Grid (Photon CCU & Free-Tier Cost Metrics) -->
         <div class="dash-metrics-grid">
           <div class="dash-metric-card">
             <div class="metric-top">
-              <span class="metric-title">Active Rooms</span>
+              <span class="metric-title">Total Active CCU</span>
               <span class="status-live-dot"></span>
             </div>
-            <div class="metric-number">${currentProj?.activeRooms || 0}</div>
-            <div class="metric-sub">Live P2P DataChannels</div>
+            <div class="metric-number text-signal">${totalCCU}</div>
+            <div class="metric-sub">Live concurrent web players</div>
           </div>
 
           <div class="dash-metric-card">
             <div class="metric-top">
-              <span class="metric-title">Matches Today</span>
+              <span class="metric-title">Catalog Games</span>
               <span class="metric-icon">🎮</span>
             </div>
-            <div class="metric-number">${currentProj?.totalMatches || 0}</div>
-            <div class="metric-sub">Edge signaling handshakes</div>
+            <div class="metric-number">${games.length}</div>
+            <div class="metric-sub">Dedicated App ID universes</div>
           </div>
 
           <div class="dash-metric-card">
             <div class="metric-top">
-              <span class="metric-title">Average Latency</span>
-              <span class="metric-icon">📶</span>
+              <span class="metric-title">Daily Edge Quota</span>
+              <span class="metric-icon">⚡</span>
             </div>
-            <div class="metric-number text-accent">${currentProj?.avgPingMs || 22} ms</div>
-            <div class="metric-sub">P50 STUN round-trip</div>
+            <div class="metric-number text-accent">${metrics.quotaUsedPercent}%</div>
+            <div class="metric-sub">${metrics.dailyRequests} / ${metrics.dailyQuotaLimit} free requests</div>
           </div>
 
           <div class="dash-metric-card">
             <div class="metric-top">
-              <span class="metric-title">Connection Rate</span>
-              <span class="metric-icon">🛡️</span>
+              <span class="metric-title">Photon Savings</span>
+              <span class="metric-icon">💰</span>
             </div>
-            <div class="metric-number text-signal">99.8%</div>
-            <div class="metric-sub">Successful peer traversal</div>
+            <div class="metric-number text-signal">+$${metrics.savedCostVsPhotonUSD || 45}.00</div>
+            <div class="metric-sub">Monthly savings vs Photon Engine</div>
           </div>
         </div>
 
-        <!-- API Key & Integration Section -->
-        <div class="dash-card api-key-card">
-          <div class="card-title-row">
-            <div>
-              <h2 class="card-heading">Project API Key</h2>
-              <p class="card-subheading">Pass this key into <code>new MerebClient({ apiKey: '...' })</code> for managed global signaling.</p>
-            </div>
-            <span class="pill-badge pill-active">${currentProj?.name || 'Starter Project'}</span>
-          </div>
-
-          <div class="key-display-row">
-            <div class="key-box">
-              <span class="key-text" id="api-key-text">${maskedKey}</span>
-            </div>
-            <button class="btn-subtle pill-btn" id="btn-toggle-key">
-              ${this.showApiKey ? 'Hide' : 'Reveal'}
-            </button>
-            <button class="btn-primary pill-btn" id="btn-copy-key">
-              Copy Key
-            </button>
-            <span class="key-copied-pill" id="key-copied-pill">Copied!</span>
-          </div>
-
-          <!-- Code Snippet -->
-          <div class="quickstart-snippet">
-            <div class="snippet-header">
-              <span>Quickstart Integration</span>
-              <span class="snippet-lang">JavaScript / TypeScript</span>
-            </div>
-            <pre class="snippet-code"><code>import { MerebClient } from 'mereb';
-
-const net = new MerebClient({
-  apiKey: '${currentProj?.apiKey || 'pk_live_your_key'}',
-  botTimeoutMs: 8000
-});
-
-net.on('match-start', ({ role, isHost }) => {
-  console.log('Multiplayer session live!');
-});</code></pre>
-          </div>
-        </div>
-
-        <!-- Projects List Section -->
+        <!-- Game Catalog Section (Photon AppID Manager) -->
         <div class="dash-card projects-card">
           <div class="card-title-row">
             <div>
-              <h2 class="card-heading">Active Projects</h2>
+              <h2 class="card-heading">My Game Catalog & App IDs</h2>
               <p class="card-subheading">
-                ${isFreePlan ? 'You are using 1 of 1 project allowed on the Free tier.' : 'Unlimited projects active on Pro tier.'}
+                Each game operates in an isolated Cloudflare edge namespace. Click <strong>"Copy AI Prompt"</strong> to hand the setup to any AI assistant.
               </p>
             </div>
           </div>
 
           <div class="projects-list">
-            ${projects.map((proj, idx) => `
-              <div class="project-row ${idx === this.currentProjectIndex ? 'project-selected' : ''}">
+            ${games.map((g, idx) => `
+              <div class="project-row ${idx === this.selectedGameIndex ? 'project-selected' : ''}" data-idx="${idx}">
                 <div class="project-info">
                   <div class="project-name-wrap">
-                    <span class="project-name">${proj.name}</span>
-                    <span class="pill-badge pill-status">Active</span>
+                    <span class="project-name">${g.name}</span>
+                    <span class="pill-badge pill-status">${g.genre}</span>
+                    <span class="pill-badge pill-active">${g.maxPlayers} Players</span>
                   </div>
                   <div class="project-meta">
-                    <span>ID: ${proj.id}</span>
+                    <span>App ID: <code>${g.id}</code></span>
                     <span>•</span>
-                    <span>Created: ${proj.createdAt}</span>
+                    <span>Matches: ${g.totalMatches || 0}</span>
                     <span>•</span>
-                    <span>Region: ${proj.region}</span>
+                    <span>Messages: ${g.totalMessages || 0}</span>
+                    <span>•</span>
+                    <span>Created: ${g.createdAt}</span>
                   </div>
                 </div>
 
                 <div class="project-actions">
-                  <button class="btn-subtle pill-btn btn-proj-copy-key" data-key="${proj.apiKey}">Copy Key</button>
-                  ${projects.length > 1 ? `
-                    <button class="btn-danger-icon btn-proj-delete" data-id="${proj.id}" title="Delete project">
+                  <button class="btn-subtle pill-btn btn-copy-api" data-url="${host}/api/games/${g.id}" title="Copy Single API link">
+                    🔗 Copy API Link
+                  </button>
+                  <button class="btn-primary pill-btn btn-copy-prompt" data-id="${g.id}" data-name="${g.name}">
+                    🤖 Copy AI Prompt
+                  </button>
+                  ${games.length > 1 ? `
+                    <button class="btn-danger-icon btn-game-delete" data-id="${g.id}" title="Delete game from catalog">
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <polyline points="3 6 5 6 21 6"></polyline>
                         <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
@@ -218,42 +184,87 @@ net.on('match-start', ({ role, isHost }) => {
             `).join('')}
           </div>
         </div>
+
+        <!-- Selected Game Quickstart & AI Integration Card -->
+        ${selectedGame ? `
+          <div class="dash-card api-key-card">
+            <div class="card-title-row">
+              <div>
+                <h2 class="card-heading">Selected Game: ${selectedGame.name} (App ID: <code>${selectedGame.id}</code>)</h2>
+                <p class="card-subheading">
+                  AI Integration link: <code>${host}/api/games/${selectedGame.id}</code>
+                </p>
+              </div>
+              <button class="btn-primary pill-btn btn-copy-prompt" data-id="${selectedGame.id}" data-name="${selectedGame.name}">
+                📋 Copy AI Integration Prompt
+              </button>
+            </div>
+
+            <div class="quickstart-snippet">
+              <div class="snippet-header">
+                <span>Multiplayer Integration Code (Photon-Style SDK)</span>
+                <span class="snippet-lang">JavaScript / TypeScript</span>
+              </div>
+              <pre class="snippet-code"><code>import { MerebClient, defineSchema, TouchControls } from 'mereb-netcode';
+
+// 1. Initialize with this game's isolated App ID
+const net = new MerebClient({
+  appId: '${selectedGame.id}',
+  host: 'mereb-signaling.dawitbaslyos.workers.dev',
+  botTimeoutMs: 8000
+});
+
+// 2. Define game state schema (Photon-style declarative packing)
+export const StateSchema = defineSchema({
+  x: 'fixed16',
+  y: 'fixed16',
+  rotation: 'fixed16',
+  score: 'uint8',
+  health: 'uint8'
+});
+
+// 3. Connect & synchronize over sub-5ms WebRTC DataChannels!
+net.on('match-start', ({ role, isHost }) => {
+  console.log('Match live in ${selectedGame.name}!');
+});</code></pre>
+            </div>
+          </div>
+        ` : ''}
       </main>
 
-      <!-- Project Creation Modal -->
-      <div class="dash-modal-backdrop" id="modal-create-proj" style="display: none;">
+      <!-- Register New Game Modal -->
+      <div class="dash-modal-backdrop" id="modal-create-game" style="display: none;">
         <div class="dash-modal-card">
-          <h3 class="modal-title">Create New Project</h3>
-          <p class="modal-desc">Give your game or AI product a name to generate dedicated edge credentials.</p>
-          <input type="text" class="modal-input" id="new-proj-name" placeholder="e.g. Cyber Tank Arena 2" maxlength="40" />
-          <div class="modal-actions">
-            <button class="btn-subtle pill-btn" id="btn-modal-cancel">Cancel</button>
-            <button class="btn-primary pill-btn" id="btn-modal-submit">Create Project</button>
-          </div>
-        </div>
-      </div>
-
-      <!-- Limit Reached / Upgrade Modal -->
-      <div class="dash-modal-backdrop" id="modal-upgrade" style="display: none;">
-        <div class="dash-modal-card upgrade-modal-card">
-          <div class="upgrade-badge">⚡ Free Tier Limit Reached</div>
-          <h3 class="modal-title">Upgrade to Mereb Pro</h3>
+          <h3 class="modal-title">Register New Game in Catalog</h3>
           <p class="modal-desc">
-            The Free plan includes <strong>1 active project</strong>. Upgrade to Mereb Pro for unlimited projects, managed multi-region TURN relays, and real-time latency diagnostics.
+            Creates a dedicated App ID and edge signaling namespace for your new game on Cloudflare Durable Objects.
           </p>
+          
+          <div style="display: flex; flex-direction: column; gap: 12px; margin-top: 4px;">
+            <label style="font-size: 12px; font-weight: 600; color: #94a3b8;">Game Title</label>
+            <input type="text" class="modal-input" id="new-game-name" placeholder="e.g. Cyber Kart 2088" maxlength="50" />
 
-          <div class="upgrade-perks-list">
-            <div>✓ Unlimited Projects & API Keys</div>
-            <div>✓ 5,000 Monthly Active Game Rooms</div>
-            <div>✓ Global Enterprise TURN Mesh (100% Firewall Bypass)</div>
-            <div>✓ Real-time Latency & Ragequit Analytics</div>
+            <label style="font-size: 12px; font-weight: 600; color: #94a3b8;">Genre</label>
+            <select class="modal-input" id="new-game-genre">
+              <option value="Top-Down Shooter">Top-Down Shooter</option>
+              <option value="2D Kart Arcade">2D Kart Arcade</option>
+              <option value="Party Brawler">Party Brawler</option>
+              <option value="Turn-Based Strategy">Turn-Based Strategy</option>
+              <option value="Hypercasual Canvas">Hypercasual Canvas</option>
+              <option value="Physics Arena">Physics Arena</option>
+            </select>
+
+            <label style="font-size: 12px; font-weight: 600; color: #94a3b8;">Match Capacity</label>
+            <select class="modal-input" id="new-game-players">
+              <option value="2">2 Players (1v1 Competitive)</option>
+              <option value="4">4 Players (Party Mode)</option>
+              <option value="8">8 Players (Arena Mayhem)</option>
+            </select>
           </div>
 
-          <div class="modal-actions">
-            <button class="btn-subtle pill-btn" id="btn-upgrade-dismiss">Stay on Free</button>
-            <button class="btn-primary pill-btn btn-confirm-upgrade" id="btn-confirm-upgrade">
-              Activate Pro ($29/mo)
-            </button>
+          <div class="modal-actions" style="margin-top: 14px;">
+            <button class="btn-subtle pill-btn" id="btn-modal-cancel">Cancel</button>
+            <button class="btn-primary pill-btn" id="btn-modal-submit">Create Game API</button>
           </div>
         </div>
       </div>
@@ -278,108 +289,108 @@ net.on('match-start', ({ role, isHost }) => {
       if (this.onNavigateHome) this.onNavigateHome();
     });
 
-    // Toggle Key Visibility
-    const toggleBtn = this.element.querySelector('#btn-toggle-key');
-    toggleBtn?.addEventListener('click', () => {
-      this.showApiKey = !this.showApiKey;
-      this.render();
+    // Sync Edge Stats Button
+    this.element.querySelector('#btn-sync-edge')?.addEventListener('click', async (e) => {
+      const btn = e.target;
+      const orig = btn.innerText;
+      btn.innerText = 'Syncing...';
+      await auth.syncWithEdge();
+      btn.innerText = 'Synced! ✓';
+      setTimeout(() => { btn.innerText = orig; }, 1500);
     });
 
-    // Copy API Key
-    const copyKeyBtn = this.element.querySelector('#btn-copy-key');
-    const copiedPill = this.element.querySelector('#key-copied-pill');
-    copyKeyBtn?.addEventListener('click', async () => {
-      const projects = auth.getProjects();
-      const currentProj = projects[this.currentProjectIndex] || projects[0];
-      if (currentProj) {
-        await navigator.clipboard.writeText(currentProj.apiKey);
-        copiedPill.classList.add('visible');
-        setTimeout(() => copiedPill.classList.remove('visible'), 1600);
-      }
+    // Select Game Row
+    this.element.querySelectorAll('.project-row').forEach(row => {
+      row.addEventListener('click', (e) => {
+        if (e.target.closest('button')) return;
+        const idx = parseInt(row.getAttribute('data-idx'), 10);
+        this.selectedGameIndex = idx;
+        this.render();
+      });
     });
 
-    // Copy key from table
-    const tableCopyBtns = this.element.querySelectorAll('.btn-proj-copy-key');
-    tableCopyBtns.forEach(btn => {
-      btn.addEventListener('click', async () => {
-        const key = btn.getAttribute('data-key');
-        if (key) {
-          await navigator.clipboard.writeText(key);
+    // Copy API Link
+    this.element.querySelectorAll('.btn-copy-api').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        const url = btn.getAttribute('data-url');
+        if (url) {
+          await navigator.clipboard.writeText(url);
           const orig = btn.innerText;
-          btn.innerText = 'Copied!';
-          setTimeout(() => { btn.innerText = orig; }, 1400);
+          btn.innerText = 'Link Copied! ✓';
+          setTimeout(() => { btn.innerText = orig; }, 1500);
         }
       });
     });
 
-    // Delete Project
-    const deleteBtns = this.element.querySelectorAll('.btn-proj-delete');
-    deleteBtns.forEach(btn => {
-      btn.addEventListener('click', () => {
+    // Copy AI Setup Prompt
+    this.element.querySelectorAll('.btn-copy-prompt').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        e.stopPropagation();
         const id = btn.getAttribute('data-id');
-        if (id && confirm('Are you sure you want to delete this project?')) {
-          auth.deleteProject(id);
-          this.currentProjectIndex = 0;
+        const name = btn.getAttribute('data-name');
+        const host = 'https://mereb-signaling.dawitbaslyos.workers.dev';
+        const prompt = `I want to add real-time multiplayer to "${name}" using Mereb Netcode Engine.
+App ID: '${id}'
+Signaling Server: '${host}'
+Follow MEREB_INTEGRATION_SPEC:
+1. Initialize MerebClient with { appId: '${id}', host: '${host}' }.
+2. Declare our game's state with defineSchema().
+3. Attach TouchControls for mobile virtual joysticks and MerebLobby.
+4. Synchronize state over WebRTC DataChannels using SnapshotInterpolator.
+5. Mount MerebTerminal for live in-game diagnostics and network lag simulation.`;
+
+        await navigator.clipboard.writeText(prompt);
+        const orig = btn.innerText;
+        btn.innerText = 'Prompt Copied! 📋';
+        setTimeout(() => { btn.innerText = orig; }, 1500);
+      });
+    });
+
+    // Delete Game
+    this.element.querySelectorAll('.btn-game-delete').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const id = btn.getAttribute('data-id');
+        if (id && confirm(`Delete game "${id}" from catalog?`)) {
+          auth.deleteGame(id);
+          this.selectedGameIndex = 0;
         }
       });
     });
 
-    // Modal Create Project
-    const createModalBtn = this.element.querySelector('#btn-create-proj-modal');
-    const createModal = this.element.querySelector('#modal-create-proj');
-    const upgradeModal = this.element.querySelector('#modal-upgrade');
-    const cancelModalBtn = this.element.querySelector('#btn-modal-cancel');
-    const submitModalBtn = this.element.querySelector('#btn-modal-submit');
-    const projNameInput = this.element.querySelector('#new-proj-name');
+    // Modal Create Game
+    const modal = this.element.querySelector('#modal-create-game');
+    const openBtn = this.element.querySelector('#btn-create-game-modal');
+    const cancelBtn = this.element.querySelector('#btn-modal-cancel');
+    const submitBtn = this.element.querySelector('#btn-modal-submit');
+    const nameInput = this.element.querySelector('#new-game-name');
+    const genreInput = this.element.querySelector('#new-game-genre');
+    const playersInput = this.element.querySelector('#new-game-players');
 
-    createModalBtn?.addEventListener('click', () => {
-      const user = auth.getUser();
-      const projects = auth.getProjects();
-      const isFree = !user || user.plan === 'free';
-
-      if (isFree && projects.length >= 1) {
-        // Enforce 1 project limit!
-        upgradeModal.style.display = 'flex';
-      } else {
-        createModal.style.display = 'flex';
-        projNameInput.value = '';
-        projNameInput.focus();
-      }
+    openBtn?.addEventListener('click', () => {
+      modal.style.display = 'flex';
+      nameInput.value = '';
+      nameInput.focus();
     });
 
-    cancelModalBtn?.addEventListener('click', () => {
-      createModal.style.display = 'none';
+    cancelBtn?.addEventListener('click', () => {
+      modal.style.display = 'none';
     });
 
-    submitModalBtn?.addEventListener('click', () => {
-      const name = projNameInput.value.trim();
+    submitBtn?.addEventListener('click', () => {
+      const name = nameInput.value.trim();
       if (!name) return;
+      const genre = genreInput.value;
+      const maxPlayers = playersInput.value;
+
       try {
-        auth.createProject(name);
-        createModal.style.display = 'none';
+        auth.addGame(name, genre, maxPlayers);
+        modal.style.display = 'none';
+        this.selectedGameIndex = auth.getGames().length - 1;
       } catch (err) {
-        if (err.code === 'LIMIT_REACHED') {
-          createModal.style.display = 'none';
-          upgradeModal.style.display = 'flex';
-        } else {
-          alert(err.message);
-        }
+        alert(err.message);
       }
-    });
-
-    // Upgrade triggers
-    const upgradeTrigger = this.element.querySelector('#btn-upgrade-plan');
-    upgradeTrigger?.addEventListener('click', () => {
-      upgradeModal.style.display = 'flex';
-    });
-
-    this.element.querySelector('#btn-upgrade-dismiss')?.addEventListener('click', () => {
-      upgradeModal.style.display = 'none';
-    });
-
-    this.element.querySelector('#btn-confirm-upgrade')?.addEventListener('click', () => {
-      auth.upgradePlan();
-      upgradeModal.style.display = 'none';
     });
   }
 

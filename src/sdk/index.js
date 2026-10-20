@@ -11,6 +11,7 @@ export { SnapshotInterpolator } from './netcode/SnapshotInterpolator.js';
 export { defineSchema } from './netcode/Schema.js';
 export { TouchControls } from './controls/TouchControls.js';
 export { MerebTerminal } from './terminal/MerebTerminal.js';
+export { Mereb } from './Mereb.js';
 export { TurnPool, DEFAULT_STUN_SERVERS, DEFAULT_TURN_SERVERS } from './netcode/TurnPool.js';
 export { NetworkQuality } from './netcode/NetworkQuality.js';
 export { PortalManager } from './portals/PortalManager.js';
@@ -32,6 +33,7 @@ import { SnapshotInterpolator } from './netcode/SnapshotInterpolator.js';
 import { defineSchema } from './netcode/Schema.js';
 import { TouchControls } from './controls/TouchControls.js';
 import { MerebTerminal } from './terminal/MerebTerminal.js';
+import { Mereb } from './Mereb.js';
 import { TurnPool, DEFAULT_STUN_SERVERS, DEFAULT_TURN_SERVERS } from './netcode/TurnPool.js';
 import { NetworkQuality } from './netcode/NetworkQuality.js';
 import { PortalManager } from './portals/PortalManager.js';
@@ -40,6 +42,8 @@ import * as Constants from './constants.js';
 // Expose on global window object for Godot Web exports and direct script tags
 if (typeof window !== 'undefined') {
   window.Mereb = {
+    ...Mereb,
+    Engine: Mereb,
     MerebClient,
     MerebLobby,
     PeerConnection,

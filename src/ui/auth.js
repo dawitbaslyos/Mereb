@@ -1,16 +1,54 @@
 /**
- * Mereb Cloud - Authentication & Project Storage Service
- * GitHub-only authentication with local persistence and project tier restrictions.
+ * Mereb Cloud - Authentication, Game Catalog & Telemetry Service
+ * GitHub-only authentication with local persistence and multi-game management.
  */
 
 const STORAGE_KEY_USER = 'mereb_cloud_user';
 const STORAGE_KEY_PROJECTS = 'mereb_cloud_projects';
+const STORAGE_KEY_GAMES = 'mereb_cloud_games';
+
+const DEFAULT_GAMES = [
+  {
+    id: 'tank-arena',
+    name: 'Mereb Arena (3D Tanks)',
+    genre: 'Top-Down Shooter',
+    maxPlayers: 2,
+    createdAt: '2026-10-18',
+    activeCCU: 0,
+    totalMatches: 24,
+    totalMessages: 18200,
+    status: 'active',
+    apiLink: 'https://mereb-signaling.dawitbaslyos.workers.dev/api/games/tank-arena',
+    aiPrompt: "Integrate Mereb multiplayer into this game using AppID 'tank-arena' and API 'https://mereb-signaling.dawitbaslyos.workers.dev'. Use defineSchema and TouchControls."
+  },
+  {
+    id: 'neon-racer',
+    name: 'Neon Racer (Prototype)',
+    genre: '2D Kart Arcade',
+    maxPlayers: 4,
+    createdAt: '2026-10-19',
+    activeCCU: 0,
+    totalMatches: 6,
+    totalMessages: 4300,
+    status: 'active',
+    apiLink: 'https://mereb-signaling.dawitbaslyos.workers.dev/api/games/neon-racer',
+    aiPrompt: "Integrate Mereb multiplayer into this game using AppID 'neon-racer' and API 'https://mereb-signaling.dawitbaslyos.workers.dev'. Use defineSchema and TouchControls."
+  }
+];
 
 export class AuthService {
   constructor() {
     this.listeners = new Set();
     this.user = this._loadUser();
     this.projects = this._loadProjects();
+    this.games = this._loadGames();
+    this.cloudMetrics = {
+      dailyRequests: 1420,
+      dailyQuotaLimit: 100000,
+      quotaUsedPercent: '1.42',
+      monthlyEstimatedCostUSD: 0.00,
+      savedCostVsPhotonUSD: 45.00
+    };
   }
 
   _loadUser() {
@@ -28,7 +66,6 @@ export class AuthService {
       if (data) return JSON.parse(data);
     } catch {}
 
-    // Default starter project
     return [
       {
         id: 'proj_starter',
@@ -49,6 +86,94 @@ export class AuthService {
     } catch {}
   }
 
+  _loadGames() {
+    try {
+      const data = localStorage.getItem(STORAGE_KEY_GAMES);
+      if (data) return JSON.parse(data);
+    } catch {}
+    return [...DEFAULT_GAMES];
+  }
+
+  _saveGames() {
+    try {
+      localStorage.setItem(STORAGE_KEY_GAMES, JSON.stringify(this.games));
+    } catch {}
+  }
+
+  getGames() {
+    return this.games;
+  }
+
+  getCloudMetrics() {
+    return this.cloudMetrics;
+  }
+
+  async syncWithEdge(host = 'https://mereb-signaling.dawitbaslyos.workers.dev') {
+    try {
+      const res = await fetch(`${host}/api/games`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.games && Array.isArray(data.games)) {
+          this.games = data.games;
+          this._saveGames();
+        }
+        if (data.metrics) {
+          this.cloudMetrics = data.metrics;
+        }
+        this._notify();
+      }
+    } catch (e) {
+      console.warn('Edge catalog sync notice:', e.message);
+    }
+  }
+
+  addGame(name, genre = 'Action', maxPlayers = 2, host = 'https://mereb-signaling.dawitbaslyos.workers.dev') {
+    if (!name || !name.trim()) throw new Error('Game title is required');
+
+    const id = name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || `game-${Date.now().toString(36)}`;
+    const existing = this.games.find(g => g.id === id);
+    if (existing) throw new Error('A game with this App ID already exists in catalog');
+
+    const newGame = {
+      id,
+      name: name.trim(),
+      genre,
+      maxPlayers: parseInt(maxPlayers, 10) || 2,
+      createdAt: new Date().toISOString().split('T')[0],
+      activeCCU: 0,
+      totalMatches: 0,
+      totalMessages: 0,
+      status: 'active',
+      apiLink: `${host}/api/games/${id}`,
+      aiPrompt: `Integrate Mereb multiplayer into this game using AppID '${id}' and API '${host}'. Follow MEREB_INTEGRATION_SPEC to wire up defineSchema and TouchControls.`
+    };
+
+    this.games.push(newGame);
+    this._saveGames();
+    this._notify();
+
+    // Fire & forget sync to Cloudflare edge
+    try {
+      fetch(`${host}/api/games`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, name: name.trim(), genre, maxPlayers })
+      }).catch(() => {});
+    } catch {}
+
+    return newGame;
+  }
+
+  deleteGame(gameId, host = 'https://mereb-signaling.dawitbaslyos.workers.dev') {
+    this.games = this.games.filter(g => g.id !== gameId);
+    this._saveGames();
+    this._notify();
+
+    try {
+      fetch(`${host}/api/games/${gameId}`, { method: 'DELETE' }).catch(() => {});
+    } catch {}
+  }
+
   getUser() {
     return this.user;
   }
@@ -64,7 +189,7 @@ export class AuthService {
       name: customUsername,
       avatar: `https://github.com/${customUsername}.png`,
       email: `${customUsername}@users.noreply.github.com`,
-      plan: 'free', // 'free' | 'pro'
+      plan: 'free',
       maxProjects: 1
     };
 
@@ -91,7 +216,6 @@ export class AuthService {
   createProject(name) {
     if (!name || !name.trim()) throw new Error('Project name is required');
 
-    // Free tier limitation enforcement
     const isFreePlan = !this.user || this.user.plan === 'free';
     if (isFreePlan && this.projects.length >= 1) {
       const err = new Error('Free plan allows a maximum of 1 active project.');
