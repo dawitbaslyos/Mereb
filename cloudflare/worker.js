@@ -399,7 +399,7 @@ export default {
       };
 
       try {
-        const { code } = await request.json();
+        const { code, redirect_uri } = await request.json();
         if (!code) {
           return new Response(JSON.stringify({ error: 'Authorization code is required' }), { status: 400, headers });
         }
@@ -414,6 +414,13 @@ export default {
         }
 
         // 1. Exchange code for access token
+        const tokenPayload = {
+          client_id: clientId,
+          client_secret: clientSecret,
+          code
+        };
+        if (redirect_uri) tokenPayload.redirect_uri = redirect_uri;
+
         const tokenRes = await fetch('https://github.com/login/oauth/access_token', {
           method: 'POST',
           headers: {
@@ -421,11 +428,7 @@ export default {
             'Accept': 'application/json',
             'User-Agent': 'Mereb-Cloud-Auth'
           },
-          body: JSON.stringify({
-            client_id: clientId,
-            client_secret: clientSecret,
-            code
-          })
+          body: JSON.stringify(tokenPayload)
         });
 
         const tokenData = await tokenRes.json();

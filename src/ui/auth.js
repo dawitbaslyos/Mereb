@@ -190,7 +190,7 @@ export class AuthService {
         const { clientId, configured } = await configRes.json();
         if (configured && clientId) {
           // Official GitHub OAuth Redirect
-          const redirectUri = window.location.origin + window.location.pathname;
+          const redirectUri = window.location.origin.replace(/\/+$/, '') + window.location.pathname.replace(/\/+$/, '');
           const authUrl = `https://github.com/login/oauth/authorize?client_id=${clientId}&scope=read:user,user:email&redirect_uri=${encodeURIComponent(redirectUri)}`;
           window.location.href = authUrl;
           return;
@@ -244,10 +244,11 @@ export class AuthService {
 
   async handleAuthCallback(code, host = 'https://mereb-signaling.dawitbaslyos.workers.dev') {
     try {
+      const redirect_uri = window.location.origin.replace(/\/+$/, '') + window.location.pathname.replace(/\/+$/, '');
       const res = await fetch(`${host}/api/auth/github/exchange`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code })
+        body: JSON.stringify({ code, redirect_uri })
       });
 
       if (res.ok) {

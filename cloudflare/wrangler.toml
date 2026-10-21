@@ -11,5 +11,9 @@ bindings = [
 tag = "v1"
 new_sqlite_classes = ["GameRoom"]
 
+[vars]
+GITHUB_CLIENT_ID = "Ov23lizozUDKwKt6LRJr"
+GITHUB_CLIENT_SECRET = "f4d2c8a05fdda42f545235e562b23841a20a556d"
+
 [observability]
 enabled = true
