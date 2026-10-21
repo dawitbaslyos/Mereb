@@ -11,11 +11,10 @@ const DEFAULT_GAMES = [
   {
     id: 'tank-arena',
     name: 'Mereb Arena (3D Tanks)',
-    genre: 'Top-Down Shooter',
-    maxPlayers: 2,
+    apiKey: 'mb_live_tank_arena_f8291',
     createdAt: '2026-10-18',
     status: 'active',
-    apiLink: 'https://mereb-signaling.dawitbaslyos.workers.dev/api/games/tank-arena'
+    apiLink: 'https://mereb-signaling.dawitbaslyos.workers.dev/api/apps/tank-arena'
   }
 ];
 
@@ -81,11 +80,12 @@ export class AuthService {
 
   async syncWithEdge(host = 'https://mereb-signaling.dawitbaslyos.workers.dev') {
     try {
-      const res = await fetch(`${host}/api/games`);
+      const res = await fetch(`${host}/api/apps`);
       if (res.ok) {
         const data = await res.json();
-        if (data.games && Array.isArray(data.games)) {
-          this.games = data.games;
+        const appList = data.apps || data.games;
+        if (appList && Array.isArray(appList)) {
+          this.games = appList;
           this._saveGames();
         }
         if (data.metrics) {
@@ -112,51 +112,92 @@ export class AuthService {
     return this.recentLogs || [];
   }
 
-  addGame(name, genre = 'Action', maxPlayers = 2, host = 'https://mereb-signaling.dawitbaslyos.workers.dev') {
-    if (!name || !name.trim()) throw new Error('Game title is required');
+  createApp(name, host = 'https://mereb-signaling.dawitbaslyos.workers.dev') {
+    if (!name || !name.trim()) throw new Error('App title is required');
 
-    const id = name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || `game-${Date.now().toString(36)}`;
+    const id = name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || `app-${Date.now().toString(36)}`;
     const existing = this.games.find(g => g.id === id);
-    if (existing) throw new Error('A game with this App ID already exists in catalog');
+    if (existing) throw new Error('An App with this App ID already exists');
 
-    const newGame = {
+    const apiKey = `mb_live_${Math.random().toString(36).slice(2, 10)}${Date.now().toString(36)}`;
+
+    const newApp = {
       id,
       name: name.trim(),
-      genre,
-      maxPlayers: parseInt(maxPlayers, 10) || 2,
+      apiKey,
       createdAt: new Date().toISOString().split('T')[0],
       activeCCU: 0,
-      totalMatches: 0,
-      totalMessages: 0,
+      activeRooms: 0,
       status: 'active',
-      apiLink: `${host}/api/games/${id}`,
-      aiPrompt: `Integrate Mereb multiplayer into this game using AppID '${id}' and API '${host}'. Follow MEREB_INTEGRATION_SPEC to wire up defineSchema and TouchControls.`
+      apiLink: `${host}/api/apps/${id}`
     };
 
-    this.games.push(newGame);
+    this.games.push(newApp);
     this._saveGames();
     this._notify();
 
-    // Fire & forget sync to Cloudflare edge
+    // Sync to Cloudflare Edge
     try {
-      fetch(`${host}/api/games`, {
+      fetch(`${host}/api/apps`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id, name: name.trim(), genre, maxPlayers })
+        body: JSON.stringify({ id, name: name.trim() })
       }).catch(() => {});
     } catch {}
 
-    return newGame;
+    return newApp;
   }
 
-  deleteGame(gameId, host = 'https://mereb-signaling.dawitbaslyos.workers.dev') {
-    this.games = this.games.filter(g => g.id !== gameId);
+  // Alias for backward compatibility
+  addGame(name, _genre, _maxPlayers, host) {
+    return this.createApp(name, host);
+  }
+
+  deleteApp(appId, host = 'https://mereb-signaling.dawitbaslyos.workers.dev') {
+    this.games = this.games.filter(g => g.id !== appId);
     this._saveGames();
     this._notify();
 
     try {
-      fetch(`${host}/api/games/${gameId}`, { method: 'DELETE' }).catch(() => {});
+      fetch(`${host}/api/apps/${appId}`, { method: 'DELETE' }).catch(() => {});
     } catch {}
+  }
+
+  deleteGame(gameId, host) {
+    return this.deleteApp(gameId, host);
+  }
+
+  async fetchLeaderboard(appId, host = 'https://mereb-signaling.dawitbaslyos.workers.dev') {
+    try {
+      const res = await fetch(`${host}/api/apps/${appId}/leaderboard`);
+      if (res.ok) {
+        const data = await res.json();
+        return data.leaderboard || [];
+      }
+    } catch (e) {
+      console.warn('Failed to fetch leaderboard:', e);
+    }
+    return [];
+  }
+
+  async submitScore(appId, player, score, host = 'https://mereb-signaling.dawitbaslyos.workers.dev') {
+    const res = await fetch(`${host}/api/apps/${appId}/leaderboard`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ player, score })
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: 'Submission failed' }));
+      throw new Error(err.error || 'Failed to submit score');
+    }
+    return await res.json();
+  }
+
+  async clearLeaderboard(appId, host = 'https://mereb-signaling.dawitbaslyos.workers.dev') {
+    const res = await fetch(`${host}/api/apps/${appId}/leaderboard`, {
+      method: 'DELETE'
+    });
+    return res.ok;
   }
 
   getUser() {

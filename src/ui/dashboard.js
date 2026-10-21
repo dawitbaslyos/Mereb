@@ -1,7 +1,7 @@
 /**
- * Mereb Cloud - Pure Developer Console
- * Real Game APIs management, live edge connection tracking, active rooms inspector,
- * and zero mock data.
+ * Mereb Cloud - Pure Developer Console (Photon-Style Netcode & Leaderboards)
+ * Engine-agnostic multiplayer backend, real-time room tracking, Cloudflare edge stats,
+ * and built-in global leaderboards.
  */
 import { auth } from './auth.js';
 
@@ -12,6 +12,10 @@ export class DashboardUI {
     this.element = document.createElement('div');
     this.element.className = 'dashboard-root';
     this.selectedGameIndex = 0;
+    this.activeTab = 'rooms'; // 'rooms' | 'leaderboard' | 'engine'
+    this.activeEngineTab = 'godot'; // 'godot' | 'web' | 'curl'
+    this.leaderboard = [];
+    this.loadingLeaderboard = false;
     this.pollInterval = null;
 
     auth.onChange(() => {
@@ -20,6 +24,7 @@ export class DashboardUI {
 
     // Initial background sync with edge catalog
     auth.syncWithEdge().then(() => {
+      this._loadCurrentLeaderboard();
       this.render();
     });
 
@@ -38,12 +43,27 @@ export class DashboardUI {
     }
   }
 
+  async _loadCurrentLeaderboard() {
+    const apps = auth.getGames();
+    const selected = apps[this.selectedGameIndex] || apps[0];
+    if (!selected) return;
+    this.loadingLeaderboard = true;
+    try {
+      this.leaderboard = await auth.fetchLeaderboard(selected.id);
+    } catch {
+      this.leaderboard = [];
+    } finally {
+      this.loadingLeaderboard = false;
+    }
+  }
+
   render() {
     const user = auth.getUser();
-    const games = auth.getGames();
+    const apps = auth.getGames();
     const activeRooms = auth.getActiveRooms();
     const recentLogs = auth.getRecentLogs();
-    const selectedGame = games[this.selectedGameIndex] || games[0] || null;
+    const metrics = auth.getCloudMetrics() || {};
+    const selectedApp = apps[this.selectedGameIndex] || apps[0] || null;
 
     if (!user) {
       this.element.innerHTML = `
@@ -61,12 +81,15 @@ export class DashboardUI {
     }
 
     const host = 'https://mereb-signaling.dawitbaslyos.workers.dev';
-    const totalCCU = games.reduce((acc, g) => acc + (g.activeCCU || 0), 0);
+    const totalCCU = apps.reduce((acc, g) => acc + (g.activeCCU || 0), 0);
     const totalRooms = activeRooms.length;
+    const dailyReqs = metrics.dailyRequests || 0;
+    const dailyLimit = metrics.dailyRequestsLimit || 100000;
+    const totalScores = metrics.totalScores || 0;
 
-    // Filter active rooms for selected game
-    const selectedGameRooms = selectedGame
-      ? activeRooms.filter(r => r.appId === selectedGame.id)
+    // Filter active rooms for selected app
+    const selectedAppRooms = selectedApp
+      ? activeRooms.filter(r => r.appId === selectedApp.id)
       : [];
 
     this.element.innerHTML = `
@@ -123,7 +146,7 @@ export class DashboardUI {
         }
         .dash-metrics-grid {
           display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+          grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
           gap: 16px;
         }
         .dash-metric-card {
@@ -143,7 +166,7 @@ export class DashboardUI {
           letter-spacing: 0.5px;
         }
         .metric-number {
-          font-size: 28px;
+          font-size: 26px;
           font-weight: 900;
           color: #f1f5f9;
         }
@@ -151,40 +174,40 @@ export class DashboardUI {
           font-size: 11.5px;
           color: #64748b;
         }
-        .games-grid {
+        .two-col-layout {
           display: grid;
-          grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
-          gap: 16px;
+          grid-template-columns: 340px 1fr;
+          gap: 20px;
+          align-items: start;
         }
-        .game-api-card {
-          background: rgba(15, 23, 42, 0.75);
-          border: 1px solid rgba(255, 255, 255, 0.09);
-          border-radius: 12px;
-          padding: 20px;
+        @media (max-width: 900px) {
+          .two-col-layout {
+            grid-template-columns: 1fr;
+          }
+        }
+        .apps-column {
           display: flex;
           flex-direction: column;
           gap: 14px;
+        }
+        .app-card {
+          background: rgba(15, 23, 42, 0.75);
+          border: 1px solid rgba(255, 255, 255, 0.09);
+          border-radius: 10px;
+          padding: 16px;
+          display: flex;
+          flex-direction: column;
+          gap: 12px;
           cursor: pointer;
           transition: all 0.15s ease;
         }
-        .game-api-card:hover {
+        .app-card:hover {
           border-color: rgba(56, 189, 248, 0.4);
-          transform: translateY(-2px);
         }
-        .game-api-card.selected {
+        .app-card.selected {
           border-color: #38bdf8;
           background: rgba(15, 23, 42, 0.95);
-          box-shadow: 0 0 20px rgba(56, 189, 248, 0.15);
-        }
-        .game-card-header {
-          display: flex;
-          align-items: flex-start;
-          justify-content: space-between;
-        }
-        .game-card-title {
-          font-size: 16px;
-          font-weight: 800;
-          color: #f8fafc;
+          box-shadow: 0 0 16px rgba(56, 189, 248, 0.15);
         }
         .tag-pill {
           font-size: 10.5px;
@@ -204,11 +227,11 @@ export class DashboardUI {
           background: rgba(0, 0, 0, 0.35);
           border: 1px solid rgba(255, 255, 255, 0.07);
           border-radius: 6px;
-          padding: 8px 12px;
+          padding: 6px 10px;
           display: flex;
           align-items: center;
           justify-content: space-between;
-          font-size: 11.5px;
+          font-size: 11px;
           font-family: 'JetBrains Mono', ui-monospace, monospace;
           color: #cbd5e1;
         }
@@ -216,41 +239,44 @@ export class DashboardUI {
           color: #38bdf8;
           font-weight: 700;
         }
-        .card-actions-row {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-        }
-        .btn-card-action {
-          flex: 1;
-          background: rgba(30, 41, 59, 0.6);
-          border: 1px solid rgba(255, 255, 255, 0.1);
-          color: #e2e8f0;
-          font-family: inherit;
-          font-size: 11.5px;
-          font-weight: 600;
-          padding: 8px 12px;
-          border-radius: 6px;
-          cursor: pointer;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          gap: 6px;
-          transition: all 0.12s;
-        }
-        .btn-card-action:hover {
-          background: rgba(56, 189, 248, 0.15);
-          border-color: #38bdf8;
-          color: #fff;
-        }
-        .inspector-card {
+        .inspector-panel {
           background: rgba(15, 23, 42, 0.85);
-          border: 1px solid rgba(56, 189, 248, 0.3);
+          border: 1px solid rgba(56, 189, 248, 0.25);
           border-radius: 12px;
           padding: 24px;
           display: flex;
           flex-direction: column;
           gap: 20px;
+        }
+        .tab-nav {
+          display: flex;
+          gap: 8px;
+          border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+          padding-bottom: 12px;
+        }
+        .tab-btn {
+          background: transparent;
+          border: 1px solid transparent;
+          color: #94a3b8;
+          font-family: inherit;
+          font-size: 13px;
+          font-weight: 600;
+          padding: 8px 16px;
+          border-radius: 8px;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          transition: all 0.12s;
+        }
+        .tab-btn:hover {
+          color: #f1f5f9;
+          background: rgba(255, 255, 255, 0.04);
+        }
+        .tab-btn.active {
+          color: #38bdf8;
+          background: rgba(56, 189, 248, 0.12);
+          border-color: rgba(56, 189, 248, 0.3);
         }
         .rooms-table {
           width: 100%;
@@ -275,7 +301,7 @@ export class DashboardUI {
         .rooms-table tr:hover td {
           background: rgba(255, 255, 255, 0.02);
         }
-        .empty-rooms-banner {
+        .empty-banner {
           padding: 32px;
           text-align: center;
           color: #64748b;
@@ -304,14 +330,47 @@ export class DashboardUI {
         .log-text { color: #38bdf8; }
         .log-join { color: #4ade80; }
         .log-leave { color: #f87171; }
+        .code-box {
+          background: #050811;
+          border: 1px solid rgba(255, 255, 255, 0.08);
+          border-radius: 8px;
+          padding: 14px 16px;
+          font-family: 'JetBrains Mono', ui-monospace, monospace;
+          font-size: 12px;
+          line-height: 1.6;
+          overflow-x: auto;
+          color: #e2e8f0;
+          white-space: pre;
+        }
+        .subtab-row {
+          display: flex;
+          gap: 6px;
+          margin-bottom: 12px;
+        }
+        .subtab-btn {
+          background: rgba(255, 255, 255, 0.04);
+          border: 1px solid rgba(255, 255, 255, 0.08);
+          color: #94a3b8;
+          font-family: inherit;
+          font-size: 11.5px;
+          padding: 6px 12px;
+          border-radius: 6px;
+          cursor: pointer;
+        }
+        .subtab-btn.active {
+          background: #0284c7;
+          color: #fff;
+          border-color: #38bdf8;
+        }
       </style>
 
-      <!-- Dashboard Top Header (Clean Minimalist) -->
+      <!-- Dashboard Top Header -->
       <header class="dash-topbar">
         <div class="dash-topbar-inner">
           <div class="dash-brand-wrap">
             <span class="dash-logo-badge">MEREB</span>
-            <span class="dash-section-name">/ Console</span>
+            <span class="dash-section-name">/ Cloud Console</span>
+            <span class="tag-pill live" style="margin-left: 6px;">● Cloudflare Edge Global</span>
           </div>
 
           <div class="dash-topbar-actions">
@@ -330,23 +389,23 @@ export class DashboardUI {
         </div>
       </header>
 
-      <!-- Main Dashboard Container -->
+      <!-- Main Container -->
       <main class="dash-main-container">
         <!-- Title & Action Row -->
         <div class="console-header-row">
           <div>
-            <h1 class="dash-page-title" style="font-size: 26px; font-weight: 800; color: #fff;">Game APIs & Live Telemetry</h1>
+            <h1 class="dash-page-title" style="font-size: 26px; font-weight: 800; color: #fff;">Cloud Apps & Netcode Stats</h1>
             <p class="dash-page-desc" style="color: #94a3b8; margin-top: 4px; font-size: 13.5px;">
-              Create game APIs and track active rooms & live connections in real time.
+              Engine-agnostic multiplayer signaling, CCU tracking & global leaderboards on Cloudflare edge.
             </p>
           </div>
           <div class="dash-title-actions" style="display: flex; gap: 10px;">
             <button class="btn-subtle pill-btn" id="btn-sync-edge">🔄 Refresh</button>
-            <button class="btn-primary pill-btn" id="btn-create-game-modal">+ Create Game API</button>
+            <button class="btn-primary pill-btn" id="btn-create-app-modal">+ New App</button>
           </div>
         </div>
 
-        <!-- Real Metrics Grid (Zero Mock Data) -->
+        <!-- Real Cloudflare & Edge Stats (Zero Mock Data) -->
         <div class="dash-metrics-grid">
           <div class="dash-metric-card">
             <div class="metric-top">
@@ -354,7 +413,7 @@ export class DashboardUI {
               <span class="status-live-dot"></span>
             </div>
             <div class="metric-number text-signal">${totalCCU}</div>
-            <div class="metric-sub">Active players connected right now</div>
+            <div class="metric-sub">Connected players right now</div>
           </div>
 
           <div class="dash-metric-card">
@@ -363,56 +422,60 @@ export class DashboardUI {
               <span class="metric-icon">⚔️</span>
             </div>
             <div class="metric-number">${totalRooms}</div>
-            <div class="metric-sub">Currently running P2P matches</div>
+            <div class="metric-sub">Live multiplayer match rooms</div>
           </div>
 
           <div class="dash-metric-card">
             <div class="metric-top">
-              <span class="metric-title">Registered APIs</span>
-              <span class="metric-icon">📁</span>
+              <span class="metric-title">Cloudflare Edge Requests</span>
+              <span class="metric-icon">⚡</span>
             </div>
-            <div class="metric-number">${games.length}</div>
-            <div class="metric-sub">Partitioned edge realms</div>
+            <div class="metric-number">${dailyReqs.toLocaleString()}</div>
+            <div class="metric-sub">${((dailyReqs / dailyLimit) * 100).toFixed(2)}% of 100,000 Free Tier / day</div>
+          </div>
+
+          <div class="dash-metric-card">
+            <div class="metric-top">
+              <span class="metric-title">Leaderboard Scores</span>
+              <span class="metric-icon">🏆</span>
+            </div>
+            <div class="metric-number">${totalScores.toLocaleString()}</div>
+            <div class="metric-sub">Highscores logged in Durable Objects</div>
           </div>
         </div>
 
-        <!-- Game APIs List Section -->
-        <div style="display: flex; flex-direction: column; gap: 14px;">
-          <div style="display: flex; justify-content: space-between; align-items: center;">
-            <h2 class="card-heading" style="font-size: 16px; font-weight: 700; color: #e2e8f0;">My Game APIs</h2>
-            <span style="font-size: 12px; color: #64748b;">Click a game to inspect live connections</span>
-          </div>
+        <!-- Two-Column Architecture: Apps List (Left) + Inspector / Tools (Right) -->
+        <div class="two-col-layout">
+          <!-- Left Column: Apps List -->
+          <div class="apps-column">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <h2 style="font-size: 15px; font-weight: 700; color: #e2e8f0; text-transform: uppercase; letter-spacing: 0.5px;">
+                Your Apps (${apps.length})
+              </h2>
+            </div>
 
-          <div class="games-grid">
-            ${games.map((g, idx) => `
-              <div class="game-api-card ${idx === this.selectedGameIndex ? 'selected' : ''}" data-idx="${idx}">
-                <div class="game-card-header">
-                  <div>
-                    <div class="game-card-title">${g.name}</div>
-                    <div style="display: flex; gap: 6px; margin-top: 4px;">
-                      <span class="tag-pill">${g.genre || 'Arcade'}</span>
-                      <span class="tag-pill">${g.maxPlayers || 2} Players</span>
-                      <span class="tag-pill live">● Edge Ready</span>
-                    </div>
-                  </div>
-                  <div style="text-align: right;">
-                    <div style="font-size: 14px; font-weight: 800; color: #4ade80;">${g.activeCCU || 0} CCU</div>
-                    <div style="font-size: 11px; color: #64748b;">${g.activeRooms || 0} Rooms</div>
-                  </div>
+            ${apps.map((app, idx) => `
+              <div class="app-card ${idx === this.selectedGameIndex ? 'selected' : ''}" data-idx="${idx}">
+                <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                  <div style="font-weight: 800; font-size: 15px; color: #f8fafc;">${app.name}</div>
+                  <span class="tag-pill ${app.activeCCU > 0 ? 'live' : ''}">${app.activeCCU || 0} CCU</span>
                 </div>
 
                 <div class="key-box-mini">
-                  <span>App ID: <code>${g.id}</code></span>
-                  <button class="btn-subtle pill-btn btn-copy-appid" data-id="${g.id}" style="padding: 2px 8px; font-size: 10px;">Copy ID</button>
+                  <span>App ID: <code>${app.id}</code></span>
+                  <button class="btn-subtle pill-btn btn-copy-appid" data-id="${app.id}" style="padding: 2px 6px; font-size: 9.5px;">Copy</button>
                 </div>
 
-                <div class="card-actions-row">
-                  <button class="btn-card-action btn-copy-endpoint" data-url="${host}/api/games/${g.id}">
-                    🔗 Copy Endpoint
-                  </button>
-                  ${games.length > 1 ? `
-                    <button class="btn-danger-icon btn-game-delete" data-id="${g.id}" title="Delete game API" style="padding: 6px;">
-                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <div class="key-box-mini" style="font-size: 10.5px;">
+                  <span style="color: #64748b;">Key: <code>${(app.apiKey || 'mb_live_...').slice(0, 14)}...</code></span>
+                  <button class="btn-subtle pill-btn btn-copy-key" data-key="${app.apiKey || app.id}" style="padding: 2px 6px; font-size: 9.5px;">Copy Key</button>
+                </div>
+
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 4px;">
+                  <span style="font-size: 11px; color: #64748b;">${app.activeRooms || 0} active rooms</span>
+                  ${apps.length > 1 ? `
+                    <button class="btn-danger-icon btn-app-delete" data-id="${app.id}" title="Delete app" style="padding: 4px;">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <polyline points="3 6 5 6 21 6"></polyline>
                         <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
                       </svg>
@@ -422,143 +485,265 @@ export class DashboardUI {
               </div>
             `).join('')}
           </div>
-        </div>
 
-        <!-- Live Connection & Room Inspector (Replacing the giant static code snippet) -->
-        ${selectedGame ? `
-          <div class="inspector-card">
-            <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 12px;">
-              <div>
-                <div style="display: flex; align-items: center; gap: 8px;">
-                  <h2 style="font-size: 17px; font-weight: 800; color: #f8fafc;">
-                    Live Connection Inspector: ${selectedGame.name}
+          <!-- Right Column: Inspector Panel with Tabs -->
+          ${selectedApp ? `
+            <div class="inspector-panel">
+              <!-- Top App Info & Navigation Tabs -->
+              <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 12px;">
+                <div>
+                  <h2 style="font-size: 18px; font-weight: 800; color: #f8fafc;">
+                    ${selectedApp.name}
                   </h2>
-                  <span class="tag-pill live">● Auto-Syncing (3.5s)</span>
+                  <p style="font-size: 12px; color: #94a3b8; margin-top: 3px;">
+                    App ID: <code style="color: #38bdf8;">${selectedApp.id}</code> &bull; Partitioned Durable Object Realm
+                  </p>
                 </div>
-                <p style="font-size: 12.5px; color: #94a3b8; margin-top: 4px;">
-                  Real-time rooms and peer sessions active on Cloudflare edge for App ID <code>${selectedGame.id}</code>.
-                </p>
-              </div>
 
-              <div style="display: flex; gap: 8px;">
-                <button class="btn-subtle pill-btn btn-copy-ws" data-ws="wss://${host.replace(/^https?:\/\//, '')}/?appId=${selectedGame.id}">
-                  Copy WebSocket URL
-                </button>
-                <button class="btn-subtle pill-btn btn-copy-endpoint" data-url="${host}/api/games/${selectedGame.id}">
-                  Copy REST API URL
-                </button>
-              </div>
-            </div>
-
-            <!-- Active Rooms Table -->
-            <div style="display: flex; flex-direction: column; gap: 10px;">
-              <div style="display: flex; justify-content: space-between; align-items: center;">
-                <span style="font-size: 12px; font-weight: 700; color: #cbd5e1; text-transform: uppercase;">
-                  Active Rooms (${selectedGameRooms.length})
-                </span>
-                <span style="font-size: 11px; color: #64748b;">Auto-updates as players join or leave</span>
-              </div>
-
-              ${selectedGameRooms.length > 0 ? `
-                <table class="rooms-table">
-                  <thead>
-                    <tr>
-                      <th>Room Code</th>
-                      <th>Status</th>
-                      <th>Connected Peers</th>
-                      <th>Host Peer ID</th>
-                      <th>Started</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    ${selectedGameRooms.map(r => `
-                      <tr>
-                        <td><code style="color: #38bdf8; font-weight: 700; font-size: 13px;">${r.roomId}</code></td>
-                        <td>
-                          <span class="tag-pill ${r.playerCount >= 2 ? 'live' : ''}">
-                            ${r.playerCount >= 2 ? '⚔️ Match Live' : '⏳ Waiting for Peer'}
-                          </span>
-                        </td>
-                        <td><strong>${r.playerCount}</strong> / ${selectedGame.maxPlayers || 2}</td>
-                        <td><code style="color: #94a3b8; font-size: 11px;">${r.hostId || 'N/A'}</code></td>
-                        <td style="color: #64748b; font-size: 11px;">${new Date(r.createdAt).toLocaleTimeString()}</td>
-                      </tr>
-                    `).join('')}
-                  </tbody>
-                </table>
-              ` : `
-                <div class="empty-rooms-banner">
-                  No active rooms right now for <strong>${selectedGame.name}</strong>.<br/>
-                  When players join via <code>${selectedGame.id}</code>, their live connections will appear here.
+                <div style="display: flex; gap: 8px;">
+                  <button class="btn-subtle pill-btn btn-copy-ws" data-ws="wss://${host.replace(/^https?:\/\//, '')}/party/?appId=${selectedApp.id}">
+                    Copy WS URL
+                  </button>
                 </div>
-              `}
-            </div>
+              </div>
 
-            <!-- Live Edge Event Feed -->
-            <div style="display: flex; flex-direction: column; gap: 8px;">
-              <span style="font-size: 11px; font-weight: 700; color: #94a3b8; text-transform: uppercase;">
-                Edge Telemetry Log Stream
-              </span>
-              <div class="log-terminal">
-                ${recentLogs.length > 0 ? recentLogs.map(l => `
-                  <div class="log-entry">
-                    <span class="log-time">[${l.time}]</span>
-                    <span class="log-text ${l.type === 'join' ? 'log-join' : l.type === 'leave' ? 'log-leave' : ''}">${l.message}</span>
+              <!-- Main Navigation Tabs -->
+              <div class="tab-nav">
+                <button class="tab-btn ${this.activeTab === 'rooms' ? 'active' : ''}" data-tab="rooms">
+                  ⚡ Live Rooms & Netcode
+                </button>
+                <button class="tab-btn ${this.activeTab === 'leaderboard' ? 'active' : ''}" data-tab="leaderboard">
+                  🏆 Leaderboards (${this.leaderboard.length})
+                </button>
+                <button class="tab-btn ${this.activeTab === 'engine' ? 'active' : ''}" data-tab="engine">
+                  🎮 Godot & Engine SDK
+                </button>
+              </div>
+
+              <!-- TAB 1: Live Rooms & Edge Logs -->
+              ${this.activeTab === 'rooms' ? `
+                <div style="display: flex; flex-direction: column; gap: 18px;">
+                  <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <span style="font-size: 12px; font-weight: 700; color: #cbd5e1; text-transform: uppercase;">
+                      Active Match Rooms (${selectedAppRooms.length})
+                    </span>
+                    <span style="font-size: 11px; color: #64748b;">Auto-updates as peers connect</span>
                   </div>
-                `).join('') : `
-                  <div style="color: #475569;">[${new Date().toLocaleTimeString()}] Console listening for real-time edge room events...</div>
-                `}
-              </div>
+
+                  ${selectedAppRooms.length > 0 ? `
+                    <table class="rooms-table">
+                      <thead>
+                        <tr>
+                          <th>Room Code</th>
+                          <th>Status</th>
+                          <th>Connected Peers</th>
+                          <th>Host Peer ID</th>
+                          <th>Started</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        ${selectedAppRooms.map(r => `
+                          <tr>
+                            <td><code style="color: #38bdf8; font-weight: 700;">${r.roomId}</code></td>
+                            <td>
+                              <span class="tag-pill ${r.playerCount >= 2 ? 'live' : ''}">
+                                ${r.playerCount >= 2 ? '⚔️ Match Live' : '⏳ Waiting for Peer'}
+                              </span>
+                            </td>
+                            <td><strong>${r.playerCount}</strong></td>
+                            <td><code style="color: #94a3b8; font-size: 11px;">${r.hostId || 'N/A'}</code></td>
+                            <td style="color: #64748b; font-size: 11px;">${new Date(r.createdAt).toLocaleTimeString()}</td>
+                          </tr>
+                        `).join('')}
+                      </tbody>
+                    </table>
+                  ` : `
+                    <div class="empty-banner">
+                      No active rooms right now for <strong>${selectedApp.name}</strong>.<br/>
+                      When players launch the game or connect via WebSocket, their sessions appear here instantly.
+                    </div>
+                  `}
+
+                  <!-- Edge Telemetry Stream -->
+                  <div style="display: flex; flex-direction: column; gap: 8px;">
+                    <span style="font-size: 11px; font-weight: 700; color: #94a3b8; text-transform: uppercase;">
+                      Live Edge Telemetry Log Stream
+                    </span>
+                    <div class="log-terminal">
+                      ${recentLogs.length > 0 ? recentLogs.map(l => `
+                        <div class="log-entry">
+                          <span class="log-time">[${l.time}]</span>
+                          <span class="log-text ${l.type === 'join' ? 'log-join' : l.type === 'leave' ? 'log-leave' : ''}">${l.message}</span>
+                        </div>
+                      `).join('') : `
+                        <div style="color: #475569;">[${new Date().toLocaleTimeString()}] Listening for real-time edge connections...</div>
+                      `}
+                    </div>
+                  </div>
+                </div>
+              ` : ''}
+
+              <!-- TAB 2: Leaderboards -->
+              ${this.activeTab === 'leaderboard' ? `
+                <div style="display: flex; flex-direction: column; gap: 18px;">
+                  <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+                    <div>
+                      <span style="font-size: 12px; font-weight: 700; color: #cbd5e1; text-transform: uppercase;">
+                        Global Highscores (Cloudflare DO Storage)
+                      </span>
+                      <p style="font-size: 12px; color: #64748b; margin-top: 2px;">
+                        Rest API: <code>/api/apps/${selectedApp.id}/leaderboard</code>
+                      </p>
+                    </div>
+
+                    ${this.leaderboard.length > 0 ? `
+                      <button class="btn-subtle pill-btn btn-clear-lb" style="color: #f87171; border-color: rgba(239, 68, 68, 0.3);">
+                        Reset Leaderboard
+                      </button>
+                    ` : ''}
+                  </div>
+
+                  <!-- Quick Interactive Score Tester -->
+                  <div style="background: rgba(0, 0, 0, 0.3); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 8px; padding: 14px; display: flex; flex-wrap: wrap; gap: 10px; align-items: center;">
+                    <input type="text" id="test-lb-player" placeholder="Player Name" class="modal-input" style="flex: 1; min-width: 130px;" />
+                    <input type="number" id="test-lb-score" placeholder="Score (e.g. 1500)" class="modal-input" style="flex: 1; min-width: 110px;" />
+                    <button class="btn-primary pill-btn" id="btn-submit-test-score" style="white-space: nowrap;">
+                      Submit Test Score
+                    </button>
+                  </div>
+
+                  <!-- Leaderboard Table -->
+                  ${this.leaderboard.length > 0 ? `
+                    <table class="rooms-table">
+                      <thead>
+                        <tr>
+                          <th>Rank</th>
+                          <th>Player</th>
+                          <th>Score</th>
+                          <th>Date</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        ${this.leaderboard.map((e, idx) => `
+                          <tr>
+                            <td style="font-weight: 800; color: ${idx === 0 ? '#facc15' : idx === 1 ? '#e2e8f0' : idx === 2 ? '#cd7f32' : '#94a3b8'};">
+                              #${idx + 1}
+                            </td>
+                            <td><strong style="color: #f8fafc;">${e.player}</strong></td>
+                            <td><code style="color: #38bdf8; font-weight: 800; font-size: 13px;">${e.score.toLocaleString()}</code></td>
+                            <td style="color: #64748b; font-size: 11px;">${new Date(e.createdAt || e.date).toLocaleDateString()}</td>
+                          </tr>
+                        `).join('')}
+                      </tbody>
+                    </table>
+                  ` : `
+                    <div class="empty-banner">
+                      No highscores submitted yet for <strong>${selectedApp.name}</strong>.<br/>
+                      Use the test form above or call the REST API from Godot to log your first score!
+                    </div>
+                  `}
+                </div>
+              ` : ''}
+
+              <!-- TAB 3: Godot & Engine Quickstart -->
+              ${this.activeTab === 'engine' ? `
+                <div style="display: flex; flex-direction: column; gap: 14px;">
+                  <div class="subtab-row">
+                    <button class="subtab-btn ${this.activeEngineTab === 'godot' ? 'active' : ''}" data-eng="godot">Godot 4 (GDScript)</button>
+                    <button class="subtab-btn ${this.activeEngineTab === 'web' ? 'active' : ''}" data-eng="web">Web & JS</button>
+                    <button class="subtab-btn ${this.activeEngineTab === 'curl' ? 'active' : ''}" data-eng="curl">cURL & REST</button>
+                  </div>
+
+                  ${this.activeEngineTab === 'godot' ? `
+                    <div class="code-box"># Mereb Netcode & Leaderboard Client for Godot 4
+extends Node
+
+var ws = WebSocketPeer.new()
+const APP_ID = "${selectedApp.id}"
+const SERVER_URL = "wss://mereb-signaling.dawitbaslyos.workers.dev/party/ROOM_123?appId=" + APP_ID
+
+func _ready():
+    # 1. Connect to Real-time Multiplayer Signaling Room
+    var err = ws.connect_to_url(SERVER_URL)
+    if err != OK:
+        print("Failed to connect: ", err)
+
+func _process(_delta):
+    ws.poll()
+    var state = ws.get_ready_state()
+    if state == WebSocketPeer.STATE_OPEN:
+        while ws.get_available_packet_count():
+            var packet = ws.get_packet().get_string_from_utf8()
+            print("Received from Mereb: ", packet)
+
+# 2. Submit Highscore to Cloudflare Leaderboard
+func submit_score(player_name: String, score: int):
+    var http = HTTPRequest.new()
+    add_child(http)
+    var url = "https://mereb-signaling.dawitbaslyos.workers.dev/api/apps/" + APP_ID + "/leaderboard"
+    var headers = ["Content-Type: application/json"]
+    var payload = JSON.stringify({ "player": player_name, "score": score })
+    http.request(url, headers, HTTPClient.METHOD_POST, payload)</div>
+                  ` : ''}
+
+                  ${this.activeEngineTab === 'web' ? `
+                    <div class="code-box">// Mereb Client for Web (Three.js / Canvas)
+const APP_ID = "${selectedApp.id}";
+const ws = new WebSocket(\`wss://mereb-signaling.dawitbaslyos.workers.dev/party/ROOM_123?appId=\${APP_ID}\`);
+
+ws.onopen = () => console.log('Connected to Mereb room!');
+ws.onmessage = (e) => console.log('Peer message:', JSON.parse(e.data));
+
+// Submit Highscore
+await fetch(\`https://mereb-signaling.dawitbaslyos.workers.dev/api/apps/\${APP_ID}/leaderboard\`, {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ player: 'AceGamer', score: 2500 })
+});</div>
+                  ` : ''}
+
+                  ${this.activeEngineTab === 'curl' ? `
+                    <div class="code-box"># 1. Fetch Global Leaderboard
+curl https://mereb-signaling.dawitbaslyos.workers.dev/api/apps/${selectedApp.id}/leaderboard
+
+# 2. Submit Highscore
+curl -X POST https://mereb-signaling.dawitbaslyos.workers.dev/api/apps/${selectedApp.id}/leaderboard \\
+  -H "Content-Type: application/json" \\
+  -d '{"player": "Alex", "score": 1250}'
+
+# 3. Check App Live Telemetry
+curl https://mereb-signaling.dawitbaslyos.workers.dev/api/apps/${selectedApp.id}</div>
+                  ` : ''}
+                </div>
+              ` : ''}
             </div>
-          </div>
-        ` : ''}
+          ` : ''}
+        </div>
       </main>
 
-      <!-- Create New Game API Modal -->
-      <div class="dash-modal-backdrop" id="modal-create-game" style="display: none;">
+      <!-- Create New App Modal (Pure Photon Style: Only Name Required!) -->
+      <div class="dash-modal-backdrop" id="modal-create-app" style="display: none;">
         <div class="dash-modal-card">
-          <h3 class="modal-title">Create New Game API</h3>
+          <h3 class="modal-title">Create Cloud App</h3>
           <p class="modal-desc">
-            Instantly creates an isolated edge namespace and App ID for your game on Cloudflare Durable Objects.
+            Instantly allocates a multi-tenant namespace on Cloudflare edge. Any engine (Godot, Unity, Web) connects using this single App ID.
           </p>
           
-          <div style="display: flex; flex-direction: column; gap: 12px; margin-top: 4px;">
+          <div style="display: flex; flex-direction: column; gap: 14px; margin-top: 8px;">
             <div>
-              <label style="font-size: 12px; font-weight: 600; color: #94a3b8;">Game Title</label>
-              <input type="text" class="modal-input" id="new-game-name" placeholder="e.g. Cyber Kart" maxlength="50" style="width: 100%; box-sizing: border-box; margin-top: 4px;" />
-            </div>
-
-            <div style="display: flex; gap: 10px;">
-              <div style="flex: 1;">
-                <label style="font-size: 12px; font-weight: 600; color: #94a3b8;">Genre</label>
-                <select class="modal-input" id="new-game-genre" style="width: 100%; box-sizing: border-box; margin-top: 4px;">
-                  <option value="Top-Down Shooter">Top-Down Shooter</option>
-                  <option value="2D Kart Arcade">2D Kart Arcade</option>
-                  <option value="Party Brawler">Party Brawler</option>
-                  <option value="Turn-Based Strategy">Turn-Based Strategy</option>
-                  <option value="Hypercasual Canvas">Hypercasual Canvas</option>
-                </select>
-              </div>
-
-              <div style="flex: 1;">
-                <label style="font-size: 12px; font-weight: 600; color: #94a3b8;">Max Players</label>
-                <select class="modal-input" id="new-game-players" style="width: 100%; box-sizing: border-box; margin-top: 4px;">
-                  <option value="2">2 Players (1v1)</option>
-                  <option value="4">4 Players (Party)</option>
-                  <option value="8">8 Players (Arena)</option>
-                </select>
-              </div>
+              <label style="font-size: 12px; font-weight: 600; color: #94a3b8;">App Name</label>
+              <input type="text" class="modal-input" id="new-app-name" placeholder="e.g. Godot Arena Battle" maxlength="50" style="width: 100%; box-sizing: border-box; margin-top: 4px;" />
             </div>
 
             <div class="key-box-mini">
               <span style="font-size: 11px; color: #94a3b8;">Generated App ID:</span>
-              <code id="preview-app-id">cyber-kart</code>
+              <code id="preview-app-id">godot-arena-battle</code>
             </div>
           </div>
 
-          <div class="modal-actions" style="margin-top: 16px;">
+          <div class="modal-actions" style="margin-top: 18px;">
             <button class="btn-subtle pill-btn" id="btn-modal-cancel">Cancel</button>
-            <button class="btn-primary pill-btn" id="btn-modal-submit">Create API</button>
+            <button class="btn-primary pill-btn" id="btn-modal-submit">Create App</button>
           </div>
         </div>
       </div>
@@ -580,16 +765,39 @@ export class DashboardUI {
       const orig = btn.innerText;
       btn.innerText = 'Syncing...';
       await auth.syncWithEdge();
+      await this._loadCurrentLeaderboard();
+      this.render();
       btn.innerText = 'Synced! ✓';
       setTimeout(() => { btn.innerText = orig; }, 1200);
     });
 
-    // Select Game Card
-    this.element.querySelectorAll('.game-api-card').forEach(card => {
-      card.addEventListener('click', (e) => {
+    // Navigation Tabs
+    this.element.querySelectorAll('.tab-btn').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        const tab = btn.getAttribute('data-tab');
+        this.activeTab = tab;
+        if (tab === 'leaderboard') {
+          await this._loadCurrentLeaderboard();
+        }
+        this.render();
+      });
+    });
+
+    // Engine SDK Subtabs
+    this.element.querySelectorAll('.subtab-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        this.activeEngineTab = btn.getAttribute('data-eng');
+        this.render();
+      });
+    });
+
+    // Select App Card
+    this.element.querySelectorAll('.app-card').forEach(card => {
+      card.addEventListener('click', async (e) => {
         if (e.target.closest('button')) return;
         const idx = parseInt(card.getAttribute('data-idx'), 10);
         this.selectedGameIndex = idx;
+        await this._loadCurrentLeaderboard();
         this.render();
       });
     });
@@ -608,15 +816,15 @@ export class DashboardUI {
       });
     });
 
-    // Copy Endpoint
-    this.element.querySelectorAll('.btn-copy-endpoint').forEach(btn => {
+    // Copy API Key
+    this.element.querySelectorAll('.btn-copy-key').forEach(btn => {
       btn.addEventListener('click', async (e) => {
         e.stopPropagation();
-        const url = btn.getAttribute('data-url');
-        if (url) {
-          await navigator.clipboard.writeText(url);
+        const key = btn.getAttribute('data-key');
+        if (key) {
+          await navigator.clipboard.writeText(key);
           const orig = btn.innerText;
-          btn.innerText = 'Copied! ✓';
+          btn.innerText = 'Copied!';
           setTimeout(() => { btn.innerText = orig; }, 1400);
         }
       });
@@ -633,37 +841,72 @@ export class DashboardUI {
       }
     });
 
-    // Delete Game API
-    this.element.querySelectorAll('.btn-game-delete').forEach(btn => {
+    // Submit Test Score
+    this.element.querySelector('#btn-submit-test-score')?.addEventListener('click', async () => {
+      const apps = auth.getGames();
+      const selected = apps[this.selectedGameIndex] || apps[0];
+      if (!selected) return;
+
+      const playerInput = this.element.querySelector('#test-lb-player');
+      const scoreInput = this.element.querySelector('#test-lb-score');
+      const player = playerInput.value.trim() || 'GodotPlayer';
+      const score = parseFloat(scoreInput.value) || 100;
+
+      const btn = this.element.querySelector('#btn-submit-test-score');
+      btn.innerText = 'Submitting...';
+      try {
+        await auth.submitScore(selected.id, player, score);
+        await this._loadCurrentLeaderboard();
+        this.render();
+      } catch (err) {
+        alert(err.message);
+        btn.innerText = 'Submit Test Score';
+      }
+    });
+
+    // Clear Leaderboard
+    this.element.querySelector('.btn-clear-lb')?.addEventListener('click', async () => {
+      const apps = auth.getGames();
+      const selected = apps[this.selectedGameIndex] || apps[0];
+      if (!selected) return;
+
+      if (confirm(`Reset leaderboard for ${selected.name}?`)) {
+        await auth.clearLeaderboard(selected.id);
+        await this._loadCurrentLeaderboard();
+        this.render();
+      }
+    });
+
+    // Delete App
+    this.element.querySelectorAll('.btn-app-delete').forEach(btn => {
       btn.addEventListener('click', (e) => {
         e.stopPropagation();
         const id = btn.getAttribute('data-id');
-        if (id && confirm(`Delete Game API "${id}"?`)) {
-          auth.deleteGame(id);
+        if (id && confirm(`Delete App "${id}"? This will terminate its rooms and leaderboards.`)) {
+          auth.deleteApp(id);
           this.selectedGameIndex = 0;
+          this.render();
         }
       });
     });
 
-    // Modal Create Game
-    const modal = this.element.querySelector('#modal-create-game');
-    const openBtn = this.element.querySelector('#btn-create-game-modal');
+    // Modal Create App
+    const modal = this.element.querySelector('#modal-create-app');
+    const openBtn = this.element.querySelector('#btn-create-app-modal');
     const cancelBtn = this.element.querySelector('#btn-modal-cancel');
     const submitBtn = this.element.querySelector('#btn-modal-submit');
-    const nameInput = this.element.querySelector('#new-game-name');
-    const genreInput = this.element.querySelector('#new-game-genre');
-    const playersInput = this.element.querySelector('#new-game-players');
+    const nameInput = this.element.querySelector('#new-app-name');
     const previewAppId = this.element.querySelector('#preview-app-id');
 
     nameInput?.addEventListener('input', (e) => {
-      const slug = e.target.value.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || 'my-game';
+      const slug = e.target.value.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || 'my-app';
       if (previewAppId) previewAppId.innerText = slug;
     });
 
     openBtn?.addEventListener('click', () => {
       modal.style.display = 'flex';
       nameInput.value = '';
-      if (previewAppId) previewAppId.innerText = 'my-game';
+      if (previewAppId) previewAppId.innerText = 'godot-arena-battle';
       nameInput.focus();
     });
 
@@ -671,16 +914,15 @@ export class DashboardUI {
       modal.style.display = 'none';
     });
 
-    submitBtn?.addEventListener('click', () => {
+    submitBtn?.addEventListener('click', async () => {
       const name = nameInput.value.trim();
       if (!name) return;
-      const genre = genreInput.value;
-      const maxPlayers = playersInput.value;
 
       try {
-        auth.addGame(name, genre, maxPlayers);
+        auth.createApp(name);
         modal.style.display = 'none';
         this.selectedGameIndex = auth.getGames().length - 1;
+        await this._loadCurrentLeaderboard();
         this.render();
       } catch (err) {
         alert(err.message);

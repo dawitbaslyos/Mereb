@@ -15,8 +15,7 @@ const INITIAL_GAMES = [
   {
     id: 'tank-arena',
     name: 'Mereb Arena (3D Tanks)',
-    genre: 'Top-Down Shooter',
-    maxPlayers: 2,
+    apiKey: 'mb_live_tank_arena_f8291',
     createdAt: '2026-10-18',
     status: 'active'
   }
@@ -43,7 +42,7 @@ export class GameRoom {
     const url = new URL(request.url);
 
     // Studio Catalog REST API handler
-    if (url.pathname.startsWith('/api/games') || url.pathname.startsWith('/api/catalog')) {
+    if (url.pathname.startsWith('/api/games') || url.pathname.startsWith('/api/catalog') || url.pathname.startsWith('/api/apps')) {
       return this.handleCatalogAPI(request, url);
     }
 
@@ -147,6 +146,26 @@ export class GameRoom {
     } catch {}
   }
 
+  async _recordDailyStat(key) {
+    const today = new Date().toISOString().split('T')[0];
+    let stats = (await this.state.storage.get('daily_stats')) || { date: today, requests: 0, messages: 0, scores: 0 };
+    if (stats.date !== today) {
+      stats = { date: today, requests: 0, messages: 0, scores: 0 };
+    }
+    stats[key] = (stats[key] || 0) + 1;
+    await this.state.storage.put('daily_stats', stats);
+    return stats;
+  }
+
+  async _getDailyStats() {
+    const today = new Date().toISOString().split('T')[0];
+    let stats = (await this.state.storage.get('daily_stats')) || { date: today, requests: 0, messages: 0, scores: 0 };
+    if (stats.date !== today) {
+      stats = { date: today, requests: 0, messages: 0, scores: 0 };
+    }
+    return stats;
+  }
+
   async handleCatalogAPI(request, url) {
     const headers = {
       'Content-Type': 'application/json',
@@ -159,6 +178,8 @@ export class GameRoom {
       return new Response(null, { headers });
     }
 
+    await this._recordDailyStat('requests');
+
     let games = await this.state.storage.get('catalog_games');
     if (!games) {
       games = [...INITIAL_GAMES];
@@ -166,10 +187,78 @@ export class GameRoom {
     }
     await this._ensureLogsLoaded();
 
-    // GET /api/games: List all games + REAL LIVE CCU & ACTIVE ROOMS
+    const parts = url.pathname.split('/').filter(Boolean);
+
+    // ==========================================
+    // 1. LEADERBOARD API: /api/apps/:appId/leaderboard or /api/games/:appId/leaderboard
+    // ==========================================
+    if ((parts[1] === 'games' || parts[1] === 'apps') && parts.length >= 4 && parts[3] === 'leaderboard') {
+      const targetAppId = parts[2];
+      const storageKey = `lb:${targetAppId}`;
+
+      // GET: Retrieve top highscores
+      if (request.method === 'GET') {
+        const lb = (await this.state.storage.get(storageKey)) || [];
+        return new Response(JSON.stringify({
+          status: 'ok',
+          appId: targetAppId,
+          totalScores: lb.length,
+          leaderboard: lb.slice(0, 50)
+        }, null, 2), { headers });
+      }
+
+      // POST: Submit a score from Godot, Unity, Web, etc.
+      if (request.method === 'POST') {
+        try {
+          const body = await request.json().catch(() => ({}));
+          const player = (body.player || body.username || 'Anonymous').toString().trim().slice(0, 32);
+          const score = typeof body.score === 'number' ? body.score : parseFloat(body.score);
+
+          if (isNaN(score)) {
+            return new Response(JSON.stringify({ error: 'Valid numeric "score" is required' }), { status: 400, headers });
+          }
+
+          let lb = (await this.state.storage.get(storageKey)) || [];
+          const entry = {
+            id: `sc_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`,
+            player,
+            score,
+            metadata: body.metadata && typeof body.metadata === 'object' ? body.metadata : {},
+            createdAt: new Date().toISOString()
+          };
+
+          lb.push(entry);
+          lb.sort((a, b) => b.score - a.score);
+          lb = lb.slice(0, 100); // keep top 100
+
+          await this.state.storage.put(storageKey, lb);
+          await this._recordDailyStat('scores');
+          await this._addLog(`Highscore in [${targetAppId}]: "${player}" scored ${score.toLocaleString()}`, 'join');
+
+          const rank = lb.findIndex(e => e.id === entry.id) + 1;
+          return new Response(JSON.stringify({
+            status: 'ok',
+            rank,
+            entry,
+            leaderboard: lb.slice(0, 10)
+          }, null, 2), { status: 201, headers });
+        } catch (err) {
+          return new Response(JSON.stringify({ error: err.message }), { status: 400, headers });
+        }
+      }
+
+      // DELETE: Reset / clear leaderboard for this App
+      if (request.method === 'DELETE') {
+        await this.state.storage.delete(storageKey);
+        await this._addLog(`Leaderboard cleared for [${targetAppId}]`, 'close');
+        return new Response(JSON.stringify({ status: 'ok', cleared: true, appId: targetAppId }), { headers });
+      }
+    }
+
+    // ==========================================
+    // 2. APPS & CATALOG GET: Real-time CCU & Active Rooms
+    // ==========================================
     if (request.method === 'GET') {
-      const parts = url.pathname.split('/').filter(Boolean);
-      
       // Calculate 100% REAL live metrics across active rooms
       const activeRoomsList = [];
       for (const room of this.activeRooms.values()) {
@@ -189,8 +278,7 @@ export class GameRoom {
         return {
           id: g.id,
           name: g.name,
-          genre: g.genre,
-          maxPlayers: g.maxPlayers,
+          apiKey: g.apiKey || `mb_live_${g.id.replace(/[^a-z0-9]/g, '').slice(0, 16)}`,
           createdAt: g.createdAt,
           status: g.status || 'active',
           activeCCU: gameCCU,
@@ -198,67 +286,81 @@ export class GameRoom {
         };
       });
 
-      // Specific game API detail
-      if (parts.length >= 3 && parts[1] === 'games') {
+      // Specific app/game API detail
+      if (parts.length >= 3 && (parts[1] === 'games' || parts[1] === 'apps')) {
         const targetId = parts[2];
         const game = gamesWithLiveStats.find(g => g.id === targetId);
         if (!game) {
-          return new Response(JSON.stringify({ error: 'Game not found' }), { status: 404, headers });
+          return new Response(JSON.stringify({ error: 'App not found' }), { status: 404, headers });
         }
         const roomsForGame = activeRoomsList.filter(r => r.appId === targetId);
+        const lb = (await this.state.storage.get(`lb:${targetId}`)) || [];
         return new Response(JSON.stringify({
+          app: game,
           game,
           activeRooms: roomsForGame,
+          leaderboard: lb.slice(0, 10),
           logs: this.recentLogs.slice(-20)
         }, null, 2), { headers });
       }
 
       const totalLiveCCU = gamesWithLiveStats.reduce((sum, g) => sum + g.activeCCU, 0);
+      const dailyStats = await this._getDailyStats();
 
       return new Response(JSON.stringify({
         status: 'ok',
+        apps: gamesWithLiveStats,
         games: gamesWithLiveStats,
         activeRooms: activeRoomsList,
         recentLogs: this.recentLogs.slice(-25),
         metrics: {
+          totalApps: games.length,
           totalGames: games.length,
           totalCCU: totalLiveCCU,
-          totalActiveRooms: activeRoomsList.length
+          totalActiveRooms: activeRoomsList.length,
+          dailyRequests: dailyStats.requests,
+          dailyRequestsLimit: 100000,
+          totalScores: dailyStats.scores || 0
         }
       }, null, 2), { headers });
     }
 
-    // POST /api/games: Create a real game API
+    // ==========================================
+    // 3. CREATE APP (POST): Pure Photon-style (Only name required)
+    // ==========================================
     if (request.method === 'POST') {
       try {
-        const body = await request.json();
-        const name = (body.name || 'New Game').trim();
-        const genre = body.genre || 'Action';
-        const maxPlayers = parseInt(body.maxPlayers, 10) || 2;
-        const id = (body.id || name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')) || `game-${Date.now().toString(36)}`;
+        const body = await request.json().catch(() => ({}));
+        const name = (body.name || 'New App').trim();
+        const id = (body.id || name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')) || `app-${Date.now().toString(36)}`;
+        const apiKey = `mb_live_${crypto.randomUUID().replace(/-/g, '').slice(0, 16)}`;
 
         const existing = games.find(g => g.id === id);
         if (existing) {
-          return new Response(JSON.stringify({ error: 'A game API with this App ID already exists' }), { status: 409, headers });
+          return new Response(JSON.stringify({ error: 'An App with this App ID already exists' }), { status: 409, headers });
         }
 
         const origin = url.origin;
         const newGame = {
           id,
           name,
-          genre,
-          maxPlayers,
+          apiKey,
           createdAt: new Date().toISOString().split('T')[0],
           status: 'active',
-          apiLink: `${origin}/api/games/${id}`
+          apiLink: `${origin}/api/apps/${id}`
         };
 
         games.push(newGame);
         await this.state.storage.put('catalog_games', games);
-        this._addLog(`Created new Game API "${id}" (${name})`, 'create');
+        await this._addLog(`Created App ID "${id}" (${name})`, 'create');
 
         return new Response(JSON.stringify({
           status: 'created',
+          app: {
+            ...newGame,
+            activeCCU: 0,
+            activeRooms: 0
+          },
           game: {
             ...newGame,
             activeCCU: 0,
@@ -270,14 +372,16 @@ export class GameRoom {
       }
     }
 
-    // DELETE /api/games/:appId: Remove game API
+    // ==========================================
+    // 4. DELETE APP: /api/apps/:appId or /api/games/:appId
+    // ==========================================
     if (request.method === 'DELETE') {
-      const parts = url.pathname.split('/').filter(Boolean);
-      if (parts.length >= 3 && parts[1] === 'games') {
+      if (parts.length >= 3 && (parts[1] === 'games' || parts[1] === 'apps')) {
         const targetId = parts[2];
         games = games.filter(g => g.id !== targetId);
         await this.state.storage.put('catalog_games', games);
-        this._addLog(`Deleted Game API "${targetId}"`, 'close');
+        await this.state.storage.delete(`lb:${targetId}`);
+        await this._addLog(`Deleted App ID "${targetId}"`, 'close');
         return new Response(JSON.stringify({ status: 'deleted', id: targetId }), { headers });
       }
     }
@@ -616,8 +720,8 @@ export default {
       }
     }
 
-    // Route Studio Catalog API to singleton catalog Durable Object
-    if (url.pathname.startsWith('/api/games') || url.pathname.startsWith('/api/catalog')) {
+    // Route Studio Catalog & Leaderboard API to singleton catalog Durable Object
+    if (url.pathname.startsWith('/api/games') || url.pathname.startsWith('/api/catalog') || url.pathname.startsWith('/api/apps')) {
       const catalogDoId = env.GAME_ROOM.idFromName('system:studio_catalog');
       const catalogStub = env.GAME_ROOM.get(catalogDoId);
       return catalogStub.fetch(new Request(url.toString(), request));
@@ -628,7 +732,7 @@ export default {
     let appId = url.searchParams.get('appId') || request.headers.get('X-Mereb-App-Id') || 'tank-arena';
     let roomId = 'default';
 
-    if (parts.length >= 4 && parts[0] === 'games' && parts[2] === 'room') {
+    if (parts.length >= 4 && (parts[0] === 'games' || parts[0] === 'apps') && parts[2] === 'room') {
       appId = parts[1];
       roomId = parts[3];
     } else if (parts.length >= 3 && parts[0] === 'parties') {
