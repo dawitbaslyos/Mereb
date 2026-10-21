@@ -58,6 +58,17 @@ class App {
     const hash = window.location.hash;
     const params = new URLSearchParams(window.location.search);
 
+    // Check for GitHub OAuth callback code
+    const code = params.get('code');
+    if (code) {
+      const cleanUrl = window.location.origin + window.location.pathname + '#/dashboard';
+      window.history.replaceState({}, document.title, cleanUrl);
+      auth.handleAuthCallback(code).then(() => {
+        this.showDashboardView();
+      });
+      return;
+    }
+
     if (params.has('room') || params.has('play') || hash === '#/play' || hash === '#play') {
       this.showGameView();
     } else if (hash === '#/dashboard' || hash === '#dashboard') {

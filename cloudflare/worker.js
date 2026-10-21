@@ -378,6 +378,140 @@ export default {
       });
     }
 
+    // GitHub OAuth Config
+    if (url.pathname === '/api/auth/github/config') {
+      return new Response(JSON.stringify({
+        clientId: env.GITHUB_CLIENT_ID || null,
+        configured: !!(env.GITHUB_CLIENT_ID && env.GITHUB_CLIENT_SECRET)
+      }), {
+        headers: {
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*'
+        }
+      });
+    }
+
+    // GitHub OAuth Token Exchange
+    if (url.pathname === '/api/auth/github/exchange' && request.method === 'POST') {
+      const headers = {
+        'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': '*'
+      };
+
+      try {
+        const { code } = await request.json();
+        if (!code) {
+          return new Response(JSON.stringify({ error: 'Authorization code is required' }), { status: 400, headers });
+        }
+
+        const clientId = env.GITHUB_CLIENT_ID;
+        const clientSecret = env.GITHUB_CLIENT_SECRET;
+
+        if (!clientId || !clientSecret) {
+          return new Response(JSON.stringify({
+            error: 'GitHub OAuth credentials not set. Set GITHUB_CLIENT_ID and GITHUB_CLIENT_SECRET on Cloudflare Worker.'
+          }), { status: 501, headers });
+        }
+
+        // 1. Exchange code for access token
+        const tokenRes = await fetch('https://github.com/login/oauth/access_token', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'User-Agent': 'Mereb-Cloud-Auth'
+          },
+          body: JSON.stringify({
+            client_id: clientId,
+            client_secret: clientSecret,
+            code
+          })
+        });
+
+        const tokenData = await tokenRes.json();
+        if (tokenData.error) {
+          return new Response(JSON.stringify({ error: tokenData.error_description || tokenData.error }), { status: 400, headers });
+        }
+
+        // 2. Fetch authenticated profile from GitHub
+        const userRes = await fetch('https://api.github.com/user', {
+          headers: {
+            'Authorization': `Bearer ${tokenData.access_token}`,
+            'Accept': 'application/json',
+            'User-Agent': 'Mereb-Cloud-Auth'
+          }
+        });
+
+        const ghUser = await userRes.json();
+        if (!ghUser || !ghUser.login) {
+          return new Response(JSON.stringify({ error: 'Failed to retrieve profile from GitHub' }), { status: 400, headers });
+        }
+
+        const user = {
+          id: `gh_${ghUser.id}`,
+          username: ghUser.login,
+          name: ghUser.name || ghUser.login,
+          avatar: ghUser.avatar_url,
+          email: ghUser.email || `${ghUser.login}@users.noreply.github.com`,
+          bio: ghUser.bio || '',
+          plan: 'free',
+          maxProjects: 1
+        };
+
+        return new Response(JSON.stringify({ status: 'ok', user }), { headers });
+      } catch (err) {
+        return new Response(JSON.stringify({ error: err.message }), { status: 500, headers });
+      }
+    }
+
+    // Direct Live GitHub Profile Lookup (Zero-setup instant authentication)
+    if (url.pathname === '/api/auth/github/profile') {
+      const username = url.searchParams.get('username');
+      if (!username) {
+        return new Response(JSON.stringify({ error: 'Username parameter required' }), {
+          status: 400,
+          headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }
+        });
+      }
+
+      try {
+        const ghRes = await fetch(`https://api.github.com/users/${encodeURIComponent(username.trim())}`, {
+          headers: {
+            'Accept': 'application/json',
+            'User-Agent': 'Mereb-Cloud-Auth'
+          }
+        });
+
+        if (!ghRes.ok) {
+          return new Response(JSON.stringify({ error: `GitHub user "${username}" not found` }), {
+            status: 404,
+            headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }
+          });
+        }
+
+        const ghUser = await ghRes.json();
+        const user = {
+          id: `gh_${ghUser.id}`,
+          username: ghUser.login,
+          name: ghUser.name || ghUser.login,
+          avatar: ghUser.avatar_url,
+          email: `${ghUser.login}@users.noreply.github.com`,
+          bio: ghUser.bio || '',
+          plan: 'free',
+          maxProjects: 1
+        };
+
+        return new Response(JSON.stringify({ status: 'ok', user }), {
+          headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }
+        });
+      } catch (err) {
+        return new Response(JSON.stringify({ error: err.message }), {
+          status: 500,
+          headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }
+        });
+      }
+    }
+
     // Route Studio Catalog API to singleton catalog Durable Object
     if (url.pathname.startsWith('/api/games') || url.pathname.startsWith('/api/catalog')) {
       const catalogDoId = env.GAME_ROOM.idFromName('system:studio_catalog');

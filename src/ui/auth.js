@@ -182,23 +182,89 @@ export class AuthService {
     return !!this.user;
   }
 
-  loginWithGithub(customUsername = 'daevutyb') {
-    const user = {
+  async loginWithGithub(customUsername = null, host = 'https://mereb-signaling.dawitbaslyos.workers.dev') {
+    // 1. Check if OAuth app is configured on Cloudflare Edge
+    try {
+      const configRes = await fetch(`${host}/api/auth/github/config`);
+      if (configRes.ok) {
+        const { clientId, configured } = await configRes.json();
+        if (configured && clientId) {
+          // Official GitHub OAuth Redirect
+          const redirectUri = window.location.origin + window.location.pathname;
+          const authUrl = `https://github.com/login/oauth/authorize?client_id=${clientId}&scope=read:user,user:email&redirect_uri=${encodeURIComponent(redirectUri)}`;
+          window.location.href = authUrl;
+          return;
+        }
+      }
+    } catch {}
+
+    // 2. Instant Live GitHub Profile Connection (Zero-setup mode)
+    let username = customUsername;
+    if (!username) {
+      username = prompt('Enter your GitHub username to connect your live profile:', this.user?.username || 'dawitbaslyos');
+      if (!username || !username.trim()) return null;
+      username = username.trim();
+    }
+
+    try {
+      const res = await fetch(`${host}/api/auth/github/profile?username=${encodeURIComponent(username)}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.user) {
+          this.user = data.user;
+          try {
+            localStorage.setItem(STORAGE_KEY_USER, JSON.stringify(this.user));
+          } catch {}
+          this._notify();
+          return this.user;
+        }
+      }
+    } catch (err) {
+      console.warn('Profile fetch warning:', err);
+    }
+
+    // 3. Fallback
+    const fallbackUser = {
       id: 'gh_' + Math.floor(Math.random() * 1000000),
-      username: customUsername,
-      name: customUsername,
-      avatar: `https://github.com/${customUsername}.png`,
-      email: `${customUsername}@users.noreply.github.com`,
+      username: username || 'dawitbaslyos',
+      name: username || 'Dawit Abiy',
+      avatar: `https://github.com/${username || 'dawitbaslyos'}.png`,
+      email: `${username || 'dawitbaslyos'}@users.noreply.github.com`,
       plan: 'free',
       maxProjects: 1
     };
 
-    this.user = user;
+    this.user = fallbackUser;
     try {
-      localStorage.setItem(STORAGE_KEY_USER, JSON.stringify(user));
+      localStorage.setItem(STORAGE_KEY_USER, JSON.stringify(fallbackUser));
     } catch {}
     this._notify();
-    return user;
+    return fallbackUser;
+  }
+
+  async handleAuthCallback(code, host = 'https://mereb-signaling.dawitbaslyos.workers.dev') {
+    try {
+      const res = await fetch(`${host}/api/auth/github/exchange`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code })
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        if (data.user) {
+          this.user = data.user;
+          try {
+            localStorage.setItem(STORAGE_KEY_USER, JSON.stringify(this.user));
+          } catch {}
+          this._notify();
+          return this.user;
+        }
+      }
+    } catch (err) {
+      console.error('OAuth exchange error:', err);
+    }
+    return null;
   }
 
   logout() {
