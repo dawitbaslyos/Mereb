@@ -1,6 +1,7 @@
 /**
- * Mereb Cloud - Game Studio & Multiplayer Management Dashboard
- * Photon-style Multi-Game Catalog, AppID manager, Edge Telemetry & Zero-Cost Tracker.
+ * Mereb Cloud - Pure Developer Console
+ * Real Game APIs management, live edge connection tracking, active rooms inspector,
+ * and zero mock data.
  */
 import { auth } from './auth.js';
 
@@ -11,30 +12,45 @@ export class DashboardUI {
     this.element = document.createElement('div');
     this.element.className = 'dashboard-root';
     this.selectedGameIndex = 0;
+    this.pollInterval = null;
 
     auth.onChange(() => {
       this.render();
     });
 
-    // Sync live metrics and catalog from Cloudflare Edge
+    // Initial background sync with edge catalog
     auth.syncWithEdge().then(() => {
       this.render();
     });
 
+    // Auto-poll live edge connections every 3.5 seconds
+    this.pollInterval = setInterval(() => {
+      auth.syncWithEdge();
+    }, 3500);
+
     this.render();
+  }
+
+  destroy() {
+    if (this.pollInterval) {
+      clearInterval(this.pollInterval);
+      this.pollInterval = null;
+    }
   }
 
   render() {
     const user = auth.getUser();
     const games = auth.getGames();
-    const metrics = auth.getCloudMetrics();
+    const activeRooms = auth.getActiveRooms();
+    const recentLogs = auth.getRecentLogs();
     const selectedGame = games[this.selectedGameIndex] || games[0] || null;
 
     if (!user) {
       this.element.innerHTML = `
         <div class="dash-empty-state">
+          <div class="dash-lock-icon">🔒</div>
           <h2>Authentication Required</h2>
-          <p>Please sign in with GitHub to access the Mereb Cloud Dashboard.</p>
+          <p>Sign in with your verified GitHub account to access the Mereb Game Console.</p>
           <button class="btn-primary pill-btn btn-login-redirect">Sign in with GitHub</button>
         </div>
       `;
@@ -46,25 +62,259 @@ export class DashboardUI {
 
     const host = 'https://mereb-signaling.dawitbaslyos.workers.dev';
     const totalCCU = games.reduce((acc, g) => acc + (g.activeCCU || 0), 0);
-    const totalMatches = games.reduce((acc, g) => acc + (g.totalMatches || 0), 0);
+    const totalRooms = activeRooms.length;
+
+    // Filter active rooms for selected game
+    const selectedGameRooms = selectedGame
+      ? activeRooms.filter(r => r.appId === selectedGame.id)
+      : [];
 
     this.element.innerHTML = `
-      <!-- Dashboard Top Header -->
+      <style>
+        .dash-topbar {
+          background: rgba(10, 15, 30, 0.95);
+          border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+          padding: 14px 28px;
+          backdrop-filter: blur(16px);
+          position: sticky;
+          top: 0;
+          z-index: 50;
+        }
+        .dash-topbar-inner {
+          max-width: 1200px;
+          margin: 0 auto;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+        }
+        .dash-brand-wrap {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+        }
+        .dash-logo-badge {
+          background: linear-gradient(135deg, #0284c7, #38bdf8);
+          color: #fff;
+          font-weight: 900;
+          font-size: 13px;
+          padding: 3px 8px;
+          border-radius: 6px;
+          letter-spacing: 0.5px;
+        }
+        .dash-section-name {
+          font-weight: 700;
+          font-size: 14px;
+          color: #94a3b8;
+        }
+        .dash-main-container {
+          max-width: 1200px;
+          margin: 0 auto;
+          padding: 32px 24px 80px;
+          display: flex;
+          flex-direction: column;
+          gap: 24px;
+        }
+        .console-header-row {
+          display: flex;
+          align-items: flex-end;
+          justify-content: space-between;
+          flex-wrap: wrap;
+          gap: 16px;
+        }
+        .dash-metrics-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+          gap: 16px;
+        }
+        .dash-metric-card {
+          background: rgba(15, 23, 42, 0.7);
+          border: 1px solid rgba(255, 255, 255, 0.08);
+          border-radius: 12px;
+          padding: 18px 20px;
+          display: flex;
+          flex-direction: column;
+          gap: 6px;
+        }
+        .metric-title {
+          font-size: 11px;
+          font-weight: 700;
+          color: #94a3b8;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+        }
+        .metric-number {
+          font-size: 28px;
+          font-weight: 900;
+          color: #f1f5f9;
+        }
+        .metric-sub {
+          font-size: 11.5px;
+          color: #64748b;
+        }
+        .games-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+          gap: 16px;
+        }
+        .game-api-card {
+          background: rgba(15, 23, 42, 0.75);
+          border: 1px solid rgba(255, 255, 255, 0.09);
+          border-radius: 12px;
+          padding: 20px;
+          display: flex;
+          flex-direction: column;
+          gap: 14px;
+          cursor: pointer;
+          transition: all 0.15s ease;
+        }
+        .game-api-card:hover {
+          border-color: rgba(56, 189, 248, 0.4);
+          transform: translateY(-2px);
+        }
+        .game-api-card.selected {
+          border-color: #38bdf8;
+          background: rgba(15, 23, 42, 0.95);
+          box-shadow: 0 0 20px rgba(56, 189, 248, 0.15);
+        }
+        .game-card-header {
+          display: flex;
+          align-items: flex-start;
+          justify-content: space-between;
+        }
+        .game-card-title {
+          font-size: 16px;
+          font-weight: 800;
+          color: #f8fafc;
+        }
+        .tag-pill {
+          font-size: 10.5px;
+          font-weight: 600;
+          padding: 2px 8px;
+          border-radius: 4px;
+          background: rgba(255, 255, 255, 0.06);
+          color: #94a3b8;
+          border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+        .tag-pill.live {
+          background: rgba(34, 197, 94, 0.15);
+          color: #4ade80;
+          border-color: rgba(34, 197, 94, 0.3);
+        }
+        .key-box-mini {
+          background: rgba(0, 0, 0, 0.35);
+          border: 1px solid rgba(255, 255, 255, 0.07);
+          border-radius: 6px;
+          padding: 8px 12px;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          font-size: 11.5px;
+          font-family: 'JetBrains Mono', ui-monospace, monospace;
+          color: #cbd5e1;
+        }
+        .key-box-mini code {
+          color: #38bdf8;
+          font-weight: 700;
+        }
+        .card-actions-row {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        }
+        .btn-card-action {
+          flex: 1;
+          background: rgba(30, 41, 59, 0.6);
+          border: 1px solid rgba(255, 255, 255, 0.1);
+          color: #e2e8f0;
+          font-family: inherit;
+          font-size: 11.5px;
+          font-weight: 600;
+          padding: 8px 12px;
+          border-radius: 6px;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 6px;
+          transition: all 0.12s;
+        }
+        .btn-card-action:hover {
+          background: rgba(56, 189, 248, 0.15);
+          border-color: #38bdf8;
+          color: #fff;
+        }
+        .inspector-card {
+          background: rgba(15, 23, 42, 0.85);
+          border: 1px solid rgba(56, 189, 248, 0.3);
+          border-radius: 12px;
+          padding: 24px;
+          display: flex;
+          flex-direction: column;
+          gap: 20px;
+        }
+        .rooms-table {
+          width: 100%;
+          border-collapse: collapse;
+          font-size: 12.5px;
+          text-align: left;
+        }
+        .rooms-table th {
+          padding: 10px 14px;
+          color: #94a3b8;
+          font-weight: 600;
+          border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+          font-size: 11px;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+        }
+        .rooms-table td {
+          padding: 12px 14px;
+          border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+          color: #f1f5f9;
+        }
+        .rooms-table tr:hover td {
+          background: rgba(255, 255, 255, 0.02);
+        }
+        .empty-rooms-banner {
+          padding: 32px;
+          text-align: center;
+          color: #64748b;
+          font-size: 13px;
+          background: rgba(0, 0, 0, 0.2);
+          border-radius: 8px;
+          border: 1px dashed rgba(255, 255, 255, 0.08);
+        }
+        .log-terminal {
+          background: #050811;
+          border: 1px solid rgba(255, 255, 255, 0.08);
+          border-radius: 8px;
+          padding: 12px 16px;
+          font-family: 'JetBrains Mono', ui-monospace, monospace;
+          font-size: 11.5px;
+          line-height: 1.6;
+          max-height: 180px;
+          overflow-y: auto;
+          color: #94a3b8;
+        }
+        .log-entry {
+          display: flex;
+          gap: 10px;
+        }
+        .log-time { color: #475569; }
+        .log-text { color: #38bdf8; }
+        .log-join { color: #4ade80; }
+        .log-leave { color: #f87171; }
+      </style>
+
+      <!-- Dashboard Top Header (Clean Minimalist) -->
       <header class="dash-topbar">
         <div class="dash-topbar-inner">
           <div class="dash-brand-wrap">
-            <span class="dash-logo">MEREB</span>
-            <span class="dash-slash">/</span>
-            <span class="dash-section-name">Game Studio Cloud</span>
-            <span class="pill-badge pill-free">
-              Cloudflare Edge Free Tier ($0.00 / mo)
-            </span>
+            <span class="dash-logo-badge">MEREB</span>
+            <span class="dash-section-name">/ Console</span>
           </div>
 
           <div class="dash-topbar-actions">
-            <button class="btn-subtle pill-btn btn-dash-home">← Back to Site</button>
-            <button class="btn-subtle pill-btn btn-dash-play">🎮 Play Arena Demo</button>
-            
             <div class="user-pill-dropdown">
               <img src="${user.avatar}" alt="${user.username}" class="user-avatar" />
               <span class="user-name">${user.username}</span>
@@ -83,97 +333,86 @@ export class DashboardUI {
       <!-- Main Dashboard Container -->
       <main class="dash-main-container">
         <!-- Title & Action Row -->
-        <div class="dash-title-row">
+        <div class="console-header-row">
           <div>
-            <h1 class="dash-page-title">Game Studio & Network Telemetry</h1>
-            <p class="dash-page-desc">Manage game App IDs, copy AI integration prompts, and monitor edge traffic & costs.</p>
+            <h1 class="dash-page-title" style="font-size: 26px; font-weight: 800; color: #fff;">Game APIs & Live Telemetry</h1>
+            <p class="dash-page-desc" style="color: #94a3b8; margin-top: 4px; font-size: 13.5px;">
+              Create game APIs and track active rooms & live connections in real time.
+            </p>
           </div>
-          <div class="dash-title-actions">
-            <button class="btn-subtle pill-btn" id="btn-sync-edge">🔄 Sync Edge Stats</button>
-            <button class="btn-primary pill-btn" id="btn-create-game-modal">+ Register New Game</button>
+          <div class="dash-title-actions" style="display: flex; gap: 10px;">
+            <button class="btn-subtle pill-btn" id="btn-sync-edge">🔄 Refresh</button>
+            <button class="btn-primary pill-btn" id="btn-create-game-modal">+ Create Game API</button>
           </div>
         </div>
 
-        <!-- Metric Cards Grid (Photon CCU & Free-Tier Cost Metrics) -->
+        <!-- Real Metrics Grid (Zero Mock Data) -->
         <div class="dash-metrics-grid">
           <div class="dash-metric-card">
             <div class="metric-top">
-              <span class="metric-title">Total Active CCU</span>
+              <span class="metric-title">Live Players (CCU)</span>
               <span class="status-live-dot"></span>
             </div>
             <div class="metric-number text-signal">${totalCCU}</div>
-            <div class="metric-sub">Live concurrent web players</div>
+            <div class="metric-sub">Active players connected right now</div>
           </div>
 
           <div class="dash-metric-card">
             <div class="metric-top">
-              <span class="metric-title">Catalog Games</span>
-              <span class="metric-icon">🎮</span>
+              <span class="metric-title">Active Rooms</span>
+              <span class="metric-icon">⚔️</span>
+            </div>
+            <div class="metric-number">${totalRooms}</div>
+            <div class="metric-sub">Currently running P2P matches</div>
+          </div>
+
+          <div class="dash-metric-card">
+            <div class="metric-top">
+              <span class="metric-title">Registered APIs</span>
+              <span class="metric-icon">📁</span>
             </div>
             <div class="metric-number">${games.length}</div>
-            <div class="metric-sub">Dedicated App ID universes</div>
-          </div>
-
-          <div class="dash-metric-card">
-            <div class="metric-top">
-              <span class="metric-title">Daily Edge Quota</span>
-              <span class="metric-icon">⚡</span>
-            </div>
-            <div class="metric-number text-accent">${metrics.quotaUsedPercent}%</div>
-            <div class="metric-sub">${metrics.dailyRequests} / ${metrics.dailyQuotaLimit} free requests</div>
-          </div>
-
-          <div class="dash-metric-card">
-            <div class="metric-top">
-              <span class="metric-title">Photon Savings</span>
-              <span class="metric-icon">💰</span>
-            </div>
-            <div class="metric-number text-signal">+$${metrics.savedCostVsPhotonUSD || 45}.00</div>
-            <div class="metric-sub">Monthly savings vs Photon Engine</div>
+            <div class="metric-sub">Partitioned edge realms</div>
           </div>
         </div>
 
-        <!-- Game Catalog Section (Photon AppID Manager) -->
-        <div class="dash-card projects-card">
-          <div class="card-title-row">
-            <div>
-              <h2 class="card-heading">My Game Catalog & App IDs</h2>
-              <p class="card-subheading">
-                Each game operates in an isolated Cloudflare edge namespace. Click <strong>"Copy AI Prompt"</strong> to hand the setup to any AI assistant.
-              </p>
-            </div>
+        <!-- Game APIs List Section -->
+        <div style="display: flex; flex-direction: column; gap: 14px;">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <h2 class="card-heading" style="font-size: 16px; font-weight: 700; color: #e2e8f0;">My Game APIs</h2>
+            <span style="font-size: 12px; color: #64748b;">Click a game to inspect live connections</span>
           </div>
 
-          <div class="projects-list">
+          <div class="games-grid">
             ${games.map((g, idx) => `
-              <div class="project-row ${idx === this.selectedGameIndex ? 'project-selected' : ''}" data-idx="${idx}">
-                <div class="project-info">
-                  <div class="project-name-wrap">
-                    <span class="project-name">${g.name}</span>
-                    <span class="pill-badge pill-status">${g.genre}</span>
-                    <span class="pill-badge pill-active">${g.maxPlayers} Players</span>
+              <div class="game-api-card ${idx === this.selectedGameIndex ? 'selected' : ''}" data-idx="${idx}">
+                <div class="game-card-header">
+                  <div>
+                    <div class="game-card-title">${g.name}</div>
+                    <div style="display: flex; gap: 6px; margin-top: 4px;">
+                      <span class="tag-pill">${g.genre || 'Arcade'}</span>
+                      <span class="tag-pill">${g.maxPlayers || 2} Players</span>
+                      <span class="tag-pill live">● Edge Ready</span>
+                    </div>
                   </div>
-                  <div class="project-meta">
-                    <span>App ID: <code>${g.id}</code></span>
-                    <span>•</span>
-                    <span>Matches: ${g.totalMatches || 0}</span>
-                    <span>•</span>
-                    <span>Messages: ${g.totalMessages || 0}</span>
-                    <span>•</span>
-                    <span>Created: ${g.createdAt}</span>
+                  <div style="text-align: right;">
+                    <div style="font-size: 14px; font-weight: 800; color: #4ade80;">${g.activeCCU || 0} CCU</div>
+                    <div style="font-size: 11px; color: #64748b;">${g.activeRooms || 0} Rooms</div>
                   </div>
                 </div>
 
-                <div class="project-actions">
-                  <button class="btn-subtle pill-btn btn-copy-api" data-url="${host}/api/games/${g.id}" title="Copy Single API link">
-                    🔗 Copy API Link
-                  </button>
-                  <button class="btn-primary pill-btn btn-copy-prompt" data-id="${g.id}" data-name="${g.name}">
-                    🤖 Copy AI Prompt
+                <div class="key-box-mini">
+                  <span>App ID: <code>${g.id}</code></span>
+                  <button class="btn-subtle pill-btn btn-copy-appid" data-id="${g.id}" style="padding: 2px 8px; font-size: 10px;">Copy ID</button>
+                </div>
+
+                <div class="card-actions-row">
+                  <button class="btn-card-action btn-copy-endpoint" data-url="${host}/api/games/${g.id}">
+                    🔗 Copy Endpoint
                   </button>
                   ${games.length > 1 ? `
-                    <button class="btn-danger-icon btn-game-delete" data-id="${g.id}" title="Delete game from catalog">
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <button class="btn-danger-icon btn-game-delete" data-id="${g.id}" title="Delete game API" style="padding: 6px;">
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <polyline points="3 6 5 6 21 6"></polyline>
                         <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
                       </svg>
@@ -185,86 +424,141 @@ export class DashboardUI {
           </div>
         </div>
 
-        <!-- Selected Game Quickstart & AI Integration Card -->
+        <!-- Live Connection & Room Inspector (Replacing the giant static code snippet) -->
         ${selectedGame ? `
-          <div class="dash-card api-key-card">
-            <div class="card-title-row">
+          <div class="inspector-card">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 12px;">
               <div>
-                <h2 class="card-heading">Selected Game: ${selectedGame.name} (App ID: <code>${selectedGame.id}</code>)</h2>
-                <p class="card-subheading">
-                  AI Integration link: <code>${host}/api/games/${selectedGame.id}</code>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <h2 style="font-size: 17px; font-weight: 800; color: #f8fafc;">
+                    Live Connection Inspector: ${selectedGame.name}
+                  </h2>
+                  <span class="tag-pill live">● Auto-Syncing (3.5s)</span>
+                </div>
+                <p style="font-size: 12.5px; color: #94a3b8; margin-top: 4px;">
+                  Real-time rooms and peer sessions active on Cloudflare edge for App ID <code>${selectedGame.id}</code>.
                 </p>
               </div>
-              <button class="btn-primary pill-btn btn-copy-prompt" data-id="${selectedGame.id}" data-name="${selectedGame.name}">
-                📋 Copy AI Integration Prompt
-              </button>
+
+              <div style="display: flex; gap: 8px;">
+                <button class="btn-subtle pill-btn btn-copy-ws" data-ws="wss://${host.replace(/^https?:\/\//, '')}/?appId=${selectedGame.id}">
+                  Copy WebSocket URL
+                </button>
+                <button class="btn-subtle pill-btn btn-copy-endpoint" data-url="${host}/api/games/${selectedGame.id}">
+                  Copy REST API URL
+                </button>
+              </div>
             </div>
 
-            <div class="quickstart-snippet">
-              <div class="snippet-header">
-                <span>Multiplayer Integration Code (Photon-Style SDK)</span>
-                <span class="snippet-lang">JavaScript / TypeScript</span>
+            <!-- Active Rooms Table -->
+            <div style="display: flex; flex-direction: column; gap: 10px;">
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span style="font-size: 12px; font-weight: 700; color: #cbd5e1; text-transform: uppercase;">
+                  Active Rooms (${selectedGameRooms.length})
+                </span>
+                <span style="font-size: 11px; color: #64748b;">Auto-updates as players join or leave</span>
               </div>
-              <pre class="snippet-code"><code>import { MerebClient, defineSchema, TouchControls } from 'mereb-netcode';
 
-// 1. Initialize with this game's isolated App ID
-const net = new MerebClient({
-  appId: '${selectedGame.id}',
-  host: 'mereb-signaling.dawitbaslyos.workers.dev',
-  botTimeoutMs: 8000
-});
+              ${selectedGameRooms.length > 0 ? `
+                <table class="rooms-table">
+                  <thead>
+                    <tr>
+                      <th>Room Code</th>
+                      <th>Status</th>
+                      <th>Connected Peers</th>
+                      <th>Host Peer ID</th>
+                      <th>Started</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    ${selectedGameRooms.map(r => `
+                      <tr>
+                        <td><code style="color: #38bdf8; font-weight: 700; font-size: 13px;">${r.roomId}</code></td>
+                        <td>
+                          <span class="tag-pill ${r.playerCount >= 2 ? 'live' : ''}">
+                            ${r.playerCount >= 2 ? '⚔️ Match Live' : '⏳ Waiting for Peer'}
+                          </span>
+                        </td>
+                        <td><strong>${r.playerCount}</strong> / ${selectedGame.maxPlayers || 2}</td>
+                        <td><code style="color: #94a3b8; font-size: 11px;">${r.hostId || 'N/A'}</code></td>
+                        <td style="color: #64748b; font-size: 11px;">${new Date(r.createdAt).toLocaleTimeString()}</td>
+                      </tr>
+                    `).join('')}
+                  </tbody>
+                </table>
+              ` : `
+                <div class="empty-rooms-banner">
+                  No active rooms right now for <strong>${selectedGame.name}</strong>.<br/>
+                  When players join via <code>${selectedGame.id}</code>, their live connections will appear here.
+                </div>
+              `}
+            </div>
 
-// 2. Define game state schema (Photon-style declarative packing)
-export const StateSchema = defineSchema({
-  x: 'fixed16',
-  y: 'fixed16',
-  rotation: 'fixed16',
-  score: 'uint8',
-  health: 'uint8'
-});
-
-// 3. Connect & synchronize over sub-5ms WebRTC DataChannels!
-net.on('match-start', ({ role, isHost }) => {
-  console.log('Match live in ${selectedGame.name}!');
-});</code></pre>
+            <!-- Live Edge Event Feed -->
+            <div style="display: flex; flex-direction: column; gap: 8px;">
+              <span style="font-size: 11px; font-weight: 700; color: #94a3b8; text-transform: uppercase;">
+                Edge Telemetry Log Stream
+              </span>
+              <div class="log-terminal">
+                ${recentLogs.length > 0 ? recentLogs.map(l => `
+                  <div class="log-entry">
+                    <span class="log-time">[${l.time}]</span>
+                    <span class="log-text ${l.type === 'join' ? 'log-join' : l.type === 'leave' ? 'log-leave' : ''}">${l.message}</span>
+                  </div>
+                `).join('') : `
+                  <div style="color: #475569;">[${new Date().toLocaleTimeString()}] Console listening for real-time edge room events...</div>
+                `}
+              </div>
             </div>
           </div>
         ` : ''}
       </main>
 
-      <!-- Register New Game Modal -->
+      <!-- Create New Game API Modal -->
       <div class="dash-modal-backdrop" id="modal-create-game" style="display: none;">
         <div class="dash-modal-card">
-          <h3 class="modal-title">Register New Game in Catalog</h3>
+          <h3 class="modal-title">Create New Game API</h3>
           <p class="modal-desc">
-            Creates a dedicated App ID and edge signaling namespace for your new game on Cloudflare Durable Objects.
+            Instantly creates an isolated edge namespace and App ID for your game on Cloudflare Durable Objects.
           </p>
           
           <div style="display: flex; flex-direction: column; gap: 12px; margin-top: 4px;">
-            <label style="font-size: 12px; font-weight: 600; color: #94a3b8;">Game Title</label>
-            <input type="text" class="modal-input" id="new-game-name" placeholder="e.g. Cyber Kart 2088" maxlength="50" />
+            <div>
+              <label style="font-size: 12px; font-weight: 600; color: #94a3b8;">Game Title</label>
+              <input type="text" class="modal-input" id="new-game-name" placeholder="e.g. Cyber Kart" maxlength="50" style="width: 100%; box-sizing: border-box; margin-top: 4px;" />
+            </div>
 
-            <label style="font-size: 12px; font-weight: 600; color: #94a3b8;">Genre</label>
-            <select class="modal-input" id="new-game-genre">
-              <option value="Top-Down Shooter">Top-Down Shooter</option>
-              <option value="2D Kart Arcade">2D Kart Arcade</option>
-              <option value="Party Brawler">Party Brawler</option>
-              <option value="Turn-Based Strategy">Turn-Based Strategy</option>
-              <option value="Hypercasual Canvas">Hypercasual Canvas</option>
-              <option value="Physics Arena">Physics Arena</option>
-            </select>
+            <div style="display: flex; gap: 10px;">
+              <div style="flex: 1;">
+                <label style="font-size: 12px; font-weight: 600; color: #94a3b8;">Genre</label>
+                <select class="modal-input" id="new-game-genre" style="width: 100%; box-sizing: border-box; margin-top: 4px;">
+                  <option value="Top-Down Shooter">Top-Down Shooter</option>
+                  <option value="2D Kart Arcade">2D Kart Arcade</option>
+                  <option value="Party Brawler">Party Brawler</option>
+                  <option value="Turn-Based Strategy">Turn-Based Strategy</option>
+                  <option value="Hypercasual Canvas">Hypercasual Canvas</option>
+                </select>
+              </div>
 
-            <label style="font-size: 12px; font-weight: 600; color: #94a3b8;">Match Capacity</label>
-            <select class="modal-input" id="new-game-players">
-              <option value="2">2 Players (1v1 Competitive)</option>
-              <option value="4">4 Players (Party Mode)</option>
-              <option value="8">8 Players (Arena Mayhem)</option>
-            </select>
+              <div style="flex: 1;">
+                <label style="font-size: 12px; font-weight: 600; color: #94a3b8;">Max Players</label>
+                <select class="modal-input" id="new-game-players" style="width: 100%; box-sizing: border-box; margin-top: 4px;">
+                  <option value="2">2 Players (1v1)</option>
+                  <option value="4">4 Players (Party)</option>
+                  <option value="8">8 Players (Arena)</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="key-box-mini">
+              <span style="font-size: 11px; color: #94a3b8;">Generated App ID:</span>
+              <code id="preview-app-id">cyber-kart</code>
+            </div>
           </div>
 
-          <div class="modal-actions" style="margin-top: 14px;">
+          <div class="modal-actions" style="margin-top: 16px;">
             <button class="btn-subtle pill-btn" id="btn-modal-cancel">Cancel</button>
-            <button class="btn-primary pill-btn" id="btn-modal-submit">Create Game API</button>
+            <button class="btn-primary pill-btn" id="btn-modal-submit">Create API</button>
           </div>
         </div>
       </div>
@@ -274,85 +568,77 @@ net.on('match-start', ({ role, isHost }) => {
   }
 
   _wireEvents() {
-    // Navigation
-    this.element.querySelector('.btn-dash-home')?.addEventListener('click', () => {
-      if (this.onNavigateHome) this.onNavigateHome();
-    });
-
-    this.element.querySelector('.btn-dash-play')?.addEventListener('click', () => {
-      if (this.onLaunchGame) this.onLaunchGame();
-    });
-
     // Logout
     this.element.querySelector('.btn-logout')?.addEventListener('click', () => {
       auth.logout();
       if (this.onNavigateHome) this.onNavigateHome();
     });
 
-    // Sync Edge Stats Button
+    // Refresh Button
     this.element.querySelector('#btn-sync-edge')?.addEventListener('click', async (e) => {
       const btn = e.target;
       const orig = btn.innerText;
       btn.innerText = 'Syncing...';
       await auth.syncWithEdge();
       btn.innerText = 'Synced! ✓';
-      setTimeout(() => { btn.innerText = orig; }, 1500);
+      setTimeout(() => { btn.innerText = orig; }, 1200);
     });
 
-    // Select Game Row
-    this.element.querySelectorAll('.project-row').forEach(row => {
-      row.addEventListener('click', (e) => {
+    // Select Game Card
+    this.element.querySelectorAll('.game-api-card').forEach(card => {
+      card.addEventListener('click', (e) => {
         if (e.target.closest('button')) return;
-        const idx = parseInt(row.getAttribute('data-idx'), 10);
+        const idx = parseInt(card.getAttribute('data-idx'), 10);
         this.selectedGameIndex = idx;
         this.render();
       });
     });
 
-    // Copy API Link
-    this.element.querySelectorAll('.btn-copy-api').forEach(btn => {
+    // Copy App ID
+    this.element.querySelectorAll('.btn-copy-appid').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        const id = btn.getAttribute('data-id');
+        if (id) {
+          await navigator.clipboard.writeText(id);
+          const orig = btn.innerText;
+          btn.innerText = 'Copied!';
+          setTimeout(() => { btn.innerText = orig; }, 1400);
+        }
+      });
+    });
+
+    // Copy Endpoint
+    this.element.querySelectorAll('.btn-copy-endpoint').forEach(btn => {
       btn.addEventListener('click', async (e) => {
         e.stopPropagation();
         const url = btn.getAttribute('data-url');
         if (url) {
           await navigator.clipboard.writeText(url);
           const orig = btn.innerText;
-          btn.innerText = 'Link Copied! ✓';
-          setTimeout(() => { btn.innerText = orig; }, 1500);
+          btn.innerText = 'Copied! ✓';
+          setTimeout(() => { btn.innerText = orig; }, 1400);
         }
       });
     });
 
-    // Copy AI Setup Prompt
-    this.element.querySelectorAll('.btn-copy-prompt').forEach(btn => {
-      btn.addEventListener('click', async (e) => {
-        e.stopPropagation();
-        const id = btn.getAttribute('data-id');
-        const name = btn.getAttribute('data-name');
-        const host = 'https://mereb-signaling.dawitbaslyos.workers.dev';
-        const prompt = `I want to add real-time multiplayer to "${name}" using Mereb Netcode Engine.
-App ID: '${id}'
-Signaling Server: '${host}'
-Follow MEREB_INTEGRATION_SPEC:
-1. Initialize MerebClient with { appId: '${id}', host: '${host}' }.
-2. Declare our game's state with defineSchema().
-3. Attach TouchControls for mobile virtual joysticks and MerebLobby.
-4. Synchronize state over WebRTC DataChannels using SnapshotInterpolator.
-5. Mount MerebTerminal for live in-game diagnostics and network lag simulation.`;
-
-        await navigator.clipboard.writeText(prompt);
-        const orig = btn.innerText;
-        btn.innerText = 'Prompt Copied! 📋';
-        setTimeout(() => { btn.innerText = orig; }, 1500);
-      });
+    // Copy WebSocket URL
+    this.element.querySelector('.btn-copy-ws')?.addEventListener('click', async (e) => {
+      const ws = e.target.getAttribute('data-ws');
+      if (ws) {
+        await navigator.clipboard.writeText(ws);
+        const orig = e.target.innerText;
+        e.target.innerText = 'Copied! ✓';
+        setTimeout(() => { e.target.innerText = orig; }, 1400);
+      }
     });
 
-    // Delete Game
+    // Delete Game API
     this.element.querySelectorAll('.btn-game-delete').forEach(btn => {
       btn.addEventListener('click', (e) => {
         e.stopPropagation();
         const id = btn.getAttribute('data-id');
-        if (id && confirm(`Delete game "${id}" from catalog?`)) {
+        if (id && confirm(`Delete Game API "${id}"?`)) {
           auth.deleteGame(id);
           this.selectedGameIndex = 0;
         }
@@ -367,10 +653,17 @@ Follow MEREB_INTEGRATION_SPEC:
     const nameInput = this.element.querySelector('#new-game-name');
     const genreInput = this.element.querySelector('#new-game-genre');
     const playersInput = this.element.querySelector('#new-game-players');
+    const previewAppId = this.element.querySelector('#preview-app-id');
+
+    nameInput?.addEventListener('input', (e) => {
+      const slug = e.target.value.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || 'my-game';
+      if (previewAppId) previewAppId.innerText = slug;
+    });
 
     openBtn?.addEventListener('click', () => {
       modal.style.display = 'flex';
       nameInput.value = '';
+      if (previewAppId) previewAppId.innerText = 'my-game';
       nameInput.focus();
     });
 
@@ -388,6 +681,7 @@ Follow MEREB_INTEGRATION_SPEC:
         auth.addGame(name, genre, maxPlayers);
         modal.style.display = 'none';
         this.selectedGameIndex = auth.getGames().length - 1;
+        this.render();
       } catch (err) {
         alert(err.message);
       }

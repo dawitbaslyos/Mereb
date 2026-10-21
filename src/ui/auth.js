@@ -14,25 +14,8 @@ const DEFAULT_GAMES = [
     genre: 'Top-Down Shooter',
     maxPlayers: 2,
     createdAt: '2026-10-18',
-    activeCCU: 0,
-    totalMatches: 24,
-    totalMessages: 18200,
     status: 'active',
-    apiLink: 'https://mereb-signaling.dawitbaslyos.workers.dev/api/games/tank-arena',
-    aiPrompt: "Integrate Mereb multiplayer into this game using AppID 'tank-arena' and API 'https://mereb-signaling.dawitbaslyos.workers.dev'. Use defineSchema and TouchControls."
-  },
-  {
-    id: 'neon-racer',
-    name: 'Neon Racer (Prototype)',
-    genre: '2D Kart Arcade',
-    maxPlayers: 4,
-    createdAt: '2026-10-19',
-    activeCCU: 0,
-    totalMatches: 6,
-    totalMessages: 4300,
-    status: 'active',
-    apiLink: 'https://mereb-signaling.dawitbaslyos.workers.dev/api/games/neon-racer',
-    aiPrompt: "Integrate Mereb multiplayer into this game using AppID 'neon-racer' and API 'https://mereb-signaling.dawitbaslyos.workers.dev'. Use defineSchema and TouchControls."
+    apiLink: 'https://mereb-signaling.dawitbaslyos.workers.dev/api/games/tank-arena'
   }
 ];
 
@@ -42,12 +25,12 @@ export class AuthService {
     this.user = this._loadUser();
     this.projects = this._loadProjects();
     this.games = this._loadGames();
+    this.activeRooms = [];
+    this.recentLogs = [];
     this.cloudMetrics = {
-      dailyRequests: 1420,
-      dailyQuotaLimit: 100000,
-      quotaUsedPercent: '1.42',
-      monthlyEstimatedCostUSD: 0.00,
-      savedCostVsPhotonUSD: 45.00
+      totalGames: 1,
+      totalCCU: 0,
+      totalActiveRooms: 0
     };
   }
 
@@ -65,19 +48,7 @@ export class AuthService {
       const data = localStorage.getItem(STORAGE_KEY_PROJECTS);
       if (data) return JSON.parse(data);
     } catch {}
-
-    return [
-      {
-        id: 'proj_starter',
-        name: 'My First Arena Game',
-        apiKey: 'pk_live_mereb_a8f92b710c4d',
-        createdAt: '2026-10-12',
-        activeRooms: 3,
-        totalMatches: 142,
-        avgPingMs: 24,
-        region: 'Global Edge (Auto)'
-      }
-    ];
+    return [];
   }
 
   _saveProjects() {
@@ -120,11 +91,25 @@ export class AuthService {
         if (data.metrics) {
           this.cloudMetrics = data.metrics;
         }
+        if (data.activeRooms) {
+          this.activeRooms = data.activeRooms;
+        }
+        if (data.recentLogs) {
+          this.recentLogs = data.recentLogs;
+        }
         this._notify();
       }
     } catch (e) {
       console.warn('Edge catalog sync notice:', e.message);
     }
+  }
+
+  getActiveRooms() {
+    return this.activeRooms || [];
+  }
+
+  getRecentLogs() {
+    return this.recentLogs || [];
   }
 
   addGame(name, genre = 'Action', maxPlayers = 2, host = 'https://mereb-signaling.dawitbaslyos.workers.dev') {

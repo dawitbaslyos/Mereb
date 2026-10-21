@@ -1,11 +1,7 @@
 /**
  * Mereb Cloudflare Edge Signaling & Studio Platform Worker
- * Zero-cost, globally distributed WebRTC signaling, game catalog & matchmaking on Cloudflare.
- * Features:
- * - Multi-Game Partitioning via App IDs (Photon-style)
- * - Game Catalog REST API (/api/games)
- * - Live CCU, Room & Traffic Telemetry
- * - Cloudflare Zero-Cost Calculator & Quota Monitor
+ * 100% REAL live WebRTC signaling, game catalog & active connection telemetry.
+ * NO MOCK DATA. Real CCU, real active rooms, and real edge logs.
  */
 
 const CLOUDFLARE_ICE_SERVERS = [
@@ -14,28 +10,14 @@ const CLOUDFLARE_ICE_SERVERS = [
   { urls: 'stun:stun1.l.google.com:19302' }
 ];
 
-// Pre-seeded games for instant out-of-the-box catalog
-const DEFAULT_GAMES = [
+// Default starter game in catalog (Only 1 real game)
+const INITIAL_GAMES = [
   {
     id: 'tank-arena',
     name: 'Mereb Arena (3D Tanks)',
     genre: 'Top-Down Shooter',
     maxPlayers: 2,
     createdAt: '2026-10-18',
-    activeCCU: 0,
-    totalMatches: 24,
-    totalMessages: 18200,
-    status: 'active'
-  },
-  {
-    id: 'neon-racer',
-    name: 'Neon Racer (Prototype)',
-    genre: '2D Kart Arcade',
-    maxPlayers: 4,
-    createdAt: '2026-10-19',
-    activeCCU: 0,
-    totalMatches: 6,
-    totalMessages: 4300,
     status: 'active'
   }
 ];
@@ -46,10 +28,14 @@ export class GameRoom {
     this.env = env;
     this.connections = new Map(); // connId -> WebSocket
     this.hostId = null;
-    this.queue = []; // Array<{ id: string, ws: WebSocket }>
+    this.queue = [];
     this.appId = 'tank-arena';
     this.roomId = 'default';
-    this.totalMessages = 0;
+    this.createdAt = Date.now();
+
+    // Registry fields (used when this instance is 'system:studio_catalog')
+    this.activeRooms = new Map(); // `${appId}:${roomId}` -> { appId, roomId, players: Set<string>, hostId: string, createdAt: number }
+    this.recentLogs = []; // Array<{ time: string, message: string, type: string }>
   }
 
   async fetch(request) {
@@ -60,9 +46,9 @@ export class GameRoom {
       return this.handleCatalogAPI(request, url);
     }
 
-    // Telemetry heartbeat endpoint from rooms
-    if (url.pathname === '/api/telemetry/heartbeat') {
-      return this.handleHeartbeat(request);
+    // Internal telemetry notification from active GameRooms
+    if (url.pathname === '/api/telemetry/room-event') {
+      return this.handleRoomEvent(request);
     }
 
     const upgradeHeader = request.headers.get('Upgrade');
@@ -86,63 +72,145 @@ export class GameRoom {
     });
   }
 
+  async _notifyCatalog(eventData) {
+    if (!this.env.GAME_ROOM) return;
+    try {
+      const catalogDo = this.env.GAME_ROOM.get(this.env.GAME_ROOM.idFromName('system:studio_catalog'));
+      await catalogDo.fetch('https://internal/api/telemetry/room-event', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(eventData)
+      });
+    } catch {}
+  }
+
+  async handleRoomEvent(request) {
+    const data = await request.json();
+    const key = `${data.appId}:${data.roomId}`;
+    const timeStr = new Date().toLocaleTimeString();
+
+    if (data.event === 'player-connected') {
+      let room = this.activeRooms.get(key);
+      if (!room) {
+        room = {
+          appId: data.appId,
+          roomId: data.roomId,
+          players: new Set(),
+          hostId: data.playerId,
+          createdAt: Date.now()
+        };
+        this.activeRooms.set(key, room);
+        this._addLog(`Room "${data.roomId}" created for [${data.appId}]`, 'create');
+      }
+      room.players.add(data.playerId);
+      this._addLog(`Player "${data.playerId}" joined room "${data.roomId}" (${room.players.size} active)`, 'join');
+    } else if (data.event === 'player-disconnected') {
+      const room = this.activeRooms.get(key);
+      if (room) {
+        room.players.delete(data.playerId);
+        this._addLog(`Player "${data.playerId}" left room "${data.roomId}"`, 'leave');
+        if (room.players.size === 0) {
+          this.activeRooms.delete(key);
+          this._addLog(`Room "${data.roomId}" closed`, 'close');
+        }
+      }
+    } else if (data.event === 'room-closed') {
+      this.activeRooms.delete(key);
+      this._addLog(`Room "${data.roomId}" terminated`, 'close');
+    }
+
+    return new Response(JSON.stringify({ ok: true }), {
+      headers: { 'Content-Type': 'application/json' }
+    });
+  }
+
+  _addLog(message, type) {
+    const time = new Date().toLocaleTimeString();
+    this.recentLogs.push({ time, message, type });
+    if (this.recentLogs.length > 50) this.recentLogs.shift();
+  }
+
   async handleCatalogAPI(request, url) {
     const headers = {
       'Content-Type': 'application/json',
       'Access-Control-Allow-Origin': '*',
       'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type, Authorization'
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Mereb-App-Id'
     };
 
     if (request.method === 'OPTIONS') {
       return new Response(null, { headers });
     }
 
-    // Load or initialize games from Durable Object storage
     let games = await this.state.storage.get('catalog_games');
     if (!games) {
-      games = [...DEFAULT_GAMES];
+      games = [...INITIAL_GAMES];
       await this.state.storage.put('catalog_games', games);
     }
 
-    // Telemetry stats
-    let stats = await this.state.storage.get('catalog_stats') || {
-      totalRequestsToday: 1420,
-      quotaDailyLimit: 100000,
-      totalDataTransferredMB: 18.4,
-      savedCostVsPhotonUSD: 45.00
-    };
-
-    // GET /api/games: List all games + metrics
+    // GET /api/games: List all games + REAL LIVE CCU & ACTIVE ROOMS
     if (request.method === 'GET') {
       const parts = url.pathname.split('/').filter(Boolean);
-      // Specific game: /api/games/:appId
+      
+      // Calculate 100% REAL live metrics across active rooms
+      const activeRoomsList = [];
+      for (const room of this.activeRooms.values()) {
+        activeRoomsList.push({
+          appId: room.appId,
+          roomId: room.roomId,
+          playerCount: room.players.size,
+          players: Array.from(room.players),
+          hostId: room.hostId,
+          createdAt: room.createdAt
+        });
+      }
+
+      const gamesWithLiveStats = games.map(g => {
+        const gameRooms = activeRoomsList.filter(r => r.appId === g.id);
+        const gameCCU = gameRooms.reduce((sum, r) => sum + r.playerCount, 0);
+        return {
+          id: g.id,
+          name: g.name,
+          genre: g.genre,
+          maxPlayers: g.maxPlayers,
+          createdAt: g.createdAt,
+          status: g.status || 'active',
+          activeCCU: gameCCU,
+          activeRooms: gameRooms.length
+        };
+      });
+
+      // Specific game API detail
       if (parts.length >= 3 && parts[1] === 'games') {
         const targetId = parts[2];
-        const game = games.find(g => g.id === targetId);
+        const game = gamesWithLiveStats.find(g => g.id === targetId);
         if (!game) {
-          return new Response(JSON.stringify({ error: 'Game not found' }), { status: 444, headers });
+          return new Response(JSON.stringify({ error: 'Game not found' }), { status: 404, headers });
         }
-        return new Response(JSON.stringify(game, null, 2), { headers });
+        const roomsForGame = activeRoomsList.filter(r => r.appId === targetId);
+        return new Response(JSON.stringify({
+          game,
+          activeRooms: roomsForGame,
+          logs: this.recentLogs.slice(-20)
+        }, null, 2), { headers });
       }
+
+      const totalLiveCCU = gamesWithLiveStats.reduce((sum, g) => sum + g.activeCCU, 0);
 
       return new Response(JSON.stringify({
         status: 'ok',
-        games,
+        games: gamesWithLiveStats,
+        activeRooms: activeRoomsList,
+        recentLogs: this.recentLogs.slice(-25),
         metrics: {
           totalGames: games.length,
-          totalCCU: games.reduce((acc, g) => acc + (g.activeCCU || 0), 0),
-          totalMatches: games.reduce((acc, g) => acc + (g.totalMatches || 0), 0),
-          dailyRequests: stats.totalRequestsToday,
-          dailyQuotaLimit: stats.quotaDailyLimit,
-          quotaUsedPercent: ((stats.totalRequestsToday / stats.quotaDailyLimit) * 100).toFixed(2),
-          monthlyEstimatedCostUSD: 0.00,
-          savedCostVsPhotonUSD: stats.savedCostVsPhotonUSD
+          totalCCU: totalLiveCCU,
+          totalActiveRooms: activeRoomsList.length
         }
       }, null, 2), { headers });
     }
 
-    // POST /api/games: Register a new game
+    // POST /api/games: Create a real game API
     if (request.method === 'POST') {
       try {
         const body = await request.json();
@@ -153,7 +221,7 @@ export class GameRoom {
 
         const existing = games.find(g => g.id === id);
         if (existing) {
-          return new Response(JSON.stringify({ error: 'A game with this App ID already exists' }), { status: 409, headers });
+          return new Response(JSON.stringify({ error: 'A game API with this App ID already exists' }), { status: 409, headers });
         }
 
         const origin = url.origin;
@@ -163,44 +231,40 @@ export class GameRoom {
           genre,
           maxPlayers,
           createdAt: new Date().toISOString().split('T')[0],
-          activeCCU: 0,
-          totalMatches: 0,
-          totalMessages: 0,
           status: 'active',
-          apiLink: `${origin}/api/games/${id}`,
-          aiPrompt: `Integrate Mereb multiplayer into this game using AppID '${id}'. API: '${origin}'. Use defineSchema and TouchControls.`
+          apiLink: `${origin}/api/games/${id}`
         };
 
         games.push(newGame);
         await this.state.storage.put('catalog_games', games);
+        this._addLog(`Created new Game API "${id}" (${name})`, 'create');
 
         return new Response(JSON.stringify({
           status: 'created',
-          game: newGame
+          game: {
+            ...newGame,
+            activeCCU: 0,
+            activeRooms: 0
+          }
         }, null, 2), { status: 201, headers });
       } catch (err) {
         return new Response(JSON.stringify({ error: err.message }), { status: 400, headers });
       }
     }
 
-    // DELETE /api/games/:appId: Remove game
+    // DELETE /api/games/:appId: Remove game API
     if (request.method === 'DELETE') {
       const parts = url.pathname.split('/').filter(Boolean);
       if (parts.length >= 3 && parts[1] === 'games') {
         const targetId = parts[2];
         games = games.filter(g => g.id !== targetId);
         await this.state.storage.put('catalog_games', games);
+        this._addLog(`Deleted Game API "${targetId}"`, 'close');
         return new Response(JSON.stringify({ status: 'deleted', id: targetId }), { headers });
       }
     }
 
     return new Response(JSON.stringify({ error: 'Not found' }), { status: 404, headers });
-  }
-
-  async handleHeartbeat(request) {
-    return new Response(JSON.stringify({ ok: true }), {
-      headers: { 'Content-Type': 'application/json' }
-    });
   }
 
   handleSession(ws, connId, isMatchmaker) {
@@ -267,15 +331,24 @@ export class GameRoom {
 
     if (this.connections.size === 1) {
       this.hostId = ws.id;
-    } else if (this.connections.size === 2 && this.hostId) {
-      // Send joiner room details
+    }
+
+    // REAL TELEMETRY: notify catalog of connection
+    this._notifyCatalog({
+      event: 'player-connected',
+      appId: this.appId,
+      roomId: this.roomId,
+      playerId: ws.id,
+      timestamp: Date.now()
+    });
+
+    if (this.connections.size === 2 && this.hostId) {
       ws.send(JSON.stringify({
         type: 'room-joined',
         players: [this.hostId, ws.id],
         hostId: this.hostId
       }));
 
-      // Notify host to initiate WebRTC offer
       const hostWs = this.connections.get(this.hostId);
       if (hostWs) {
         hostWs.send(JSON.stringify({ type: 'player-joined', playerId: ws.id }));
@@ -284,7 +357,6 @@ export class GameRoom {
     }
 
     ws.addEventListener('message', (event) => {
-      this.totalMessages++;
       let data;
       try {
         data = JSON.parse(event.data);
@@ -307,20 +379,34 @@ export class GameRoom {
     const handleDisconnect = () => {
       this.connections.delete(ws.id);
 
-      // Notify remaining peer
+      // REAL TELEMETRY: notify catalog of disconnect
+      this._notifyCatalog({
+        event: 'player-disconnected',
+        appId: this.appId,
+        roomId: this.roomId,
+        playerId: ws.id,
+        timestamp: Date.now()
+      });
+
       for (const peerWs of this.connections.values()) {
         try {
           peerWs.send(JSON.stringify({ type: 'player-left', playerId: ws.id }));
         } catch {}
       }
 
-      // If host left, shut down room
       if (ws.id === this.hostId) {
         for (const peerWs of this.connections.values()) {
           try { peerWs.close(); } catch {}
         }
         this.connections.clear();
         this.hostId = null;
+
+        this._notifyCatalog({
+          event: 'room-closed',
+          appId: this.appId,
+          roomId: this.roomId,
+          timestamp: Date.now()
+        });
       }
     };
 
@@ -355,7 +441,6 @@ export default {
           service: 'Mereb Cloudflare Edge Signaling & Studio Platform',
           edgePoP: request.cf?.colo || 'UNKNOWN',
           country: request.cf?.country || 'GLOBAL',
-          catalogEndpoint: '/api/games',
           iceServers: CLOUDFLARE_ICE_SERVERS
         }, null, 2), {
           headers: {
@@ -413,7 +498,6 @@ export default {
           }), { status: 501, headers });
         }
 
-        // 1. Exchange code for access token
         const tokenPayload = {
           client_id: clientId,
           client_secret: clientSecret,
@@ -436,7 +520,6 @@ export default {
           return new Response(JSON.stringify({ error: tokenData.error_description || tokenData.error }), { status: 400, headers });
         }
 
-        // 2. Fetch authenticated profile from GitHub
         const userRes = await fetch('https://api.github.com/user', {
           headers: {
             'Authorization': `Bearer ${tokenData.access_token}`,
@@ -467,7 +550,7 @@ export default {
       }
     }
 
-    // Direct Live GitHub Profile Lookup (Zero-setup instant authentication)
+    // Direct Live GitHub Profile Lookup
     if (url.pathname === '/api/auth/github/profile') {
       const username = url.searchParams.get('username');
       if (!username) {
@@ -522,12 +605,7 @@ export default {
       return catalogStub.fetch(new Request(url.toString(), request));
     }
 
-    // Extract App ID & Room ID from path or query params
-    // Formats supported:
-    // 1. /games/:appId/room/:roomId
-    // 2. /:appId/:roomId
-    // 3. /party/:room?appId=tank-arena
-    // 4. Default to 'tank-arena'
+    // Route room connections
     const parts = url.pathname.split('/').filter(Boolean);
     let appId = url.searchParams.get('appId') || request.headers.get('X-Mereb-App-Id') || 'tank-arena';
     let roomId = 'default';
@@ -560,7 +638,6 @@ export default {
       });
     }
 
-    // Partition Durable Objects by AppID + RoomID (Photon Cloud architecture)
     const doPartitionKey = `${appId}:${roomId}`;
     const doId = env.GAME_ROOM.idFromName(doPartitionKey);
     const roomStub = env.GAME_ROOM.get(doId);
