@@ -36,6 +36,7 @@ export class GameRoom {
     // Registry fields (used when this instance is 'system:studio_catalog')
     this.activeRooms = new Map(); // `${appId}:${roomId}` -> { appId, roomId, players: Set<string>, hostId: string, createdAt: number }
     this.recentLogs = []; // Array<{ time: string, message: string, type: string }>
+    this.logsLoaded = false;
   }
 
   async fetch(request) {
@@ -124,10 +125,26 @@ export class GameRoom {
     });
   }
 
-  _addLog(message, type) {
+  async _ensureLogsLoaded() {
+    if (!this.logsLoaded) {
+      try {
+        const stored = await this.state.storage.get('recent_logs');
+        if (Array.isArray(stored)) {
+          this.recentLogs = stored;
+        }
+      } catch {}
+      this.logsLoaded = true;
+    }
+  }
+
+  async _addLog(message, type) {
+    await this._ensureLogsLoaded();
     const time = new Date().toLocaleTimeString();
     this.recentLogs.push({ time, message, type });
     if (this.recentLogs.length > 50) this.recentLogs.shift();
+    try {
+      await this.state.storage.put('recent_logs', this.recentLogs);
+    } catch {}
   }
 
   async handleCatalogAPI(request, url) {
@@ -147,6 +164,7 @@ export class GameRoom {
       games = [...INITIAL_GAMES];
       await this.state.storage.put('catalog_games', games);
     }
+    await this._ensureLogsLoaded();
 
     // GET /api/games: List all games + REAL LIVE CCU & ACTIVE ROOMS
     if (request.method === 'GET') {
