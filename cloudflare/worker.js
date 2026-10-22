@@ -10,13 +10,13 @@ const CLOUDFLARE_ICE_SERVERS = [
   { urls: 'stun:stun1.l.google.com:19302' }
 ];
 
-// Default starter game in catalog (Only 1 real game)
+// Default starter app in catalog
 const INITIAL_GAMES = [
   {
-    id: 'tank-arena',
-    name: 'Mereb Arena (3D Tanks)',
-    apiKey: 'mb_live_tank_arena_f8291',
-    createdAt: '2026-10-18',
+    id: 'app_starter',
+    name: 'Starter App',
+    apiKey: 'pk_live_mereb_starter_key',
+    createdAt: '2026-10-22',
     status: 'active'
   }
 ];
@@ -49,6 +49,45 @@ export class GameRoom {
     // Internal telemetry notification from active GameRooms
     if (url.pathname === '/api/telemetry/room-event') {
       return this.handleRoomEvent(request);
+    }
+
+    // Room Presence API
+    if (url.pathname.endsWith('/presence') || url.pathname.endsWith('/info')) {
+      return new Response(JSON.stringify({
+        appId: this.appId,
+        roomId: this.roomId,
+        connectedPeers: Array.from(this.connections.keys()),
+        peerCount: this.connections.size,
+        hostId: this.hostId,
+        createdAt: this.createdAt
+      }), {
+        headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }
+      });
+    }
+
+    // Room Broadcast REST API
+    if (request.method === 'POST' && (url.pathname.endsWith('/broadcast') || url.pathname.endsWith('/publish'))) {
+      const body = await request.json().catch(() => ({}));
+      const payload = JSON.stringify({
+        ...body,
+        from: 'server',
+        timestamp: Date.now()
+      });
+      let count = 0;
+      for (const ws of this.connections.values()) {
+        try {
+          ws.send(payload);
+          count++;
+        } catch {}
+      }
+      return new Response(JSON.stringify({
+        status: 'ok',
+        sentToPeers: count,
+        roomId: this.roomId,
+        appId: this.appId
+      }), {
+        headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }
+      });
     }
 
     const upgradeHeader = request.headers.get('Upgrade');
@@ -443,15 +482,15 @@ export class GameRoom {
   }
 
   _handleGameRoom(ws) {
-    if (this.connections.size >= 2) {
-      ws.send(JSON.stringify({ type: 'error', message: 'Room full' }));
-      ws.close(1008, 'Room full');
+    if (this.connections.size >= 100) {
+      ws.send(JSON.stringify({ type: 'error', message: 'Room channel capacity reached (100 peers max)' }));
+      ws.close(1008, 'Room capacity reached');
       return;
     }
 
     this.connections.set(ws.id, ws);
 
-    if (this.connections.size === 1) {
+    if (!this.hostId) {
       this.hostId = ws.id;
     }
 
@@ -464,17 +503,28 @@ export class GameRoom {
       timestamp: Date.now()
     });
 
-    if (this.connections.size === 2 && this.hostId) {
-      ws.send(JSON.stringify({
-        type: 'room-joined',
-        players: [this.hostId, ws.id],
-        hostId: this.hostId
-      }));
+    // Handshake packet to new client
+    const existingPeers = Array.from(this.connections.keys()).filter(id => id !== ws.id);
+    ws.send(JSON.stringify({
+      type: 'connected',
+      id: ws.id,
+      appId: this.appId,
+      roomId: this.roomId,
+      isHost: ws.id === this.hostId,
+      peers: existingPeers,
+      totalConnected: this.connections.size
+    }));
 
-      const hostWs = this.connections.get(this.hostId);
-      if (hostWs) {
-        hostWs.send(JSON.stringify({ type: 'player-joined', playerId: ws.id }));
-        hostWs.send(JSON.stringify({ type: 'start-signal', peerId: ws.id }));
+    // Notify other peers in room
+    for (const [peerId, peerWs] of this.connections.entries()) {
+      if (peerId !== ws.id) {
+        try {
+          peerWs.send(JSON.stringify({
+            type: 'peer-joined',
+            id: ws.id,
+            totalConnected: this.connections.size
+          }));
+        } catch {}
       }
     }
 
@@ -483,17 +533,33 @@ export class GameRoom {
       try {
         data = JSON.parse(event.data);
       } catch {
-        return;
+        data = { type: 'message', text: event.data };
       }
 
-      if (data.type === 'signal' && data.to) {
+      // Targeted message (WebRTC signal or private message)
+      if (data.to) {
         const target = this.connections.get(data.to);
         if (target) {
           target.send(JSON.stringify({
-            type: 'signal',
-            from: ws.id,
-            signal: data.signal
+            ...data,
+            from: ws.id
           }));
+        }
+        return;
+      }
+
+      // Broadcast message to all other peers in channel
+      const payload = JSON.stringify({
+        ...data,
+        from: ws.id,
+        timestamp: Date.now()
+      });
+
+      for (const [peerId, peerWs] of this.connections.entries()) {
+        if (peerId !== ws.id) {
+          try {
+            peerWs.send(payload);
+          } catch {}
         }
       }
     });
@@ -512,17 +578,20 @@ export class GameRoom {
 
       for (const peerWs of this.connections.values()) {
         try {
-          peerWs.send(JSON.stringify({ type: 'player-left', playerId: ws.id }));
+          peerWs.send(JSON.stringify({
+            type: 'peer-left',
+            id: ws.id,
+            totalConnected: this.connections.size
+          }));
         } catch {}
       }
 
       if (ws.id === this.hostId) {
-        for (const peerWs of this.connections.values()) {
-          try { peerWs.close(); } catch {}
-        }
-        this.connections.clear();
-        this.hostId = null;
+        this.hostId = this.connections.keys().next().value || null;
+      }
 
+      if (this.connections.size === 0) {
+        this.hostId = null;
         this._notifyCatalog({
           event: 'room-closed',
           appId: this.appId,
@@ -537,12 +606,175 @@ export class GameRoom {
   }
 }
 
+const CLIENT_SDK_JS = `/**
+ * Mereb Cloud Client SDK v1.0.0
+ * Universal Realtime WebSocket & WebRTC Client for Web, Node, and Game Engines.
+ * (c) 2026 Mereb Cloud Platform
+ */
+(function(global, factory) {
+  typeof exports === 'object' && typeof module !== 'undefined' ? module.exports = factory() :
+  typeof define === 'function' && define.amd ? define(factory) :
+  (global = typeof globalThis !== 'undefined' ? globalThis : global || self, global.Mereb = factory());
+})(this, function() {
+  'use strict';
+
+  class MerebRoom extends EventTarget {
+    constructor(client, roomId) {
+      super();
+      this.client = client;
+      this.roomId = roomId;
+      this.id = null;
+      this.peers = [];
+      this.isHost = false;
+      this.connected = false;
+      this._listeners = new Map();
+      this.ws = null;
+      this._connect();
+    }
+
+    _connect() {
+      const proto = this.client.endpoint.startsWith('https') ? 'wss:' : 'ws:';
+      const host = this.client.endpoint.replace(/^https?:\\/\\//, '');
+      const url = \`\${proto}//\${host}/v1/\${this.client.appId}/\${this.roomId}?key=\${this.client.apiKey || ''}\`;
+      this.ws = new WebSocket(url);
+
+      this.ws.onopen = () => {
+        this.connected = true;
+        this.emit('open', { roomId: this.roomId });
+      };
+
+      this.ws.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          if (data.type === 'connected') {
+            this.id = data.id;
+            this.isHost = data.isHost;
+            this.peers = data.peers || [];
+            this.emit('connected', data);
+            return;
+          }
+          if (data.type === 'peer-joined') {
+            if (!this.peers.includes(data.id)) this.peers.push(data.id);
+            this.emit('peer-joined', data);
+            return;
+          }
+          if (data.type === 'peer-left') {
+            this.peers = this.peers.filter(p => p !== data.id);
+            this.emit('peer-left', data);
+            return;
+          }
+          
+          const eventType = data.event || data.type || 'message';
+          this.emit(eventType, data);
+          this.emit('*', data);
+        } catch {
+          this.emit('message', event.data);
+        }
+      };
+
+      this.ws.onclose = (e) => {
+        this.connected = false;
+        this.emit('close', e);
+      };
+
+      this.ws.onerror = (e) => {
+        this.emit('error', e);
+      };
+    }
+
+    on(event, callback) {
+      if (!this._listeners.has(event)) this._listeners.set(event, []);
+      this._listeners.get(event).push(callback);
+      return this;
+    }
+
+    off(event, callback) {
+      if (!this._listeners.has(event)) return this;
+      this._listeners.set(event, this._listeners.get(event).filter(cb => cb !== callback));
+      return this;
+    }
+
+    emit(event, data) {
+      const cbs = this._listeners.get(event) || [];
+      cbs.forEach(cb => cb(data));
+      this.dispatchEvent(new CustomEvent(event, { detail: data }));
+    }
+
+    send(data) {
+      const payload = typeof data === 'string' ? data : JSON.stringify(data);
+      if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+        this.ws.send(payload);
+      } else if (this.ws) {
+        this.ws.addEventListener('open', () => this.ws.send(payload), { once: true });
+      }
+    }
+
+    sendTo(peerId, data) {
+      this.send({ to: peerId, payload: data });
+    }
+
+    close() {
+      if (this.ws) this.ws.close();
+    }
+  }
+
+  class Mereb {
+    constructor(options = {}) {
+      if (typeof options === 'string') {
+        this.appId = options;
+        this.apiKey = '';
+        this.endpoint = 'https://mereb-signaling.dawitbaslyos.workers.dev';
+      } else {
+        this.appId = options.appId || 'app_starter';
+        this.apiKey = options.apiKey || options.key || '';
+        this.endpoint = (options.endpoint || 'https://mereb-signaling.dawitbaslyos.workers.dev').replace(/\\/+$/, '');
+      }
+      this.rooms = new Map();
+    }
+
+    room(roomId = 'default') {
+      if (!this.rooms.has(roomId)) {
+        this.rooms.set(roomId, new MerebRoom(this, roomId));
+      }
+      return this.rooms.get(roomId);
+    }
+
+    async broadcast(roomId, message) {
+      const res = await fetch(\`\${this.endpoint}/v1/\${this.appId}/\${roomId}/broadcast\`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(message)
+      });
+      return await res.json();
+    }
+
+    async getPresence(roomId) {
+      const res = await fetch(\`\${this.endpoint}/v1/\${this.appId}/\${roomId}/presence\`);
+      return await res.json();
+    }
+  }
+
+  return Mereb;
+});
+`;
+
 /**
  * Main Worker Router
  */
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
+
+    // Serve Standalone Client SDK
+    if (url.pathname === '/sdk.js' || url.pathname === '/v1/sdk.js') {
+      return new Response(CLIENT_SDK_JS, {
+        headers: {
+          'Content-Type': 'application/javascript; charset=utf-8',
+          'Access-Control-Allow-Origin': '*',
+          'Cache-Control': 'public, max-age=3600'
+        }
+      });
+    }
 
     // Global CORS preflight
     if (request.method === 'OPTIONS') {
@@ -729,10 +961,13 @@ export default {
 
     // Route room connections
     const parts = url.pathname.split('/').filter(Boolean);
-    let appId = url.searchParams.get('appId') || request.headers.get('X-Mereb-App-Id') || 'tank-arena';
+    let appId = url.searchParams.get('appId') || request.headers.get('X-Mereb-App-Id') || 'app_starter';
     let roomId = 'default';
 
-    if (parts.length >= 4 && (parts[0] === 'games' || parts[0] === 'apps') && parts[2] === 'room') {
+    if (parts[0] === 'v1' && parts.length >= 3) {
+      appId = parts[1];
+      roomId = parts[2];
+    } else if (parts.length >= 4 && (parts[0] === 'games' || parts[0] === 'apps') && parts[2] === 'room') {
       appId = parts[1];
       roomId = parts[3];
     } else if (parts.length >= 3 && parts[0] === 'parties') {

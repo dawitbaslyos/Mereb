@@ -6,15 +6,16 @@
 const STORAGE_KEY_USER = 'mereb_cloud_user';
 const STORAGE_KEY_PROJECTS = 'mereb_cloud_projects';
 const STORAGE_KEY_GAMES = 'mereb_cloud_games';
+export const CLOUD_EDGE_HOST = 'https://mereb-signaling.dawitbaslyos.workers.dev';
 
 const DEFAULT_GAMES = [
   {
-    id: 'tank-arena',
-    name: 'Mereb Arena (3D Tanks)',
-    apiKey: 'mb_live_tank_arena_f8291',
-    createdAt: '2026-10-18',
+    id: 'app_starter',
+    name: 'Starter App',
+    apiKey: 'pk_live_mereb_starter_key',
+    createdAt: '2026-10-22',
     status: 'active',
-    apiLink: 'https://mereb-signaling.dawitbaslyos.workers.dev/api/apps/tank-arena'
+    apiLink: 'https://mereb-signaling.dawitbaslyos.workers.dev/api/apps/app_starter'
   }
 ];
 
@@ -36,10 +37,18 @@ export class AuthService {
   _loadUser() {
     try {
       const data = localStorage.getItem(STORAGE_KEY_USER);
-      return data ? JSON.parse(data) : null;
-    } catch {
-      return null;
-    }
+      if (data) return JSON.parse(data);
+    } catch {}
+
+    // Auto-provision seamless Developer Workspace (Never blocks the user!)
+    return {
+      id: 'dev_local',
+      username: 'Developer',
+      name: 'Developer Workspace',
+      avatar: 'https://api.dicebear.com/7.x/identicon/svg?seed=mereb',
+      plan: 'free',
+      isGuest: true
+    };
   }
 
   _loadProjects() {
@@ -295,10 +304,17 @@ export class AuthService {
   }
 
   logout() {
-    this.user = null;
     try {
       localStorage.removeItem(STORAGE_KEY_USER);
     } catch {}
+    this.user = {
+      id: 'dev_local',
+      username: 'Developer',
+      name: 'Developer Workspace',
+      avatar: 'https://api.dicebear.com/7.x/identicon/svg?seed=mereb',
+      plan: 'free',
+      isGuest: true
+    };
     this._notify();
   }
 
@@ -308,13 +324,6 @@ export class AuthService {
 
   createProject(name) {
     if (!name || !name.trim()) throw new Error('Project name is required');
-
-    const isFreePlan = !this.user || this.user.plan === 'free';
-    if (isFreePlan && this.projects.length >= 1) {
-      const err = new Error('Free plan allows a maximum of 1 active project.');
-      err.code = 'LIMIT_REACHED';
-      throw err;
-    }
 
     const randomSuffix = Math.random().toString(36).substring(2, 10);
     const newProj = {
