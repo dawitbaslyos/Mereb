@@ -1,7 +1,7 @@
 /**
  * Mereb Cloud - Pure Developer Console
  * Realtime WebSocket & WebRTC Cloud Platform
- * Instant Client SDK, Connection Endpoints, Interactive Playground, and Edge Telemetry.
+ * Client SDK, Connection Endpoints, Active Channels, and Edge Telemetry.
  */
 import { auth, CLOUD_EDGE_HOST } from './auth.js';
 
@@ -11,16 +11,10 @@ export class DashboardUI {
     this.element = document.createElement('div');
     this.element.className = 'dashboard-root';
     this.selectedAppIndex = 0;
-    this.activeTab = 'playground'; // 'playground' | 'sdk' | 'channels' | 'leaderboard'
-    this.activeSdkTab = 'js'; // 'js' | 'native' | 'godot' | 'curl'
+    this.activeTab = 'sdk'; // 'sdk' | 'channels' | 'leaderboard'
+    this.activeSdkTab = 'godot'; // 'godot' | 'native' | 'js' | 'curl'
     this.leaderboard = [];
     this.pollInterval = null;
-
-    // Interactive Playground State
-    this.clientAWs = null;
-    this.clientBWs = null;
-    this.clientAMessages = [];
-    this.clientBMessages = [];
 
     auth.onChange(() => {
       this.render();
@@ -44,14 +38,6 @@ export class DashboardUI {
     if (this.pollInterval) {
       clearInterval(this.pollInterval);
       this.pollInterval = null;
-    }
-    if (this.clientAWs) {
-      this.clientAWs.close();
-      this.clientAWs = null;
-    }
-    if (this.clientBWs) {
-      this.clientBWs.close();
-      this.clientBWs = null;
     }
   }
 
@@ -87,6 +73,9 @@ export class DashboardUI {
 
     const wsUrl = selectedApp
       ? `${wsProtoHost}/v1/${selectedApp.id}/general?key=${selectedApp.apiKey || 'pk_live_...'}`
+      : '';
+    const broadcastUrl = selectedApp
+      ? `${host}/v1/${selectedApp.id}/general/broadcast`
       : '';
 
     this.element.innerHTML = `
@@ -240,10 +229,44 @@ export class DashboardUI {
           background: rgba(15, 23, 42, 0.85);
           border: 1px solid rgba(56, 189, 248, 0.25);
           border-radius: 12px;
-          padding: 20px 24px;
+          padding: 22px 26px;
           display: flex;
           flex-direction: column;
-          gap: 18px;
+          gap: 20px;
+        }
+        .credentials-card {
+          background: rgba(0, 0, 0, 0.38);
+          border: 1px solid rgba(255, 255, 255, 0.08);
+          border-radius: 10px;
+          padding: 16px;
+          display: flex;
+          flex-direction: column;
+          gap: 12px;
+        }
+        .cred-row {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 12px;
+          flex-wrap: wrap;
+        }
+        .cred-label {
+          font-size: 11px;
+          font-weight: 700;
+          color: #94a3b8;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+        }
+        .cred-value {
+          font-family: 'JetBrains Mono', ui-monospace, monospace;
+          font-size: 12px;
+          color: #38bdf8;
+          background: rgba(0, 0, 0, 0.4);
+          padding: 4px 10px;
+          border-radius: 6px;
+          border: 1px solid rgba(255, 255, 255, 0.06);
+          word-break: break-all;
+          flex: 1;
         }
         .tab-nav {
           display: flex;
@@ -256,9 +279,9 @@ export class DashboardUI {
           border: 1px solid transparent;
           color: #94a3b8;
           font-family: inherit;
-          font-size: 12.5px;
+          font-size: 13px;
           font-weight: 600;
-          padding: 7px 14px;
+          padding: 8px 16px;
           border-radius: 6px;
           cursor: pointer;
           display: flex;
@@ -274,22 +297,6 @@ export class DashboardUI {
           color: #38bdf8;
           background: rgba(56, 189, 248, 0.12);
           border-color: rgba(56, 189, 248, 0.3);
-        }
-        .hero-url-banner {
-          background: rgba(0, 0, 0, 0.4);
-          border: 1px solid rgba(56, 189, 248, 0.25);
-          border-radius: 8px;
-          padding: 12px 16px;
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          gap: 12px;
-          font-family: 'JetBrains Mono', ui-monospace, monospace;
-          font-size: 12px;
-        }
-        .hero-url-banner code {
-          color: #38bdf8;
-          word-break: break-all;
         }
         .rooms-table {
           width: 100%;
@@ -315,10 +322,10 @@ export class DashboardUI {
           background: rgba(255, 255, 255, 0.02);
         }
         .empty-banner {
-          padding: 24px;
+          padding: 28px;
           text-align: center;
           color: #64748b;
-          font-size: 12.5px;
+          font-size: 13px;
           background: rgba(0, 0, 0, 0.2);
           border-radius: 8px;
           border: 1px dashed rgba(255, 255, 255, 0.08);
@@ -327,11 +334,11 @@ export class DashboardUI {
           background: #050811;
           border: 1px solid rgba(255, 255, 255, 0.08);
           border-radius: 8px;
-          padding: 10px 14px;
+          padding: 12px 14px;
           font-family: 'JetBrains Mono', ui-monospace, monospace;
           font-size: 11.5px;
           line-height: 1.6;
-          max-height: 160px;
+          max-height: 200px;
           overflow-y: auto;
           color: #94a3b8;
         }
@@ -344,9 +351,9 @@ export class DashboardUI {
           background: #050811;
           border: 1px solid rgba(255, 255, 255, 0.08);
           border-radius: 8px;
-          padding: 14px 16px;
+          padding: 16px 18px;
           font-family: 'JetBrains Mono', ui-monospace, monospace;
-          font-size: 12px;
+          font-size: 12.5px;
           line-height: 1.6;
           overflow-x: auto;
           color: #e2e8f0;
@@ -355,64 +362,23 @@ export class DashboardUI {
         .subtab-row {
           display: flex;
           gap: 6px;
-          margin-bottom: 10px;
+          margin-bottom: 12px;
         }
         .subtab-btn {
           background: rgba(255, 255, 255, 0.04);
           border: 1px solid rgba(255, 255, 255, 0.08);
           color: #94a3b8;
           font-family: inherit;
-          font-size: 11.5px;
-          padding: 5px 12px;
-          border-radius: 5px;
+          font-size: 12px;
+          padding: 6px 14px;
+          border-radius: 6px;
           cursor: pointer;
+          transition: all 0.12s;
         }
         .subtab-btn.active {
           background: #0284c7;
           color: #fff;
           border-color: #38bdf8;
-        }
-        /* Dual-client tester styles */
-        .playground-grid {
-          display: grid;
-          grid-template-columns: 1fr 1fr;
-          gap: 14px;
-        }
-        @media (max-width: 768px) {
-          .playground-grid { grid-template-columns: 1fr; }
-        }
-        .client-box {
-          background: rgba(0, 0, 0, 0.35);
-          border: 1px solid rgba(255, 255, 255, 0.08);
-          border-radius: 8px;
-          padding: 14px;
-          display: flex;
-          flex-direction: column;
-          gap: 10px;
-        }
-        .client-header {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-        }
-        .client-title {
-          font-size: 13px;
-          font-weight: 700;
-          color: #f1f5f9;
-        }
-        .client-terminal {
-          background: #030712;
-          border: 1px solid rgba(255, 255, 255, 0.06);
-          border-radius: 6px;
-          height: 130px;
-          overflow-y: auto;
-          padding: 8px 10px;
-          font-family: 'JetBrains Mono', ui-monospace, monospace;
-          font-size: 11px;
-          color: #94a3b8;
-          display: flex;
-          flex-direction: column;
-          gap: 4px;
         }
       </style>
 
@@ -543,36 +509,55 @@ export class DashboardUI {
           <!-- App Inspector & Live Tools -->
           ${selectedApp ? `
             <div class="inspector-panel">
-              <!-- Top Banner with Instant WebSocket URL -->
+              <!-- App Overview Header -->
               <div>
                 <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 8px;">
                   <div>
-                    <h2 style="font-size: 18px; font-weight: 800; color: #f8fafc; margin: 0;">
+                    <h2 style="font-size: 20px; font-weight: 800; color: #f8fafc; margin: 0;">
                       ${selectedApp.name}
                     </h2>
-                    <p style="font-size: 12px; color: #94a3b8; margin-top: 2px;">
-                      Client connection endpoint for web apps, Godot, Three.js, and browser frontends.
+                    <p style="font-size: 12.5px; color: #94a3b8; margin-top: 2px;">
+                      Real-time client connection endpoint for Web, Godot, React, and Game Engines.
                     </p>
                   </div>
                 </div>
 
-                <!-- Instant Connection URL Banner -->
-                <div class="hero-url-banner" style="margin-top: 10px;">
-                  <div>
-                    <span style="color: #94a3b8; font-size: 10.5px; text-transform: uppercase; font-weight: 700; display: block;">WebSocket Connection URL:</span>
-                    <code>${wsUrl}</code>
+                <!-- Comprehensive Connection Credentials Card -->
+                <div class="credentials-card" style="margin-top: 14px;">
+                  <div class="cred-row">
+                    <span class="cred-label">WebSocket URL:</span>
+                    <span class="cred-value">${wsUrl}</span>
+                    <button class="btn-primary pill-btn btn-copy-hero-ws" data-url="${wsUrl}" style="padding: 5px 12px; font-size: 11px; white-space: nowrap;">
+                      Copy URL
+                    </button>
                   </div>
-                  <button class="btn-primary pill-btn btn-copy-hero-ws" data-url="${wsUrl}" style="padding: 6px 14px; font-size: 11px; white-space: nowrap;">
-                    Copy URL
-                  </button>
+
+                  <div class="cred-row">
+                    <span class="cred-label">REST / Broadcast:</span>
+                    <span class="cred-value">${broadcastUrl}</span>
+                    <button class="btn-subtle pill-btn btn-copy-endpoint" data-url="${broadcastUrl}" style="padding: 5px 12px; font-size: 11px; white-space: nowrap;">
+                      Copy Endpoint
+                    </button>
+                  </div>
+
+                  <div style="display: flex; gap: 12px; flex-wrap: wrap; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 10px;">
+                    <div style="display: flex; align-items: center; gap: 6px; font-size: 11.5px;">
+                      <span style="color: #64748b;">App ID:</span>
+                      <code style="color: #38bdf8; font-weight: 700;">${selectedApp.id}</code>
+                      <button class="btn-subtle pill-btn btn-copy-appid" data-id="${selectedApp.id}" style="padding: 1px 6px; font-size: 9.5px;">Copy</button>
+                    </div>
+
+                    <div style="display: flex; align-items: center; gap: 6px; font-size: 11.5px;">
+                      <span style="color: #64748b;">API Key:</span>
+                      <code style="color: #38bdf8; font-weight: 700;">${selectedApp.apiKey || 'pk_live_...'}</code>
+                      <button class="btn-subtle pill-btn btn-copy-key" data-key="${selectedApp.apiKey || selectedApp.id}" style="padding: 1px 6px; font-size: 9.5px;">Copy</button>
+                    </div>
+                  </div>
                 </div>
               </div>
 
               <!-- Main Navigation Tabs -->
               <div class="tab-nav">
-                <button class="tab-btn ${this.activeTab === 'playground' ? 'active' : ''}" data-tab="playground">
-                  ⚡ Interactive Playground
-                </button>
                 <button class="tab-btn ${this.activeTab === 'sdk' ? 'active' : ''}" data-tab="sdk">
                   📦 Client SDK & Code
                 </button>
@@ -584,123 +569,28 @@ export class DashboardUI {
                 </button>
               </div>
 
-              <!-- TAB 1: Interactive Connection Playground -->
-              ${this.activeTab === 'playground' ? `
-                <div style="display: flex; flex-direction: column; gap: 14px;">
-                  <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <span style="font-size: 12px; font-weight: 700; color: #cbd5e1; text-transform: uppercase;">
-                      Live Dual-Client WebSocket Tester
-                    </span>
-                    <span style="font-size: 11px; color: #64748b;">Connect 2 virtual clients and send messages over Cloudflare Edge</span>
-                  </div>
-
-                  <div class="playground-grid">
-                    <!-- Client A -->
-                    <div class="client-box">
-                      <div class="client-header">
-                        <span class="client-title">Client A (Sender)</span>
-                        <button class="btn-subtle pill-btn" id="btn-toggle-client-a" style="padding: 4px 10px; font-size: 11px;">
-                          ${this.clientAWs ? 'Disconnect' : 'Connect Client A'}
-                        </button>
-                      </div>
-
-                      <div class="client-terminal" id="terminal-client-a">
-                        ${this.clientAMessages.length > 0 ? this.clientAMessages.map(m => `<div>${m}</div>`).join('') : '<div style="color: #475569;">Click "Connect Client A" to start WebSocket.</div>'}
-                      </div>
-
-                      <div style="display: flex; gap: 8px;">
-                        <input type="text" id="input-client-a" placeholder="Type a message..." class="modal-input" style="flex: 1; padding: 6px 10px; font-size: 12px;" ${!this.clientAWs ? 'disabled' : ''} />
-                        <button class="btn-primary pill-btn" id="btn-send-client-a" style="padding: 6px 12px; font-size: 11px;" ${!this.clientAWs ? 'disabled' : ''}>
-                          Send ➜
-                        </button>
-                      </div>
-                    </div>
-
-                    <!-- Client B -->
-                    <div class="client-box">
-                      <div class="client-header">
-                        <span class="client-title">Client B (Receiver)</span>
-                        <button class="btn-subtle pill-btn" id="btn-toggle-client-b" style="padding: 4px 10px; font-size: 11px;">
-                          ${this.clientBWs ? 'Disconnect' : 'Connect Client B'}
-                        </button>
-                      </div>
-
-                      <div class="client-terminal" id="terminal-client-b">
-                        ${this.clientBMessages.length > 0 ? this.clientBMessages.map(m => `<div>${m}</div>`).join('') : '<div style="color: #475569;">Click "Connect Client B" to join the channel.</div>'}
-                      </div>
-
-                      <div style="display: flex; gap: 8px;">
-                        <input type="text" id="input-client-b" placeholder="Reply from Client B..." class="modal-input" style="flex: 1; padding: 6px 10px; font-size: 12px;" ${!this.clientBWs ? 'disabled' : ''} />
-                        <button class="btn-primary pill-btn" id="btn-send-client-b" style="padding: 6px 12px; font-size: 11px;" ${!this.clientBWs ? 'disabled' : ''}>
-                          Reply ➜
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              ` : ''}
-
-              <!-- TAB 2: Client SDK & Integration Code -->
+              <!-- TAB 1: Client SDK & Integration Code -->
               ${this.activeTab === 'sdk' ? `
                 <div style="display: flex; flex-direction: column; gap: 14px;">
                   <div class="subtab-row">
-                    <button class="subtab-btn ${this.activeSdkTab === 'js' ? 'active' : ''}" data-sdk="js">Client SDK (CDN / ESM)</button>
-                    <button class="subtab-btn ${this.activeSdkTab === 'native' ? 'active' : ''}" data-sdk="native">Zero-Dependency Native WebSocket</button>
                     <button class="subtab-btn ${this.activeSdkTab === 'godot' ? 'active' : ''}" data-sdk="godot">Godot 4 (GDScript)</button>
+                    <button class="subtab-btn ${this.activeSdkTab === 'native' ? 'active' : ''}" data-sdk="native">Zero-Dependency Native WebSocket</button>
+                    <button class="subtab-btn ${this.activeSdkTab === 'js' ? 'active' : ''}" data-sdk="js">Client SDK (CDN / ESM)</button>
                     <button class="subtab-btn ${this.activeSdkTab === 'curl' ? 'active' : ''}" data-sdk="curl">REST Server Broadcast (cURL)</button>
                   </div>
 
-                  ${this.activeSdkTab === 'js' ? `
-                    <div class="code-box">&lt;!-- 1. Include Mereb SDK directly in HTML --&gt;
-&lt;script src="https://mereb-cloud.vercel.app/sdk.js"&gt;&lt;/script&gt;
-
-&lt;script&gt;
-  // 2. Initialize Mereb Client
-  const client = new Mereb({
-    appId: '${selectedApp.id}',
-    apiKey: '${selectedApp.apiKey || 'pk_live_...'}'
-  });
-
-  // 3. Join a real-time room/channel
-  const channel = client.room('global');
-
-  // 4. Listen for live incoming messages
-  channel.on('message', (data) =&gt; {
-    console.log('Received message from peer:', data);
-  });
-
-  // 5. Send message to all connected peers
-  channel.send({ text: 'Hello from client-side web!' });
-&lt;/script&gt;</div>
-                  ` : ''}
-
-                  ${this.activeSdkTab === 'native' ? `
-                    <div class="code-box">// Pure Native Browser WebSocket (Zero Dependencies, Zero Libraries!)
-const url = '${wsUrl}';
-const ws = new WebSocket(url);
-
-ws.onopen = () =&gt; {
-  console.log('Connected to Mereb Edge WebSocket!');
-  ws.send(JSON.stringify({ event: 'greeting', text: 'Hello edge!' }));
-};
-
-ws.onmessage = (event) =&gt; {
-  const data = JSON.parse(event.data);
-  console.log('Live message:', data);
-};</div>
-                  ` : ''}
-
                   ${this.activeSdkTab === 'godot' ? `
-                    <div class="code-box"># Godot 4 Client-Side Web Connection
+                    <div class="code-box"># Godot 4 Client-Side Realtime Web Connection
 extends Node
 
 var ws = WebSocketPeer.new()
 const URL = "${wsUrl}"
 
 func _ready():
+    # 1. Connect directly to Mereb Cloud Edge WebSocket
     var err = ws.connect_to_url(URL)
     if err != OK:
-        print("Connection failed: ", err)
+        print("Failed to connect: ", err)
 
 func _process(_delta):
     ws.poll()
@@ -710,24 +600,68 @@ func _process(_delta):
             var packet = ws.get_packet().get_string_from_utf8()
             print("Received from Mereb: ", packet)
 
+# 2. Broadcast data to all peers connected to this channel
 func send_data(dict: Dictionary):
     if ws.get_ready_state() == WebSocketPeer.STATE_OPEN:
         ws.send_text(JSON.stringify(dict))</div>
                   ` : ''}
 
+                  ${this.activeSdkTab === 'native' ? `
+                    <div class="code-box">// Pure Native Browser WebSocket (Zero Dependencies, Zero Libraries!)
+const url = '${wsUrl}';
+const ws = new WebSocket(url);
+
+ws.onopen = () =&gt; {
+  console.log('Connected to Mereb Edge WebSocket!');
+  // Send message to all other connected peers in the channel
+  ws.send(JSON.stringify({ event: 'greeting', text: 'Hello from web client!' }));
+};
+
+ws.onmessage = (event) =&gt; {
+  const data = JSON.parse(event.data);
+  console.log('Received live packet:', data);
+};
+
+ws.onclose = () =&gt; console.log('Disconnected from edge channel');</div>
+                  ` : ''}
+
+                  ${this.activeSdkTab === 'js' ? `
+                    <div class="code-box">&lt;!-- 1. Include Mereb SDK directly via CDN script tag --&gt;
+&lt;script src="https://mereb-cloud.vercel.app/sdk.js"&gt;&lt;/script&gt;
+
+&lt;script&gt;
+  // 2. Initialize Mereb Client with your App ID
+  const client = new Mereb({
+    appId: '${selectedApp.id}',
+    apiKey: '${selectedApp.apiKey || 'pk_live_...'}'
+  });
+
+  // 3. Join a real-time channel
+  const channel = client.room('general');
+
+  // 4. Listen for live incoming messages
+  channel.on('message', (data) =&gt; {
+    console.log('Received message from peer:', data);
+  });
+
+  // 5. Send message to all peers in the channel
+  channel.send({ text: 'Hello from client-side web!' });
+&lt;/script&gt;</div>
+                  ` : ''}
+
                   ${this.activeSdkTab === 'curl' ? `
-                    <div class="code-box"># Publish a message to all connected clients in this channel from your backend:
+                    <div class="code-box"># 1. Publish a message to all connected clients in this channel from your backend:
 curl -X POST ${host}/v1/${selectedApp.id}/general/broadcast \\
   -H "Content-Type: application/json" \\
   -d '{"event": "system-alert", "text": "Server scheduled maintenance in 10 minutes"}'
 
-# Query active presence in this channel:
+# 2. Query active presence in this channel:
 curl ${host}/v1/${selectedApp.id}/general/presence</div>
                   ` : ''}
                 </div>
               ` : ''}
 
-              <!-- TAB 3: Active Channels & Live Telemetry -->
+              <!-- TAB 2: Active Channels & Live Telemetry -->
               ${this.activeTab === 'channels' ? `
                 <div style="display: flex; flex-direction: column; gap: 16px;">
                   <div style="display: flex; justify-content: space-between; align-items: center;">
@@ -765,7 +699,7 @@ curl ${host}/v1/${selectedApp.id}/general/presence</div>
                   ` : `
                     <div class="empty-banner">
                       No active channels currently open for <strong>${selectedApp.name}</strong>.<br/>
-                      Connect via the Playground tab or open a WebSocket to see real-time connections appear here.
+                      When clients connect via WebSocket, their real-time sessions appear here immediately.
                     </div>
                   `}
 
@@ -788,7 +722,7 @@ curl ${host}/v1/${selectedApp.id}/general/presence</div>
                 </div>
               ` : ''}
 
-              <!-- TAB 4: Global Leaderboards -->
+              <!-- TAB 3: Global Leaderboards -->
               ${this.activeTab === 'leaderboard' ? `
                 <div style="display: flex; flex-direction: column; gap: 16px;">
                   <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
@@ -947,6 +881,17 @@ curl ${host}/v1/${selectedApp.id}/general/presence</div>
       }
     });
 
+    // Copy Endpoint
+    this.element.querySelector('.btn-copy-endpoint')?.addEventListener('click', async (e) => {
+      const url = e.target.getAttribute('data-url');
+      if (url) {
+        await navigator.clipboard.writeText(url);
+        const orig = e.target.innerText;
+        e.target.innerText = 'Copied! ✓';
+        setTimeout(() => { e.target.innerText = orig; }, 1400);
+      }
+    });
+
     // Copy App ID
     this.element.querySelectorAll('.btn-copy-appid').forEach(btn => {
       btn.addEventListener('click', async (e) => {
@@ -1027,9 +972,6 @@ curl ${host}/v1/${selectedApp.id}/general/presence</div>
       }
     });
 
-    // Playground Controls
-    this._wirePlayground();
-
     // Leaderboard form
     this.element.querySelector('#btn-submit-test-score')?.addEventListener('click', async () => {
       const apps = auth.getGames();
@@ -1060,136 +1002,6 @@ curl ${host}/v1/${selectedApp.id}/general/presence</div>
         this.render();
       }
     });
-  }
-
-  _wirePlayground() {
-    const apps = auth.getGames();
-    const selected = apps[this.selectedAppIndex] || apps[0];
-    if (!selected) return;
-
-    const wsProtoHost = CLOUD_EDGE_HOST.replace(/^http/, 'ws');
-    const playgroundUrl = `${wsProtoHost}/v1/${selected.id}/playground?key=${selected.apiKey || 'test'}`;
-
-    // Toggle Client A
-    this.element.querySelector('#btn-toggle-client-a')?.addEventListener('click', () => {
-      if (this.clientAWs) {
-        this.clientAWs.close();
-        this.clientAWs = null;
-        this.clientAMessages.push(`<span style="color: #f87171;">Disconnected</span>`);
-        this.render();
-      } else {
-        this.clientAMessages.push(`<span style="color: #38bdf8;">Connecting to ${playgroundUrl}...</span>`);
-        const ws = new WebSocket(playgroundUrl);
-        this.clientAWs = ws;
-
-        ws.onopen = () => {
-          this.clientAMessages.push(`<span style="color: #4ade80;">Connected to edge room!</span>`);
-          this.render();
-        };
-        ws.onmessage = (e) => {
-          try {
-            const data = JSON.parse(e.data);
-            if (data.type === 'connected') {
-              this.clientAMessages.push(`<span style="color: #94a3b8;">Assigned Peer ID: ${data.id}</span>`);
-            } else if (data.text) {
-              this.clientAMessages.push(`<span style="color: #38bdf8;">[Peer]: ${data.text}</span>`);
-            } else {
-              this.clientAMessages.push(`<span>${JSON.stringify(data)}</span>`);
-            }
-          } catch {
-            this.clientAMessages.push(`<span>${e.data}</span>`);
-          }
-          this._updatePlaygroundTerminals();
-        };
-        ws.onclose = () => {
-          this.clientAWs = null;
-          this.render();
-        };
-        this.render();
-      }
-    });
-
-    // Send Client A
-    const sendA = () => {
-      const input = this.element.querySelector('#input-client-a');
-      const text = input.value.trim();
-      if (!text || !this.clientAWs) return;
-      this.clientAWs.send(JSON.stringify({ text }));
-      this.clientAMessages.push(`<span style="color: #f8fafc;">[You]: ${text}</span>`);
-      input.value = '';
-      this._updatePlaygroundTerminals();
-    };
-    this.element.querySelector('#btn-send-client-a')?.addEventListener('click', sendA);
-    this.element.querySelector('#input-client-a')?.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') sendA();
-    });
-
-    // Toggle Client B
-    this.element.querySelector('#btn-toggle-client-b')?.addEventListener('click', () => {
-      if (this.clientBWs) {
-        this.clientBWs.close();
-        this.clientBWs = null;
-        this.clientBMessages.push(`<span style="color: #f87171;">Disconnected</span>`);
-        this.render();
-      } else {
-        this.clientBMessages.push(`<span style="color: #38bdf8;">Connecting to ${playgroundUrl}...</span>`);
-        const ws = new WebSocket(playgroundUrl);
-        this.clientBWs = ws;
-
-        ws.onopen = () => {
-          this.clientBMessages.push(`<span style="color: #4ade80;">Connected to edge room!</span>`);
-          this.render();
-        };
-        ws.onmessage = (e) => {
-          try {
-            const data = JSON.parse(e.data);
-            if (data.type === 'connected') {
-              this.clientBMessages.push(`<span style="color: #94a3b8;">Assigned Peer ID: ${data.id}</span>`);
-            } else if (data.text) {
-              this.clientBMessages.push(`<span style="color: #38bdf8;">[Peer]: ${data.text}</span>`);
-            } else {
-              this.clientBMessages.push(`<span>${JSON.stringify(data)}</span>`);
-            }
-          } catch {
-            this.clientBMessages.push(`<span>${e.data}</span>`);
-          }
-          this._updatePlaygroundTerminals();
-        };
-        ws.onclose = () => {
-          this.clientBWs = null;
-          this.render();
-        };
-        this.render();
-      }
-    });
-
-    // Send Client B
-    const sendB = () => {
-      const input = this.element.querySelector('#input-client-b');
-      const text = input.value.trim();
-      if (!text || !this.clientBWs) return;
-      this.clientBWs.send(JSON.stringify({ text }));
-      this.clientBMessages.push(`<span style="color: #f8fafc;">[You]: ${text}</span>`);
-      input.value = '';
-      this._updatePlaygroundTerminals();
-    };
-    this.element.querySelector('#btn-send-client-b')?.addEventListener('click', sendB);
-    this.element.querySelector('#input-client-b')?.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') sendB();
-    });
-  }
-
-  _updatePlaygroundTerminals() {
-    const termA = this.element.querySelector('#terminal-client-a');
-    if (termA) {
-      termA.innerHTML = this.clientAMessages.map(m => `<div>${m}</div>`).join('');
-      termA.scrollTop = termA.scrollHeight;
-    }
-    const termB = this.element.querySelector('#terminal-client-b');
-    if (termB) {
-      termB.innerHTML = this.clientBMessages.map(m => `<div>${m}</div>`).join('');
-      termB.scrollTop = termB.scrollHeight;
-    }
   }
 
   getElement() {

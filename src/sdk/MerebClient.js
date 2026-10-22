@@ -237,10 +237,10 @@ export class MerebClient extends EventTarget {
 
   // --- Public API Methods ---
 
-  async createRoom() {
+  async createRoom(customCode = null) {
     this.disconnect();
     this.role = ROLE.HOST;
-    this.roomCode = generateRoomCode();
+    this.roomCode = customCode ? customCode.toUpperCase().trim() : generateRoomCode();
     this._setStatus(STATUS.CONNECTING);
 
     await this.signaling.connect(this.roomCode);

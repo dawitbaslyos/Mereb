@@ -817,15 +817,15 @@ var A = class extends EventTarget {
 			reason: e
 		} })));
 	}
-	async createRoom() {
-		this.disconnect(), this.role = T.HOST, this.roomCode = k(), this._setStatus(E.CONNECTING), await this.signaling.connect(this.roomCode), this.localId = this.signaling.playerId, this._setStatus(E.IN_LOBBY);
-		let e = typeof window < "u" ? `${window.location.origin}${window.location.pathname}?room=${this.roomCode}` : `?room=${this.roomCode}`;
+	async createRoom(e = null) {
+		this.disconnect(), this.role = T.HOST, this.roomCode = e ? e.toUpperCase().trim() : k(), this._setStatus(E.CONNECTING), await this.signaling.connect(this.roomCode), this.localId = this.signaling.playerId, this._setStatus(E.IN_LOBBY);
+		let t = typeof window < "u" ? `${window.location.origin}${window.location.pathname}?room=${this.roomCode}` : `?room=${this.roomCode}`;
 		return this.dispatchEvent(new CustomEvent("room-created", { detail: {
 			roomCode: this.roomCode,
-			shareUrl: e
+			shareUrl: t
 		} })), {
 			roomCode: this.roomCode,
-			shareUrl: e
+			shareUrl: t
 		};
 	}
 	async joinRoom(e) {
