@@ -40,9 +40,11 @@ export class GameRoom {
 
   async fetch(request) {
     const url = new URL(request.url);
+    if (url.searchParams.has('appId')) this.appId = url.searchParams.get('appId');
+    if (url.searchParams.has('roomId')) this.roomId = url.searchParams.get('roomId');
 
     // Studio Catalog REST API handler
-    if (url.pathname.startsWith('/api/games') || url.pathname.startsWith('/api/catalog') || url.pathname.startsWith('/api/apps')) {
+    if (url.pathname.startsWith('/api/games') || url.pathname.startsWith('/api/catalog') || url.pathname.startsWith('/api/apps') || url.pathname.startsWith('/api/leaderboard')) {
       return this.handleCatalogAPI(request, url);
     }
 
@@ -56,8 +58,9 @@ export class GameRoom {
       return new Response(JSON.stringify({
         appId: this.appId,
         roomId: this.roomId,
-        connectedPeers: Array.from(this.connections.keys()),
+        ccu: this.connections.size,
         peerCount: this.connections.size,
+        connectedPeers: Array.from(this.connections.keys()),
         hostId: this.hostId,
         createdAt: this.createdAt
       }), {
@@ -97,8 +100,8 @@ export class GameRoom {
 
     const connId = url.searchParams.get('_pk') || Math.random().toString(36).slice(2, 10);
     const isMatchmaker = url.searchParams.get('is_matchmaker') === '1';
-    this.appId = url.searchParams.get('appId') || 'tank-arena';
-    this.roomId = url.searchParams.get('roomId') || 'default';
+    this.appId = url.searchParams.get('appId') || this.appId || 'app_starter';
+    this.roomId = url.searchParams.get('roomId') || this.roomId || 'default';
 
     const webSocketPair = new WebSocketPair();
     const [client, server] = Object.values(webSocketPair);
@@ -229,10 +232,21 @@ export class GameRoom {
     const parts = url.pathname.split('/').filter(Boolean);
 
     // ==========================================
-    // 1. LEADERBOARD API: /api/apps/:appId/leaderboard or /api/games/:appId/leaderboard
+    // 1. LEADERBOARD API: /api/apps/:appId/leaderboard or /api/leaderboard(s)
     // ==========================================
-    if ((parts[1] === 'games' || parts[1] === 'apps') && parts.length >= 4 && parts[3] === 'leaderboard') {
-      const targetAppId = parts[2];
+    const isLbRoute = (
+      ((parts[1] === 'games' || parts[1] === 'apps') && parts.length >= 4 && (parts[3] === 'leaderboard' || parts[3] === 'leaderboards')) ||
+      (parts[1] === 'leaderboard' || parts[1] === 'leaderboards')
+    );
+    if (isLbRoute) {
+      let targetAppId = ((parts[1] === 'games' || parts[1] === 'apps') && parts[2])
+        ? parts[2]
+        : (url.searchParams.get('appId') || 'illegalsoccer');
+      let parsedBody = null;
+      if (request.method === 'POST') {
+        parsedBody = await request.json().catch(() => ({}));
+        if (parsedBody && parsedBody.appId) targetAppId = parsedBody.appId;
+      }
       const storageKey = `lb:${targetAppId}`;
 
       // GET: Retrieve top highscores
@@ -249,7 +263,7 @@ export class GameRoom {
       // POST: Submit a score from Godot, Unity, Web, etc.
       if (request.method === 'POST') {
         try {
-          const body = await request.json().catch(() => ({}));
+          const body = parsedBody || (await request.json().catch(() => ({})));
           const player = (body.player || body.username || 'Anonymous').toString().trim().slice(0, 32);
           const score = typeof body.score === 'number' ? body.score : parseFloat(body.score);
 
@@ -261,6 +275,7 @@ export class GameRoom {
           const entry = {
             id: `sc_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`,
             player,
+            username: player,
             score,
             metadata: body.metadata && typeof body.metadata === 'object' ? body.metadata : {},
             createdAt: new Date().toISOString()
@@ -515,6 +530,30 @@ export class GameRoom {
       totalConnected: this.connections.size
     }));
 
+    // If joining a 2-player match and host is waiting, trigger WebRTC handshake
+    if (this.connections.size === 2 && this.hostId && ws.id !== this.hostId) {
+      // 1. Send room-joined event to joining peer
+      ws.send(JSON.stringify({
+        type: 'room-joined',
+        players: [this.hostId, ws.id],
+        hostId: this.hostId,
+        peerId: this.hostId
+      }));
+
+      // 2. Notify host that player joined and to start signaling offer
+      const hostWs = this.connections.get(this.hostId);
+      if (hostWs) {
+        hostWs.send(JSON.stringify({
+          type: 'player-joined',
+          playerId: ws.id
+        }));
+        hostWs.send(JSON.stringify({
+          type: 'start-signal',
+          peerId: ws.id
+        }));
+      }
+    }
+
     // Notify other peers in room
     for (const [peerId, peerWs] of this.connections.entries()) {
       if (peerId !== ws.id) {
@@ -529,6 +568,18 @@ export class GameRoom {
     }
 
     ws.addEventListener('message', (event) => {
+      // 1. High-Performance Raw Binary Forwarding (Godot, Three.js, ArrayBuffer, Uint8Array)
+      if (typeof event.data !== 'string') {
+        for (const [peerId, peerWs] of this.connections.entries()) {
+          if (peerId !== ws.id) {
+            try {
+              peerWs.send(event.data);
+            } catch {}
+          }
+        }
+        return;
+      }
+
       let data;
       try {
         data = JSON.parse(event.data);
@@ -536,7 +587,24 @@ export class GameRoom {
         data = { type: 'message', text: event.data };
       }
 
-      // Targeted message (WebRTC signal or private message)
+      // 2. Heartbeat Ping / Pong for sub-10ms RTT & connection keepalive
+      if (data.type === 'ping') {
+        try {
+          ws.send(JSON.stringify({ type: 'pong', time: data.time || Date.now() }));
+        } catch {}
+        return;
+      }
+
+      // 3. Peer Discovery
+      if (data.type === 'get-peers') {
+        try {
+          const peerList = Array.from(this.connections.keys()).filter(id => id !== ws.id);
+          ws.send(JSON.stringify({ type: 'peers', peers: peerList, total: this.connections.size }));
+        } catch {}
+        return;
+      }
+
+      // 4. Targeted Message (WebRTC Signaling: Offer, Answer, ICE Candidate)
       if (data.to) {
         const target = this.connections.get(data.to);
         if (target) {
@@ -548,7 +616,7 @@ export class GameRoom {
         return;
       }
 
-      // Broadcast message to all other peers in channel
+      // 5. Room Broadcast to all other peers in channel
       const payload = JSON.stringify({
         ...data,
         from: ws.id,
@@ -637,6 +705,7 @@ const CLIENT_SDK_JS = `/**
       const host = this.client.endpoint.replace(/^https?:\\/\\//, '');
       const url = \`\${proto}//\${host}/v1/\${this.client.appId}/\${this.roomId}?key=\${this.client.apiKey || ''}\`;
       this.ws = new WebSocket(url);
+      this.ws.binaryType = 'arraybuffer';
 
       this.ws.onopen = () => {
         this.connected = true;
@@ -644,6 +713,12 @@ const CLIENT_SDK_JS = `/**
       };
 
       this.ws.onmessage = (event) => {
+        if (typeof event.data !== 'string') {
+          this.emit('binary', event.data);
+          this.emit('*', event.data);
+          return;
+        }
+
         try {
           const data = JSON.parse(event.data);
           if (data.type === 'connected') {
@@ -661,6 +736,10 @@ const CLIENT_SDK_JS = `/**
           if (data.type === 'peer-left') {
             this.peers = this.peers.filter(p => p !== data.id);
             this.emit('peer-left', data);
+            return;
+          }
+          if (data.type === 'pong') {
+            this.emit('pong', data);
             return;
           }
           
@@ -709,8 +788,30 @@ const CLIENT_SDK_JS = `/**
       }
     }
 
+    sendBinary(buffer) {
+      if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+        this.ws.send(buffer);
+      }
+    }
+
     sendTo(peerId, data) {
       this.send({ to: peerId, payload: data });
+    }
+
+    ping() {
+      return new Promise((resolve) => {
+        const start = performance.now();
+        const handler = (data) => {
+          this.off('pong', handler);
+          resolve(Math.round(performance.now() - start));
+        };
+        this.on('pong', handler);
+        this.send({ type: 'ping' });
+        setTimeout(() => {
+          this.off('pong', handler);
+          resolve(-1);
+        }, 3000);
+      });
     }
 
     close() {
@@ -727,7 +828,7 @@ const CLIENT_SDK_JS = `/**
       } else {
         this.appId = options.appId || 'app_starter';
         this.apiKey = options.apiKey || options.key || '';
-        this.endpoint = (options.endpoint || 'https://mereb-signaling.dawitbaslyos.workers.dev').replace(/\\/+$/, '');
+        this.endpoint = (options.endpoint || 'https://mereb-signaling.dawitbaslyos.workers.dev').replace(/\/+$/, '');
       }
       this.rooms = new Map();
     }
@@ -750,6 +851,20 @@ const CLIENT_SDK_JS = `/**
 
     async getPresence(roomId) {
       const res = await fetch(\`\${this.endpoint}/v1/\${this.appId}/\${roomId}/presence\`);
+      return await res.json();
+    }
+
+    async getLeaderboard(appId = this.appId) {
+      const res = await fetch(\`\${this.endpoint}/api/apps/\${appId}/leaderboard\`);
+      return await res.json();
+    }
+
+    async submitScore(player, score, metadata = {}, appId = this.appId) {
+      const res = await fetch(\`\${this.endpoint}/api/apps/\${appId}/leaderboard\`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ player, score, metadata })
+      });
       return await res.json();
     }
   }
@@ -953,7 +1068,7 @@ export default {
     }
 
     // Route Studio Catalog & Leaderboard API to singleton catalog Durable Object
-    if (url.pathname.startsWith('/api/games') || url.pathname.startsWith('/api/catalog') || url.pathname.startsWith('/api/apps')) {
+    if (url.pathname.startsWith('/api/games') || url.pathname.startsWith('/api/catalog') || url.pathname.startsWith('/api/apps') || url.pathname.startsWith('/api/leaderboard')) {
       const catalogDoId = env.GAME_ROOM.idFromName('system:studio_catalog');
       const catalogStub = env.GAME_ROOM.get(catalogDoId);
       return catalogStub.fetch(new Request(url.toString(), request));

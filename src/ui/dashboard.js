@@ -600,10 +600,15 @@ func _process(_delta):
             var packet = ws.get_packet().get_string_from_utf8()
             print("Received from Mereb: ", packet)
 
-# 2. Broadcast data to all peers connected to this channel
+# 2. Broadcast JSON data to all peers in channel
 func send_data(dict: Dictionary):
     if ws.get_ready_state() == WebSocketPeer.STATE_OPEN:
-        ws.send_text(JSON.stringify(dict))</div>
+        ws.send_text(JSON.stringify(dict))
+
+# 3. Broadcast raw binary packets for ultra-low latency netcode
+func send_binary(bytes: PackedByteArray):
+    if ws.get_ready_state() == WebSocketPeer.STATE_OPEN:
+        ws.put_packet(bytes)</div>
                   ` : ''}
 
                   ${this.activeSdkTab === 'native' ? `
@@ -644,8 +649,11 @@ ws.onclose = () =&gt; console.log('Disconnected from edge channel');</div>
     console.log('Received message from peer:', data);
   });
 
-  // 5. Send message to all peers in the channel
+  // 5. Send message or binary to all peers in the channel
   channel.send({ text: 'Hello from client-side web!' });
+
+  // 6. Check edge latency & connection health
+  channel.ping().then(ms => console.log('Ping latency:', ms, 'ms'));
 &lt;/script&gt;</div>
                   ` : ''}
 

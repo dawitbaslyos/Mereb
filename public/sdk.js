@@ -29,6 +29,7 @@
       const host = this.client.endpoint.replace(/^https?:\/\//, '');
       const url = `${proto}//${host}/v1/${this.client.appId}/${this.roomId}?key=${this.client.apiKey || ''}`;
       this.ws = new WebSocket(url);
+      this.ws.binaryType = 'arraybuffer';
 
       this.ws.onopen = () => {
         this.connected = true;
@@ -36,6 +37,12 @@
       };
 
       this.ws.onmessage = (event) => {
+        if (typeof event.data !== 'string') {
+          this.emit('binary', event.data);
+          this.emit('*', event.data);
+          return;
+        }
+
         try {
           const data = JSON.parse(event.data);
           if (data.type === 'connected') {
@@ -53,6 +60,10 @@
           if (data.type === 'peer-left') {
             this.peers = this.peers.filter(p => p !== data.id);
             this.emit('peer-left', data);
+            return;
+          }
+          if (data.type === 'pong') {
+            this.emit('pong', data);
             return;
           }
           
@@ -101,8 +112,30 @@
       }
     }
 
+    sendBinary(buffer) {
+      if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+        this.ws.send(buffer);
+      }
+    }
+
     sendTo(peerId, data) {
       this.send({ to: peerId, payload: data });
+    }
+
+    ping() {
+      return new Promise((resolve) => {
+        const start = performance.now();
+        const handler = (data) => {
+          this.off('pong', handler);
+          resolve(Math.round(performance.now() - start));
+        };
+        this.on('pong', handler);
+        this.send({ type: 'ping' });
+        setTimeout(() => {
+          this.off('pong', handler);
+          resolve(-1);
+        }, 3000);
+      });
     }
 
     close() {
@@ -142,6 +175,20 @@
 
     async getPresence(roomId) {
       const res = await fetch(`${this.endpoint}/v1/${this.appId}/${roomId}/presence`);
+      return await res.json();
+    }
+
+    async getLeaderboard(appId = this.appId) {
+      const res = await fetch(`${this.endpoint}/api/apps/${appId}/leaderboard`);
+      return await res.json();
+    }
+
+    async submitScore(player, score, metadata = {}, appId = this.appId) {
+      const res = await fetch(`${this.endpoint}/api/apps/${appId}/leaderboard`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ player, score, metadata })
+      });
       return await res.json();
     }
   }

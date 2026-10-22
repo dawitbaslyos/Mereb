@@ -726,14 +726,18 @@ var A = class extends EventTarget {
 		this.signaling.addEventListener("message", async (e) => {
 			let t = e.detail;
 			switch (t.type) {
+				case "peer-joined":
 				case D.PLAYER_JOINED:
-					this.peerId = t.playerId;
+					this.peerId = t.id || t.playerId, this.role === T.HOST && await this._initPeerConnection(!0);
+					break;
+				case "connected":
+					this.localId = t.id, t.peers && t.peers.length > 0 && (this.peerId = t.peers[0], this.role !== T.HOST && (this.role = T.CLIENT));
 					break;
 				case D.ROOM_JOINED:
-					this.peerId = t.players.find((e) => e !== this.localId), t.hostId !== this.localId && (this.role = T.CLIENT);
+					this.peerId = t.peerId || (t.players ? t.players.find((e) => e !== this.localId) : null), t.hostId && t.hostId !== this.localId && (this.role = T.CLIENT);
 					break;
 				case D.START_SIGNAL:
-					this.peerId = t.peerId, this.role = T.HOST, await this._initPeerConnection(!0);
+					this.peerId = t.peerId || this.peerId, this.role = T.HOST, await this._initPeerConnection(!0);
 					break;
 				case D.SIGNAL:
 					await this._handleSignal(t);

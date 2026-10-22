@@ -70,19 +70,33 @@ export class MerebClient extends EventTarget {
       const msg = e.detail;
 
       switch (msg.type) {
+        case 'peer-joined':
         case WS.PLAYER_JOINED:
-          this.peerId = msg.playerId;
+          this.peerId = msg.id || msg.playerId;
+          if (this.role === ROLE.HOST) {
+            await this._initPeerConnection(true);
+          }
+          break;
+
+        case 'connected':
+          this.localId = msg.id;
+          if (msg.peers && msg.peers.length > 0) {
+            this.peerId = msg.peers[0];
+            if (this.role !== ROLE.HOST) {
+              this.role = ROLE.CLIENT;
+            }
+          }
           break;
 
         case WS.ROOM_JOINED:
-          this.peerId = msg.players.find(id => id !== this.localId);
-          if (msg.hostId !== this.localId) {
+          this.peerId = msg.peerId || (msg.players ? msg.players.find(id => id !== this.localId) : null);
+          if (msg.hostId && msg.hostId !== this.localId) {
             this.role = ROLE.CLIENT;
           }
           break;
 
         case WS.START_SIGNAL:
-          this.peerId = msg.peerId;
+          this.peerId = msg.peerId || this.peerId;
           this.role = ROLE.HOST;
           await this._initPeerConnection(true);
           break;
