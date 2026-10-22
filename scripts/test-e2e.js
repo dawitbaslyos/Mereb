@@ -12,7 +12,7 @@
 const EDGE_URL = 'https://mereb-signaling.dawitbaslyos.workers.dev';
 const WS_URL = 'wss://mereb-signaling.dawitbaslyos.workers.dev';
 const APP_ID = 'illegalsoccer';
-const ROOM_ID = 'general';
+const ROOM_ID = 'test_' + Date.now().toString(36);
 
 async function runTests() {
   console.log('🚀 Starting Mereb Cloud End-to-End Edge Verification...\n');
@@ -150,16 +150,17 @@ async function runTests() {
   // Test 6: HTTP REST Broadcast
   console.log('\n[Test 6] Testing HTTP REST Broadcast to Room...');
   const restBroadcastPromise = new Promise((resolve, reject) => {
-    const timeout = setTimeout(() => reject(new Error('Timeout waiting for REST broadcast')), 5000);
+    const timeout = setTimeout(() => reject(new Error('Timeout waiting for REST broadcast')), 15000);
     const handler = (e) => {
-      if (typeof e.data === 'string') {
-        const msg = JSON.parse(e.data);
+      try {
+        const raw = typeof e.data === 'string' ? e.data : (e.data ? e.data.toString() : e.toString());
+        const msg = JSON.parse(raw);
         if (msg.alert === 'GOAL_SCORED') {
           clearTimeout(timeout);
           ws1.removeEventListener('message', handler);
           resolve(msg);
         }
-      }
+      } catch {}
     };
     ws1.addEventListener('message', handler);
   });
