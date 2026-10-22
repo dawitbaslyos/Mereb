@@ -11,7 +11,7 @@ export class MerebClient extends EventTarget {
   constructor(options = {}) {
     super();
     this.host = options.host || (typeof window !== 'undefined' && window.location.hostname === 'localhost' ? 'localhost:1999' : '');
-    this.appId = options.appId || 'tank-arena';
+    this.appId = options.appId || 'illegalsoccer';
     this.botTimeoutMs = options.botTimeoutMs ?? 8000;
     this.iceServers = options.iceServers;
     this.autoJoinFromUrl = options.autoJoinFromUrl ?? true;

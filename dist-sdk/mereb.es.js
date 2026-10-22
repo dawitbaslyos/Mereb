@@ -393,7 +393,7 @@ function k() {
 //#endregion
 //#region src/sdk/SignalingClient.js
 var A = class extends EventTarget {
-	constructor(e, t = "tank-arena") {
+	constructor(e, t = "illegalsoccer") {
 		super(), this.host = e, this.appId = t, this.ws = null, this.roomId = null;
 	}
 	connect(e, t = 15e3) {
@@ -708,7 +708,7 @@ var A = class extends EventTarget {
 	}
 }, P = class extends EventTarget {
 	constructor(e = {}) {
-		if (super(), this.host = e.host || (typeof window < "u" && window.location.hostname === "localhost" ? "localhost:1999" : ""), this.appId = e.appId || "tank-arena", this.botTimeoutMs = e.botTimeoutMs ?? 8e3, this.iceServers = e.iceServers, this.autoJoinFromUrl = e.autoJoinFromUrl ?? !0, this.signaling = new A(this.host, this.appId), this.peer = null, this.portal = new N(this), this.status = E.IDLE, this.role = null, this.localId = null, this.peerId = null, this.roomCode = null, this.isBot = !1, this.latency = 0, this._matchTimeout = null, e.onMatchStart && this.on("match-start", e.onMatchStart), e.onState && this.on("state", e.onState), e.onInput && this.on("input", e.onInput), e.onEvent && this.on("event", e.onEvent), e.onPeerDisconnect && this.on("peer-disconnect", e.onPeerDisconnect), e.onStatusChange && this.on("status-change", e.onStatusChange), e.onLatency && this.on("latency", e.onLatency), e.onQuality && this.on("quality", e.onQuality), this._setupSignalingListeners(), this.autoJoinFromUrl && typeof window < "u") {
+		if (super(), this.host = e.host || (typeof window < "u" && window.location.hostname === "localhost" ? "localhost:1999" : ""), this.appId = e.appId || "illegalsoccer", this.botTimeoutMs = e.botTimeoutMs ?? 8e3, this.iceServers = e.iceServers, this.autoJoinFromUrl = e.autoJoinFromUrl ?? !0, this.signaling = new A(this.host, this.appId), this.peer = null, this.portal = new N(this), this.status = E.IDLE, this.role = null, this.localId = null, this.peerId = null, this.roomCode = null, this.isBot = !1, this.latency = 0, this._matchTimeout = null, e.onMatchStart && this.on("match-start", e.onMatchStart), e.onState && this.on("state", e.onState), e.onInput && this.on("input", e.onInput), e.onEvent && this.on("event", e.onEvent), e.onPeerDisconnect && this.on("peer-disconnect", e.onPeerDisconnect), e.onStatusChange && this.on("status-change", e.onStatusChange), e.onLatency && this.on("latency", e.onLatency), e.onQuality && this.on("quality", e.onQuality), this._setupSignalingListeners(), this.autoJoinFromUrl && typeof window < "u") {
 			let e = new URLSearchParams(window.location.search).get("room");
 			e && setTimeout(() => this.joinRoom(e), 50);
 		}
@@ -1564,10 +1564,10 @@ var W = class {
 	}
 }, K = new class {
 	constructor() {
-		this.client = null, this.appId = "tank-arena", this.host = "mereb-signaling.dawitbaslyos.workers.dev", this.entities = /* @__PURE__ */ new Map(), this.interpolator = new H(), this.rpcHandlers = /* @__PURE__ */ new Map(), this.touch = null, this.isInitialized = !1;
+		this.client = null, this.appId = "illegalsoccer", this.host = "mereb-signaling.dawitbaslyos.workers.dev", this.entities = /* @__PURE__ */ new Map(), this.interpolator = new H(), this.rpcHandlers = /* @__PURE__ */ new Map(), this.touch = null, this.isInitialized = !1;
 	}
 	async init(e = {}) {
-		return this.isInitialized && this.client ? this.client : (this.appId = e.appId || "tank-arena", this.host = e.host || "mereb-signaling.dawitbaslyos.workers.dev", this.client = new P({
+		return this.isInitialized && this.client ? this.client : (this.appId = e.appId || "illegalsoccer", this.host = e.host || "mereb-signaling.dawitbaslyos.workers.dev", this.client = new P({
 			appId: this.appId,
 			host: this.host,
 			botTimeoutMs: e.botTimeoutMs ?? 8e3,

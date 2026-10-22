@@ -10,7 +10,7 @@ import { TouchControls } from './controls/TouchControls.js';
 class MerebEngine {
   constructor() {
     this.client = null;
-    this.appId = 'tank-arena';
+    this.appId = 'illegalsoccer';
     this.host = 'mereb-signaling.dawitbaslyos.workers.dev';
     this.entities = new Map();
     this.interpolator = new SnapshotInterpolator();
@@ -25,7 +25,7 @@ class MerebEngine {
   async init(config = {}) {
     if (this.isInitialized && this.client) return this.client;
 
-    this.appId = config.appId || 'tank-arena';
+    this.appId = config.appId || 'illegalsoccer';
     this.host = config.host || 'mereb-signaling.dawitbaslyos.workers.dev';
 
     this.client = new MerebClient({

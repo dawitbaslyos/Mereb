@@ -28,7 +28,7 @@ export class GameRoom {
     this.connections = new Map(); // connId -> WebSocket
     this.hostId = null;
     this.queue = [];
-    this.appId = 'tank-arena';
+    this.appId = 'illegalsoccer';
     this.roomId = 'default';
     this.createdAt = Date.now();
 

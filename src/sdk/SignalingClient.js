@@ -5,7 +5,7 @@ import PartySocket from 'partysocket';
 import { WS } from './constants.js';
 
 export class SignalingClient extends EventTarget {
-  constructor(host, appId = 'tank-arena') {
+  constructor(host, appId = 'illegalsoccer') {
     super();
     this.host = host;
     this.appId = appId;
