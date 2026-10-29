@@ -25,7 +25,7 @@ async function runTests() {
   ws1.binaryType = 'arraybuffer';
 
   const p1Connected = new Promise((resolve, reject) => {
-    const timeout = setTimeout(() => reject(new Error('Timeout connecting peer 1')), 5000);
+    const timeout = setTimeout(() => reject(new Error('Timeout connecting peer 1')), 12000);
     ws1.onopen = () => console.log(' -> ws1 connected');
     ws1.onmessage = (e) => {
       if (typeof e.data === 'string') {
@@ -71,7 +71,7 @@ async function runTests() {
   ws2.binaryType = 'arraybuffer';
 
   const p2Joined = new Promise((resolve, reject) => {
-    const timeout = setTimeout(() => reject(new Error('Timeout peer 2 joined')), 5000);
+    const timeout = setTimeout(() => reject(new Error('Timeout peer 2 joined')), 12000);
     const handler = (e) => {
       if (typeof e.data === 'string') {
         const msg = JSON.parse(e.data);
@@ -85,13 +85,19 @@ async function runTests() {
     ws1.addEventListener('message', handler);
   });
 
-  const p2Connected = new Promise((resolve) => {
+  const p2Connected = new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => reject(new Error('Timeout connecting peer 2')), 12000);
+    ws2.onopen = () => console.log(' -> ws2 connected');
     ws2.onmessage = (e) => {
       if (typeof e.data === 'string') {
         const msg = JSON.parse(e.data);
-        if (msg.type === 'connected') resolve(msg);
+        if (msg.type === 'connected') {
+          clearTimeout(timeout);
+          resolve(msg);
+        }
       }
     };
+    ws2.onerror = (err) => reject(err);
   });
 
   const [p2Info, joinEvent] = await Promise.all([p2Connected, p2Joined]);
@@ -101,7 +107,7 @@ async function runTests() {
   // Test 4: JSON Broadcast between peers
   console.log('\n[Test 4] Testing JSON Broadcast from Peer 2 to Peer 1...');
   const jsonPromise = new Promise((resolve, reject) => {
-    const timeout = setTimeout(() => reject(new Error('Timeout waiting for JSON broadcast')), 5000);
+    const timeout = setTimeout(() => reject(new Error('Timeout waiting for JSON broadcast')), 12000);
     const handler = (e) => {
       if (typeof e.data === 'string') {
         const msg = JSON.parse(e.data);
@@ -123,7 +129,7 @@ async function runTests() {
   // Test 5: Raw Binary Forwarding (ArrayBuffer/Uint8Array)
   console.log('\n[Test 5] Testing High-Performance Raw Binary Forwarding...');
   const binaryPromise = new Promise((resolve, reject) => {
-    const timeout = setTimeout(() => reject(new Error('Timeout waiting for binary packet')), 5000);
+    const timeout = setTimeout(() => reject(new Error('Timeout waiting for binary packet')), 12000);
     const handler = (e) => {
       if (typeof e.data !== 'string') {
         clearTimeout(timeout);

@@ -121,8 +121,54 @@ export class AuthService {
     return this.recentLogs || [];
   }
 
+  getPlan() {
+    return this.user?.plan || 'free';
+  }
+
+  getGameLimit() {
+    const plan = this.getPlan();
+    if (plan === 'pro') return 10;
+    if (plan === 'enterprise') return 999;
+    return 1;
+  }
+
+  canAddGame() {
+    const limit = this.getGameLimit();
+    if (this.games.length >= limit) {
+      if (this.getPlan() === 'free') {
+        return {
+          allowed: false,
+          limit,
+          message: 'Free tier is limited to 1 game. Upgrade to Pro ($20/mo) for up to 10 games.'
+        };
+      }
+      return {
+        allowed: false,
+        limit,
+        message: 'Pro tier limit reached (10 games). Contact us for custom Enterprise scale.'
+      };
+    }
+    return { allowed: true, limit };
+  }
+
+  setPlan(plan) {
+    if (!this.user) {
+      this.user = this._loadUser();
+    }
+    this.user.plan = plan;
+    try {
+      localStorage.setItem(STORAGE_KEY_USER, JSON.stringify(this.user));
+    } catch {}
+    this._notify();
+  }
+
   createApp(name, host = 'https://mereb-signaling.dawitbaslyos.workers.dev') {
     if (!name || !name.trim()) throw new Error('App title is required');
+
+    const check = this.canAddGame();
+    if (!check.allowed) {
+      throw new Error(check.message);
+    }
 
     const id = name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || `app-${Date.now().toString(36)}`;
     const existing = this.games.find(g => g.id === id);
