@@ -55,6 +55,11 @@ class App {
   }
 
   handleRoute() {
+    if (typeof window !== 'undefined' && window.location.hostname === 'docs.mereb.cloud' && !window.location.pathname.startsWith('/docs')) {
+      window.location.replace('/docs' + window.location.pathname + window.location.search + window.location.hash);
+      return;
+    }
+
     const hash = window.location.hash;
     const params = new URLSearchParams(window.location.search);
 

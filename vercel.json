@@ -1,51 +1,44 @@
 {
-  "framework": "vite",
+  "$schema": "https://openapi.vercel.sh/vercel.json",
   "cleanUrls": true,
   "rewrites": [
     {
-      "source": "/",
-      "has": [
-        {
-          "type": "host",
-          "value": "docs.mereb.cloud"
-        }
-      ],
+      "source": "/assets/:path*",
+      "destination": "/assets/:path*"
+    },
+    {
+      "source": "/robots.txt",
+      "destination": "/robots.txt"
+    },
+    {
+      "source": "/sitemap.xml",
+      "destination": "/sitemap.xml"
+    },
+    {
+      "source": "/llms.txt",
+      "destination": "/llms.txt"
+    },
+    {
+      "source": "/llms-full.txt",
+      "destination": "/llms-full.txt"
+    },
+    {
+      "source": "/docs/:path*",
+      "destination": "/docs/:path*"
+    },
+    {
+      "source": "/docs",
       "destination": "/docs/index.html"
     },
     {
-      "source": "/manual/:path*",
+      "source": "/:path*",
       "has": [
         {
           "type": "host",
           "value": "docs.mereb.cloud"
         }
       ],
-      "destination": "/docs/manual/:path*"
-    },
-    {
-      "source": "/api/:path*",
-      "has": [
-        {
-          "type": "host",
-          "value": "docs.mereb.cloud"
-        }
-      ],
-      "destination": "/docs/api/:path*"
-    },
-    {
-      "source": "/((?!assets/|docs/|.*\\..*).*)",
-      "has": [
-        {
-          "type": "host",
-          "value": "docs.mereb.cloud"
-        }
-      ],
-      "destination": "/docs/index.html"
-    },
-    { "source": "/docs", "destination": "/docs/index.html" },
-    { "source": "/docs/", "destination": "/docs/index.html" },
-    { "source": "/docs/:path*", "destination": "/docs/:path*" },
-    { "source": "/llms.txt", "destination": "/llms.txt" },
-    { "source": "/llms-full.txt", "destination": "/llms-full.txt" }
+      "destination": "/docs/:path*"
+    }
   ]
 }
