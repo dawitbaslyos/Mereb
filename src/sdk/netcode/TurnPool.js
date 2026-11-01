@@ -51,4 +51,33 @@ export class TurnPool {
       ...DEFAULT_TURN_SERVERS
     ];
   }
+
+  /**
+   * Fetches authenticated Managed TURN relays from Mereb Cloud edge
+   * @param {string} edgeUrl - Mereb signaling / cloud edge URL
+   * @param {string} [apiKey] - Project API key (e.g. pk_live_...)
+   * @param {string} [appId] - Project App ID
+   */
+  static async fetchManagedTurn(edgeUrl, apiKey, appId) {
+    if (!edgeUrl) return DEFAULT_STUN_SERVERS;
+    try {
+      const url = new URL(`${edgeUrl.replace(/\/+$/, '')}/api/turn-credentials`);
+      if (apiKey) url.searchParams.set('apiKey', apiKey);
+      if (appId) url.searchParams.set('appId', appId);
+
+      const res = await fetch(url.toString());
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data.iceServers) && data.iceServers.length > 0) {
+          return data.iceServers;
+        }
+      }
+    } catch (err) {
+      console.warn('[Mereb:TurnPool] Managed TURN discovery notice:', err.message);
+    }
+    return [
+      ...DEFAULT_STUN_SERVERS,
+      ...DEFAULT_TURN_SERVERS
+    ];
+  }
 }

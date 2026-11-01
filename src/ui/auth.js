@@ -191,16 +191,61 @@ export class AuthService {
     this._saveGames();
     this._notify();
 
-    // Sync to Cloudflare Edge
+    // Sync to Cloudflare Edge with User Ownership
     try {
       fetch(`${host}/api/apps`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id, name: name.trim() })
+        headers: { 
+          'Content-Type': 'application/json',
+          'X-Mereb-User-Id': this.user?.id || 'dev_local'
+        },
+        body: JSON.stringify({ 
+          id, 
+          name: name.trim(),
+          userId: this.user?.id || 'dev_local'
+        })
       }).catch(() => {});
     } catch {}
 
     return newApp;
+  }
+
+  async createPolarCheckout(plan = 'pro', host = CLOUD_EDGE_HOST) {
+    try {
+      const res = await fetch(`${host}/api/billing/polar/checkout`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          plan,
+          userId: this.user?.id || 'dev_local',
+          email: this.user?.email || ''
+        })
+      });
+      if (res.ok) {
+        return await res.json();
+      }
+    } catch (err) {
+      console.warn('Polar checkout initiation warning:', err);
+    }
+    return { 
+      status: 'ok', 
+      mode: 'demo', 
+      message: 'Polar checkout ready. Configure POLAR_CHECKOUT_PRO_URL in cloudflare/.dev.vars to connect live billing.',
+      url: 'https://polar.sh/'
+    };
+  }
+
+  async syncSubscription(host = CLOUD_EDGE_HOST) {
+    if (!this.user?.id) return;
+    try {
+      const res = await fetch(`${host}/api/billing/subscription?userId=${encodeURIComponent(this.user.id)}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.plan && data.plan !== this.user.plan) {
+          this.setPlan(data.plan);
+        }
+      }
+    } catch {}
   }
 
   // Alias for backward compatibility
@@ -261,6 +306,59 @@ export class AuthService {
 
   isAuthenticated() {
     return !!this.user;
+  }
+
+  showGithubLoginModal(onSuccess = null) {
+    const existing = document.querySelector('.auth-modal-backdrop');
+    if (existing) existing.remove();
+
+    const modal = document.createElement('div');
+    modal.className = 'modal-backdrop auth-modal-backdrop';
+    modal.innerHTML = `
+      <div class="modal-dialog">
+        <div class="modal-header">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <div class="dash-brand-icon" style="width: 22px; height: 22px; font-size: 11px;">M</div>
+            <h3 style="font-size: 16px;">Sign in to Mereb</h3>
+          </div>
+          <button class="modal-close" id="auth-modal-close">&times;</button>
+        </div>
+
+        <div class="modal-body">
+          <div style="background: rgba(255, 255, 255, 0.04); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 14px; margin-bottom: 16px;">
+            <div style="font-size: 13px; font-weight: 600; color: #ffffff; margin-bottom: 2px;">Your first game is free forever</div>
+            <div style="font-size: 12px; color: var(--text-dim);">No credit card required. Connect your GitHub profile to manage multiplayer endpoints.</div>
+          </div>
+
+          <label class="modal-label">GITHUB USERNAME</label>
+          <input type="text" id="auth-github-input" class="modal-input" placeholder="e.g. dawitbaslyos" value="${this.user?.username && this.user.username !== 'Developer' ? this.user.username : ''}" autofocus />
+        </div>
+
+        <div class="modal-footer">
+          <button class="origin-btn origin-btn-sm" id="auth-modal-cancel">Cancel</button>
+          <button class="origin-btn origin-btn-primary origin-btn-sm" id="auth-modal-submit">Continue with GitHub</button>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(modal);
+
+    const close = () => modal.remove();
+    modal.querySelector('#auth-modal-close').onclick = close;
+    modal.querySelector('#auth-modal-cancel').onclick = close;
+
+    const submit = async () => {
+      const input = modal.querySelector('#auth-github-input').value.trim();
+      const username = input || 'dawitbaslyos';
+      close();
+      await this.loginWithGithub(username);
+      if (onSuccess) onSuccess();
+    };
+
+    modal.querySelector('#auth-modal-submit').onclick = submit;
+    modal.querySelector('#auth-github-input').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') submit();
+    });
   }
 
   async loginWithGithub(customUsername = null, host = 'https://mereb-signaling.dawitbaslyos.workers.dev') {

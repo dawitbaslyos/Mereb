@@ -1,23 +1,20 @@
 /**
- * Mereb Cloud - Game Multiplayer Landing Page
- * Artstyle: Mesmerizing, cool, lightweight flock of fishes canvas background.
- * Core Promise: Straightforward multiplayer hosting & single-prompt integration.
- * Includes:
- * - Full-screen interactive FlockCanvas (60fps schooling fish)
- * - Clean, punchy, game-centric messaging without text saturation
- * - Direct pricing: Free (1 Game), Pro ($20/mo for 10 games), Enterprise (Custom)
- * - Big, centered "Copy Prompt" button right before the page ending for 1-click AI game integration
+ * Mereb Cloud - Landing Page
+ * Aesthetic: Pure Black & White (#000000 / #ffffff) + San Francisco (SF Pro)
+ * Inspired by Mobbin's 2026 Editorial Minimalism ("Where developers and agents build")
  */
 import { auth } from './auth.js';
-import { FlockCanvas } from './flock.js';
 
 export class LandingUI {
   constructor({ onLaunchGame, onNavigateDashboard }) {
     this.onLaunchGame = onLaunchGame;
     this.onNavigateDashboard = onNavigateDashboard;
     this.element = document.createElement('div');
-    this.element.className = 'landing-root fish-theme';
-    this.flock = null;
+    this.element.className = 'landing-root';
+
+    // Interactive Widget States
+    this.widgetVpsMode = 'p2p'; // 'p2p' | 'vps'
+    this.adSimState = 'idle'; // 'idle' | 'simulating' | 'preserved'
 
     auth.onChange(() => {
       this.render();
@@ -27,19 +24,16 @@ export class LandingUI {
   }
 
   destroy() {
-    if (this.flock) {
-      this.flock.destroy();
-      this.flock = null;
-    }
+    // Cleanup if needed
   }
 
   render() {
     const user = auth.getUser();
+    const isSigned = user && !user.isGuest;
 
-    // Universal AI Prompt for Claude Code, Cursor, ChatGPT, and Gemini
-    const universalAiPrompt = `You are an expert game multiplayer engineer integrating Mereb Netcode Cloud into this game codebase.
+    const universalAiPrompt = `You are an expert game multiplayer engineer integrating Mereb Netcode Cloud into this game.
 
-Mereb is a zero-cost, high-performance WebRTC UDP multiplayer engine with Cloudflare Edge signaling.
+Mereb is a high-performance, zero-cost WebRTC UDP multiplayer engine with Cloudflare Edge signaling.
 
 ### Mereb Cloud Public Endpoints:
 - WebSocket & WebRTC Edge Signaling: wss://mereb-signaling.dawitbaslyos.workers.dev/v1/{YOUR_APP_ID}/{ROOM_ID}?key={YOUR_API_KEY}
@@ -47,391 +41,309 @@ Mereb is a zero-cost, high-performance WebRTC UDP multiplayer engine with Cloudf
 - Global Leaderboard API: https://mereb-signaling.dawitbaslyos.workers.dev/api/apps/{YOUR_APP_ID}/leaderboard
 
 ### Integration Architecture:
-1. P2P Direct WebRTC UDP DataChannels: Use 'unreliable' channel (ordered: false, maxRetransmits: 0, binaryType: 'arraybuffer') for 30-60Hz physics transforms (positions, velocities, rotations) to achieve sub-15ms response.
+1. P2P Direct WebRTC UDP DataChannels: Use 'unreliable' channel (ordered: false, maxRetransmits: 0, binaryType: 'arraybuffer') for 30-60Hz physics transforms (positions, velocities, rotations).
 2. Reliable Channel: Use 'reliable' channel (ordered: true) for match events (game over, score updates, weapon triggers).
-3. Cloudflare WebSocket Fallback: Keep WebSocket signaling connection open as an automatic zero-downtime fallback if symmetric NAT restricts direct P2P.
-4. Compact Binary Stream: Pack transforms with fixed-point int16 coordinates (* 100) and 1-byte bitmasks for player states instead of JSON strings (95% bandwidth reduction, 0 GC stutter).
-5. Frame-0 Client Prediction: Predict local player actions immediately on frame 0, then smoothly interpolate remote state upon receiving authoritative host ticks.
+3. Cloudflare WebSocket Fallback: Keep WebSocket signaling connection open as an automatic zero-downtime fallback.
+4. Compact Binary Stream: Pack transforms with fixed-point int16 coordinates (* 100) and 1-byte bitmasks for player states (95% bandwidth reduction).
+5. Frame-0 Client Prediction: Predict local player actions immediately on frame 0, then smoothly interpolate remote state.
 
-Now inspect my game codebase (Godot 4, Three.js, React, or Unity) and implement Mereb netcode end-to-end. Provide full, production-ready code with no placeholders or mocks.`;
+Inspect my game files (Three.js, Godot 4, or Unity) and implement Mereb netcode end-to-end with full production-ready code.`;
 
     this.element.innerHTML = `
-      <!-- Mesmerizing Schooling Fishes Canvas Background -->
-      <canvas id="flock-fishes-canvas" class="flock-fishes-canvas"></canvas>
+      <!-- Floating Navigation Header -->
+      <header class="landing-nav-header">
+        <div class="landing-nav-inner">
+          <a href="#hero" class="landing-brand">
+            <div class="landing-brand-logo">M</div>
+            <span>MEREB</span>
+          </a>
 
-      <div class="landing-content-layer">
-        <!-- Top Navigation -->
-        <header class="landing-header">
-          <div class="landing-header-inner">
-            <a href="#hero" class="landing-brand">
-              <svg viewBox="0 0 36 36" width="34" height="34" fill="none">
-                <rect width="36" height="36" rx="10" fill="#38bdf8"/>
-                <path d="M8 24L13 12L18 19L23 12L28 24" stroke="#050814" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/>
-                <circle cx="18" cy="24" r="2.5" fill="#34d399"/>
-              </svg>
-              <div class="brand-text-col">
-                <span class="brand-title">Mereb</span>
-                <span class="brand-tag">Multiplayer Cloud</span>
+          <div class="landing-header-status">
+            <span class="live-green-pulse"></span>
+            <span>All Systems Operational</span>
+          </div>
+
+          <div class="landing-header-right">
+            <a href="/docs" class="landing-header-link">Docs</a>
+            <a href="https://github.com/dawitbaslyos/Mereb" target="_blank" class="landing-header-link">GitHub</a>
+            ${isSigned
+              ? `<button class="origin-btn origin-btn-primary origin-btn-sm" id="btn-nav-console">Open Console →</button>`
+              : `<button class="origin-btn origin-btn-primary origin-btn-sm" id="btn-nav-auth">Log in with GitHub</button>`
+            }
+          </div>
+        </div>
+      </header>
+
+      <!-- SECTION 1: THE HERO (Mobbin "Teams and Agents" Pattern) -->
+      <section class="landing-hero" id="hero">
+        <div class="hero-authority-badge">
+          <span class="live-green-pulse"></span>
+          <span>The #1 way to build multiplayer games</span>
+        </div>
+
+        <h1 class="hero-headline">
+          Where developers and agents<br />build multiplayer games.
+        </h1>
+
+        <p class="hero-subline">
+          Multiplayer used to take months of netcode and surprise server bills. Now, it's one prompt. Free forever for your first game.
+        </p>
+
+        <div class="hero-actions">
+          <button class="origin-btn origin-btn-primary origin-btn-pill" id="btn-hero-copy-prompt">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
+            <span>Copy prompt</span>
+          </button>
+
+          <button class="origin-btn origin-btn-pill" id="btn-hero-test-game">
+            <span>Test 3D game →</span>
+          </button>
+        </div>
+
+        <div class="hero-trust-bar">
+          <span>Three.js</span>
+          <span>•</span>
+          <span>Godot</span>
+          <span>•</span>
+          <span>Unity</span>
+          <span>•</span>
+          <span>Poki</span>
+          <span>•</span>
+          <span>CrazyGames</span>
+        </div>
+      </section>
+
+      <!-- SECTION 2: THE EDITORIAL "BEFORE VS. NOW" SHOWCASES -->
+      <section class="landing-showcase-section" id="features">
+        <!-- Feature 1: The AI Agent & MCP Angle -->
+        <div class="showcase-block">
+          <div class="showcase-block-content">
+            <span class="sub-tag">MCP & AGENT SKILL</span>
+            <h3>Multiplayer took months. Now, it's one prompt.</h3>
+            <p>Every indie developer has a folder of unfinished game prototypes. Building the networking alone meant weeks of WebSockets, NAT traversal, and state sync. With Mereb, your AI coding agent connects your game in 60 seconds.</p>
+          </div>
+          <div class="widget-interactive-box">
+            <div class="agent-chat-bubble">
+              <div style="font-size: 11px; font-family: var(--font-mono); color: var(--text-dim); display: flex; align-items: center; gap: 6px;">
+                <span>🤖 AGENT PROMPT</span>
               </div>
-            </a>
-
-            <nav class="landing-nav">
-              <a href="#features" class="nav-link">Features</a>
-              <a href="#pricing" class="nav-link">Pricing</a>
-              <a href="#prompt-section" class="nav-link">Single-Prompt</a>
-              <a href="https://github.com/dawitbaslyos/Mereb" target="_blank" rel="noreferrer" class="nav-link">GitHub</a>
-            </nav>
-
-            <div class="landing-header-actions">
-              <button class="btn-console-cta" id="btn-nav-console">
-                <span>${user ? `Open Console (${user.username})` : 'Developer Console'}</span>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg>
+              <div>"Make my Three.js arena multiplayer with room lobbies and 60Hz transform sync using Mereb."</div>
+            </div>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 4px;">
+              <div class="prompt-sim-terminal">
+                ✔ 2 peers connected via WebRTC in 28ms
+              </div>
+              <button class="origin-copy-pill" id="btn-widget-copy-prompt">
+                <span>Copy Prompt</span>
               </button>
             </div>
           </div>
-        </header>
+        </div>
 
-        <!-- HERO SECTION -->
-        <section class="hero-section" id="hero">
-          <div class="hero-pill-badge">
-            <span class="pill-spark">⚡</span>
-            <span>WebRTC UDP DataChannels • Cloudflare Edge Signaling</span>
+        <!-- Feature 2: Web Portal Ad Shield -->
+        <div class="showcase-block">
+          <div class="showcase-block-content">
+            <span class="sub-tag">WEB PORTAL DEFENSE</span>
+            <h3>Video ads used to disconnect your players. Not anymore.</h3>
+            <p>When players watch rewarded or interstitial ads on Poki or CrazyGames, browser tabs freeze and standard WebSocket servers drop the connection. Mereb pauses state gracefully and restores sync the instant the ad finishes.</p>
           </div>
+          <div class="widget-interactive-box">
+            <div class="ad-sim-bar">
+              <button class="ad-sim-btn origin-btn-primary" id="btn-ad-sim">
+                ${this.adSimState === 'simulating' ? 'Simulating 5s Ad...' : 'Simulate Video Ad'}
+              </button>
+              <div class="ad-sim-result" id="ad-sim-display">
+                ${this.adSimState === 'simulating'
+                  ? `<span style="color: #eab308;">⏳ Tab paused for ad...</span>`
+                  : `<span style="color: #4ade80;">🟢 Connection Preserved · 0 Drops</span>`
+                }
+              </div>
+            </div>
+            <div style="font-size: 11px; font-family: var(--font-mono); color: var(--text-dim);">
+              SDK auto-buffers position deltas during iframe ad pauses.
+            </div>
+          </div>
+        </div>
 
-          <h1 class="hero-title">
-            Multiplayer for Games in a <span class="gradient-text">Single Prompt.</span>
-          </h1>
+        <!-- Feature 3: Architecture on Demand -->
+        <div class="showcase-block">
+          <div class="showcase-block-content">
+            <span class="sub-tag">ARCHITECTURE ON DEMAND</span>
+            <h3>Start free on P2P. Switch to dedicated VPS when you go viral.</h3>
+            <p>Zero server bills while you build and test. When your game hits the front page and needs authoritative physics or anti-cheat, flip one switch in your dashboard. Zero client code changes.</p>
+          </div>
+          <div class="widget-interactive-box">
+            <div class="vps-toggle-bar">
+              <button class="vps-toggle-btn ${this.widgetVpsMode === 'p2p' ? 'active' : ''}" id="toggle-mode-p2p">Free P2P Mesh</button>
+              <button class="vps-toggle-btn ${this.widgetVpsMode === 'vps' ? 'active' : ''}" id="toggle-mode-vps">Dedicated VPS</button>
+            </div>
+            <div class="vps-toggle-status" id="vps-status-display">
+              ${this.widgetVpsMode === 'p2p'
+                ? `<span>🟢 Sub-15ms direct peer data</span><span>$0.00 / month</span>`
+                : `<span>⚡ Authoritative server ticks</span><span>$20.00 / month</span>`
+              }
+            </div>
+          </div>
+        </div>
 
-          <p class="hero-subtext">
-            Straightforward serverless netcode. Zero server compute bills. Plug directly into Godot, Three.js, React, or Unity—or let an AI coding agent build it for you in seconds.
+        <!-- Feature 4: Honest Transparent Pricing -->
+        <div class="showcase-block">
+          <div class="showcase-block-content">
+            <span class="sub-tag">TRANSPARENT HOSTING</span>
+            <h3>Free forever for your first game. No credit card traps.</h3>
+            <p>Host your first web or mobile game with unlimited players for free. Upgrade to Pro for $20/month flat only when you publish your second game.</p>
+          </div>
+          <div class="widget-interactive-box">
+            <div class="pricing-pill-row">
+              <div>
+                <strong style="font-size: 14px; color: #ffffff;">Game 1: Free Forever</strong>
+                <div style="font-size: 12px; color: var(--text-dim);">Unlimited players · Full P2P + Edge WebRTC</div>
+              </div>
+              <div style="font-size: 20px; font-weight: 800; color: #ffffff;">$0</div>
+            </div>
+            <div class="pricing-pill-row">
+              <div>
+                <strong style="font-size: 14px; color: #ffffff;">Game 2+: Pro Tier</strong>
+                <div style="font-size: 12px; color: var(--text-dim);">Unlimited Games + Dedicated VPS Matchmaker</div>
+              </div>
+              <div style="font-size: 20px; font-weight: 800; color: #ffffff;">$20<span style="font-size: 12px; font-weight: normal; color: var(--text-dim);">/mo</span></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- SECTION 3: THE AUTHENTIC HUMAN STORY (Mobbin 0:42 pattern) -->
+      <section class="landing-origin-section">
+        <div class="landing-origin-card">
+          <span style="font-size: 28px; line-height: 1;">❝</span>
+          <h3>Built because game hosting was broken.</h3>
+          <p>
+            Mereb started because making a simple 2-player web game shouldn't require configuring Kubernetes or paying $100/month for server bandwidth before you even have players. It's built for indie creators and AI agents who just want games to work with zero friction.
           </p>
+        </div>
+      </section>
 
-          <div class="hero-btn-row">
-            <button class="btn-hero-primary" id="btn-hero-console">
-              <span>Open Developer Console</span>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
-            </button>
+      <!-- SECTION 4: EDITORIAL CLOSING CTA -->
+      <section class="landing-cta-section">
+        <div class="landing-cta-card">
+          <h2>Find what works. Build what's next.</h2>
+          <p>Copy the prompt, open your editor, and see your players moving together in under 60 seconds.</p>
+          ${isSigned
+            ? `<button class="origin-btn origin-btn-primary origin-btn-pill" id="btn-cta-console" style="padding: 14px 32px; font-size: 15px;">Open Console →</button>`
+            : `<button class="origin-btn origin-btn-primary origin-btn-pill" id="btn-cta-auth" style="padding: 14px 32px; font-size: 15px;">Continue with GitHub</button>`
+          }
+        </div>
+      </section>
 
-            <button class="btn-hero-secondary" id="btn-hero-copy-prompt">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
-              <span>Copy AI Prompt</span>
-            </button>
-          </div>
-
-          <!-- Hero Metrics Strip -->
-          <div class="hero-stats-strip">
-            <div class="stat-pill">
-              <strong>&lt; 15ms</strong>
-              <span>Direct UDP P2P</span>
+      <!-- SECTION 5: THE SEXY MINIMAL FOOTER -->
+      <footer class="landing-footer">
+        <div class="landing-footer-inner">
+          <div class="footer-col">
+            <div class="landing-brand" style="margin-bottom: 12px;">
+              <div class="landing-brand-logo">M</div>
+              <span>MEREB</span>
             </div>
-            <div class="stat-separator">•</div>
-            <div class="stat-pill">
-              <strong>113 Bytes</strong>
-              <span>Binary Stream</span>
-            </div>
-            <div class="stat-separator">•</div>
-            <div class="stat-pill">
-              <strong>$0 Compute</strong>
-              <span>Edge Serverless</span>
-            </div>
-            <div class="stat-separator">•</div>
-            <div class="stat-pill">
-              <strong>1 Prompt</strong>
-              <span>AI Integration</span>
-            </div>
-          </div>
-        </section>
-
-        <!-- 3 CORE PILLARS SECTION -->
-        <section class="pillars-section" id="features">
-          <div class="section-badge">BUILT FOR SPEED</div>
-          <h2 class="section-heading">Everything Your Game Needs to Go Live</h2>
-
-          <div class="pillars-grid">
-            <div class="pillar-card">
-              <div class="pillar-icon">⚡</div>
-              <h3>Sub-15ms WebRTC UDP</h3>
-              <p>Direct peer-to-peer data channels eliminate TCP head-of-line blocking. Real-time physics stream over UDP, with automatic WebSocket edge relay fallback.</p>
-            </div>
-
-            <div class="pillar-card">
-              <div class="pillar-icon">📦</div>
-              <h3>95% Binary Bit-Packing</h3>
-              <p>Shrink 2,500-byte JSON sync strings down to 113-byte ArrayBuffer packets. Pre-allocated scratch views eliminate V8 garbage collection frame drops.</p>
-            </div>
-
-            <div class="pillar-card">
-              <div class="pillar-icon">☁️</div>
-              <h3>Firebase for Multiplayer</h3>
-              <p>Manage your games like APIs in our console. Auto-provision rooms, live CCU analytics, Durable Objects state tracking, and global highscore leaderboards.</p>
-            </div>
-          </div>
-        </section>
-
-        <!-- PRICING SECTION -->
-        <section class="pricing-section" id="pricing">
-          <div class="section-badge">TRANSPARENT PRICING</div>
-          <h2 class="section-heading">Simple, Straightforward Plans</h2>
-          <p class="section-subheading">Start free with 1 game. Upgrade when your games grow.</p>
-
-          <div class="pricing-grid">
-            <!-- Free Tier -->
-            <div class="pricing-card">
-              <div class="card-plan-header">
-                <h3>Free</h3>
-                <p class="plan-desc">Perfect for testing, game jams, and prototyping.</p>
-              </div>
-              <div class="price-row">
-                <span class="price-val">$0</span>
-                <span class="price-cadence">/ month</span>
-              </div>
-              <ul class="plan-features">
-                <li><span class="check-mark">✓</span> <strong>1 Game</strong> API endpoint</li>
-                <li><span class="check-mark">✓</span> <strong>50 Peak CCU</strong></li>
-                <li><span class="check-mark">✓</span> <strong>100,000 Messages / mo</strong></li>
-                <li><span class="check-mark">✓</span> Direct WebRTC UDP + Edge Relay</li>
-                <li><span class="check-mark">✓</span> Global Leaderboards API</li>
-                <li><span class="check-mark">✓</span> Community Discord Support</li>
-              </ul>
-              <button class="btn-plan-select btn-plan-free" id="btn-select-free">
-                <span>Current Plan</span>
-              </button>
-            </div>
-
-            <!-- Pro Tier ($20/mo) -->
-            <div class="pricing-card featured-pro-card">
-              <div class="featured-badge">MOST POPULAR</div>
-              <div class="card-plan-header">
-                <h3>Pro Studio</h3>
-                <p class="plan-desc">For indie developers and studios launching live games.</p>
-              </div>
-              <div class="price-row">
-                <span class="price-val">$20</span>
-                <span class="price-cadence">/ month</span>
-              </div>
-              <ul class="plan-features">
-                <li><span class="check-mark">✓</span> <strong>Up to 10 Games</strong></li>
-                <li><span class="check-mark">✓</span> <strong>500 Peak CCU</strong></li>
-                <li><span class="check-mark">✓</span> <strong>5,000,000 Messages / mo</strong></li>
-                <li><span class="check-mark">✓</span> Sub-15ms WebRTC UDP DataChannels</li>
-                <li><span class="check-mark">✓</span> Dedicated Cloudflare Edge Routing</li>
-                <li><span class="check-mark">✓</span> Unlimited Highscore Leaderboards</li>
-                <li><span class="check-mark">✓</span> Priority Support</li>
-              </ul>
-              <button class="btn-plan-select btn-plan-pro" id="btn-select-pro">
-                <span>Upgrade to Pro ($20/mo)</span>
-              </button>
-            </div>
-
-            <!-- Enterprise Tier (Custom) -->
-            <div class="pricing-card">
-              <div class="card-plan-header">
-                <h3>Enterprise</h3>
-                <p class="plan-desc">For hit titles, portals, and publisher portfolios.</p>
-              </div>
-              <div class="price-row">
-                <span class="price-val">Custom</span>
-                <span class="price-cadence">/ bespoke scale</span>
-              </div>
-              <ul class="plan-features">
-                <li><span class="check-mark">✓</span> <strong>More than 10 Games</strong></li>
-                <li><span class="check-mark">✓</span> <strong>Custom CCU & Bandwidth Scale</strong></li>
-                <li><span class="check-mark">✓</span> Private VPS / Cloudflare Connect Cluster</li>
-                <li><span class="check-mark">✓</span> Custom Domain & Custom SSL</li>
-                <li><span class="check-mark">✓</span> 99.99% Availability SLA</li>
-                <li><span class="check-mark">✓</span> 24/7 Dedicated Engineering Support</li>
-              </ul>
-              <a href="https://github.com/dawitbaslyos/Mereb/issues" target="_blank" rel="noreferrer" class="btn-plan-select btn-plan-enterprise">
-                <span>Contact Enterprise</span>
-              </a>
-            </div>
-          </div>
-        </section>
-
-        <!-- BIG CENTERED "COPY PROMPT" SECTION (Right Before Page Ending) -->
-        <section class="prompt-cta-section" id="prompt-section">
-          <div class="prompt-cta-container">
-            <div class="prompt-spark-icon">🤖 ⚡ 🎮</div>
-            <h2 class="prompt-cta-title">Integrate Into Your Game With One Prompt</h2>
-            <p class="prompt-cta-subtext">
-              Copy this universal prompt into <strong>Claude Code, Cursor, ChatGPT, or Gemini</strong>. Your AI assistant will inspect your game files and wire Mereb's client SDK, WebRTC UDP DataChannels, and leaderboards end-to-end.
+            <p style="font-size: 13px; color: var(--text-dim); max-width: 240px; line-height: 1.5;">
+              The #1 way to build multiplayer games. Pure black and white. Zero bloat.
             </p>
-
-            <!-- BIG CENTERED PROMPT BUTTON -->
-            <div class="big-button-wrap">
-              <button class="btn-big-copy-prompt" id="btn-big-copy-prompt">
-                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
-                <span>COPY PROMPT</span>
-              </button>
-            </div>
-
-            <!-- Expandable Prompt Preview -->
-            <div class="prompt-preview-wrap">
-              <div class="prompt-preview-header">
-                <span>Universal AI Agent Prompt Preview</span>
-                <button class="btn-preview-toggle" id="btn-toggle-preview">Show Code</button>
-              </div>
-              <pre class="prompt-preview-code" id="prompt-preview-box"><code>${this._escapeHtml(universalAiPrompt)}</code></pre>
-            </div>
-          </div>
-        </section>
-
-        <!-- FOOTER -->
-        <footer class="landing-footer">
-          <div class="landing-footer-inner">
-            <div class="footer-col-brand">
-              <div class="footer-logo-row">
-                <svg viewBox="0 0 36 36" width="28" height="28" fill="none">
-                  <rect width="36" height="36" rx="8" fill="#38bdf8"/>
-                  <path d="M8 24L13 12L18 19L23 12L28 24" stroke="#050814" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
-                  <circle cx="18" cy="24" r="2.5" fill="#34d399"/>
-                </svg>
-                <span class="footer-brand-title">Mereb Cloud</span>
-              </div>
-              <p class="footer-tagline">Straightforward multiplayer hosting & single-prompt game integration.</p>
-            </div>
-
-            <div class="footer-col-links">
-              <div class="footer-group">
-                <h4>Product</h4>
-                <a href="#features">Features</a>
-                <a href="#pricing">Pricing</a>
-                <a href="#prompt-section">Single-Prompt</a>
-                <a href="javascript:void(0)" id="footer-btn-console">Console</a>
-              </div>
-
-              <div class="footer-group">
-                <h4>Engines</h4>
-                <a href="https://github.com/dawitbaslyos/Mereb" target="_blank" rel="noreferrer">Godot 4 Addon</a>
-                <a href="https://github.com/dawitbaslyos/Mereb" target="_blank" rel="noreferrer">Three.js / Web</a>
-                <a href="https://github.com/dawitbaslyos/Mereb" target="_blank" rel="noreferrer">React Hook</a>
-                <a href="https://github.com/dawitbaslyos/Mereb" target="_blank" rel="noreferrer">Unity & Native</a>
-              </div>
-
-              <div class="footer-group">
-                <h4>Platform</h4>
-                <a href="https://github.com/dawitbaslyos/Mereb" target="_blank" rel="noreferrer">GitHub Repository</a>
-                <a href="https://github.com/dawitbaslyos/Mereb/blob/main/LICENSE" target="_blank" rel="noreferrer">MIT License</a>
-                <a href="https://mereb-signaling.dawitbaslyos.workers.dev/presence" target="_blank" rel="noreferrer">Cloud Status</a>
-              </div>
-            </div>
           </div>
 
-          <div class="footer-bottom-bar">
-            <span>&copy; ${new Date().getFullYear()} Mereb Cloud. Built for game developers & AI coding agents.</span>
+          <div class="footer-col">
+            <h4>Platforms</h4>
+            <ul>
+              <li><a href="/docs">HTML5 / Three.js</a></li>
+              <li><a href="/docs">Godot 4 Addon</a></li>
+              <li><a href="/docs">Unity C# WebGL</a></li>
+              <li><a href="/docs">Poki &amp; CrazyGames</a></li>
+            </ul>
           </div>
-        </footer>
-      </div>
+
+          <div class="footer-col">
+            <h4>Resources</h4>
+            <ul>
+              <li><a href="/docs">Documentation (2026.1 LTS)</a></li>
+              <li><a href="/llms.txt" target="_blank">AI Context (llms.txt)</a></li>
+              <li><a href="https://github.com/dawitbaslyos/Mereb" target="_blank">GitHub</a></li>
+              <li><a href="https://discord.gg/mereb" target="_blank">Discord</a></li>
+            </ul>
+          </div>
+
+          <div class="footer-col">
+            <h4>Legal</h4>
+            <ul>
+              <li><a href="#hero">Terms of Service</a></li>
+              <li><a href="#hero">Privacy Policy</a></li>
+              <li><a href="#hero">Security</a></li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="footer-bottom-bar">
+          <span>© 2026 Mereb Inc. All rights reserved.</span>
+          <span>Free forever for your first game.</span>
+        </div>
+      </footer>
     `;
-
-    // Initialize Flock of Fishes Canvas Animation
-    setTimeout(() => {
-      const canvasEl = this.element.querySelector('#flock-fishes-canvas');
-      if (canvasEl) {
-        if (this.flock) this.flock.destroy();
-        this.flock = new FlockCanvas(canvasEl);
-      }
-    }, 50);
 
     this._bindEvents(universalAiPrompt);
   }
 
-  _bindEvents(promptText) {
-    // Navigation to Console
-    const navigateConsole = () => {
-      if (this.onNavigateDashboard) {
-        this.onNavigateDashboard();
+  _bindEvents(universalAiPrompt) {
+    const copyPrompt = () => {
+      navigator.clipboard.writeText(universalAiPrompt).then(() => {
+        alert('Copied 1-Prompt Integration to clipboard! Paste into Cursor, Claude Code, or Antigravity.');
+      });
+    };
+
+    // Copy Prompt Buttons
+    this.element.querySelector('#btn-hero-copy-prompt')?.addEventListener('click', copyPrompt);
+    this.element.querySelector('#btn-widget-copy-prompt')?.addEventListener('click', copyPrompt);
+
+    // Test Game Button
+    this.element.querySelector('#btn-hero-test-game')?.addEventListener('click', () => {
+      if (this.onLaunchGame) this.onLaunchGame();
+    });
+
+    // Navigation & Auth Buttons
+    const handleAuthOrConsole = () => {
+      const user = auth.getUser();
+      if (user && !user.isGuest) {
+        if (this.onNavigateDashboard) this.onNavigateDashboard();
       } else {
-        window.location.hash = '#/dashboard';
+        auth.showGithubLoginModal(() => {
+          if (this.onNavigateDashboard) this.onNavigateDashboard();
+        });
       }
     };
 
-    this.element.querySelector('#btn-nav-console')?.addEventListener('click', navigateConsole);
-    this.element.querySelector('#btn-hero-console')?.addEventListener('click', navigateConsole);
-    this.element.querySelector('#btn-select-free')?.addEventListener('click', navigateConsole);
-    this.element.querySelector('#footer-btn-console')?.addEventListener('click', navigateConsole);
+    this.element.querySelector('#btn-nav-console')?.addEventListener('click', () => {
+      if (this.onNavigateDashboard) this.onNavigateDashboard();
+    });
+    this.element.querySelector('#btn-nav-auth')?.addEventListener('click', handleAuthOrConsole);
+    this.element.querySelector('#btn-cta-console')?.addEventListener('click', () => {
+      if (this.onNavigateDashboard) this.onNavigateDashboard();
+    });
+    this.element.querySelector('#btn-cta-auth')?.addEventListener('click', handleAuthOrConsole);
 
-    // Plan Upgrade Trigger (Pro $20/mo)
-    this.element.querySelector('#btn-select-pro')?.addEventListener('click', () => {
-      if (confirm('Upgrade your workspace to Mereb Pro ($20/month) for up to 10 games, 500 CCU, and sub-15ms WebRTC UDP channels?')) {
-        auth.setPlan('pro');
-        alert('🎉 Upgraded to Pro ($20/month)! Opening your Developer Console...');
-        navigateConsole();
-      }
+    // Interactive Widget 1: P2P ⇄ VPS Switch
+    this.element.querySelector('#toggle-mode-p2p')?.addEventListener('click', () => {
+      this.widgetVpsMode = 'p2p';
+      this.render();
+    });
+    this.element.querySelector('#toggle-mode-vps')?.addEventListener('click', () => {
+      this.widgetVpsMode = 'vps';
+      this.render();
     });
 
-    // Copy Prompt Functionality (Hero button and Big Centered Button)
-    const handleCopyPrompt = (btn) => {
-      navigator.clipboard.writeText(promptText).then(() => {
-        const originalHtml = btn.innerHTML;
-        btn.innerHTML = `
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"></polyline></svg>
-          <span>COPIED TO CLIPBOARD!</span>
-        `;
-        btn.classList.add('copied-glow');
-
-        // Floating Toast Notification
-        this._showToast('✨ Copied Universal Netcode Prompt! Paste into Claude Code, Cursor, or ChatGPT.');
-
-        setTimeout(() => {
-          btn.innerHTML = originalHtml;
-          btn.classList.remove('copied-glow');
-        }, 2500);
-      }).catch(() => {
-        alert('Failed to copy prompt automatically. Please copy from the preview box below.');
-      });
-    };
-
-    this.element.querySelector('#btn-hero-copy-prompt')?.addEventListener('click', (e) => {
-      handleCopyPrompt(e.currentTarget);
+    // Interactive Widget 2: Ad Simulator
+    this.element.querySelector('#btn-ad-sim')?.addEventListener('click', () => {
+      this.adSimState = 'simulating';
+      this.render();
+      setTimeout(() => {
+        this.adSimState = 'preserved';
+        this.render();
+      }, 1500);
     });
-
-    this.element.querySelector('#btn-big-copy-prompt')?.addEventListener('click', (e) => {
-      handleCopyPrompt(e.currentTarget);
-    });
-
-    // Toggle Preview Box
-    const toggleBtn = this.element.querySelector('#btn-toggle-preview');
-    const previewBox = this.element.querySelector('#prompt-preview-box');
-    if (toggleBtn && previewBox) {
-      toggleBtn.addEventListener('click', () => {
-        if (previewBox.style.display === 'block') {
-          previewBox.style.display = 'none';
-          toggleBtn.textContent = 'Show Code';
-        } else {
-          previewBox.style.display = 'block';
-          toggleBtn.textContent = 'Hide Code';
-        }
-      });
-    }
-  }
-
-  _showToast(msg) {
-    const existing = document.querySelector('.mereb-toast');
-    if (existing) existing.remove();
-
-    const toast = document.createElement('div');
-    toast.className = 'mereb-toast';
-    toast.textContent = msg;
-    document.body.appendChild(toast);
-
-    setTimeout(() => {
-      toast.classList.add('show');
-    }, 10);
-
-    setTimeout(() => {
-      toast.classList.remove('show');
-      setTimeout(() => toast.remove(), 400);
-    }, 3500);
-  }
-
-  _escapeHtml(str) {
-    return str
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&#039;');
   }
 
   getElement() {

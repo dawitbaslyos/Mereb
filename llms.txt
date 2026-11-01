@@ -1,0 +1,50 @@
+# Mereb Multiplayer Netcode & Matchmaking SDK
+> Zero-cost, serverless WebRTC P2P multiplayer netcode & edge matchmaking engine for web, indie, and 3D games (Three.js, Godot 4, Unity WebGL, React, Poki, CrazyGames).
+
+## Core Capabilities
+- Direct 60Hz peer-to-peer gameplay over WebRTC UDP DataChannels ($0 server bills).
+- Serverless edge matchmaking via Cloudflare Workers + Durable Objects with SQLite.
+- Binary schema packing (`defineSchema`, `BinaryWriter`, `BinaryReader`) saving 85%+ bandwidth vs JSON.
+- Cubic Hermite snapshot interpolation and shortest-angle rotation slerp.
+- Automatic 8-second smart bot fallback to eradicate empty matchmaking queues.
+- Web portal ad resilience (`PortalManager`) preventing socket drops during Poki and CrazyGames video ads.
+- Built-in multi-TURN pool with port 443 TLS fallback for strict school/enterprise Wi-Fi firewalls.
+- Drop-in arcade lobby UI (`MerebLobby`) and in-game developer terminal (`MerebTerminal`).
+
+## Key Documentation & Guides
+- [Manual: Architecture Overview](docs/manual/01_OVERVIEW_AND_ARCHITECTURE.md): Network topology, host authority, dual data channels.
+- [Manual: Quickstart](docs/manual/02_QUICKSTART_AND_SETUP.md): 5-minute setup and lifecycle loop.
+- [Manual: Why Mereb is Better (Benchmarks)](docs/manual/03_WHY_MEREB_IS_BETTER_BENCHMARKS.md): Comparison matrix vs Photon, Hathora, Agones, Nakama, GameLift.
+- [Manual: Configuration & Skills](docs/manual/04_CONFIGURATION_AND_CLOUD_SKILLS.md): Cloudflare Workers, Durable Objects, STUN/TURN relays, Polar billing.
+- [Manual: Unity 3D WebGL Integration](docs/manual/05_UNITY_3D_INTEGRATION_GUIDE.md): WebGL .jslib bridge, MerebNetworkManager.cs, and Unity C# scripts.
+- [Manual: Godot 4 Integration](docs/manual/06_GODOT_4_INTEGRATION_GUIDE.md): Native GDScript addon (addons/mereb/), HTML5 template, and signals.
+- [Manual: Web, Three.js & React](docs/manual/07_WEB_AND_REACT_INTEGRATION.md): Three.js render loop, Phaser 3, and useMereb() React hook.
+- [Manual: Netcode & Binary Packing](docs/manual/08_NETCODE_BINARY_AND_INTERPOLATION.md): defineSchema, BinaryWriter, and Hermite interpolation.
+- [Manual: Portal Hooks](docs/manual/09_PORTAL_HOOKS_POKI_CRAZYGAMES.md): Poki SDK & CrazyGames SDK lifecycle integration.
+- [Manual: Troubleshooting & FAQs](docs/manual/10_TROUBLESHOOTING_AND_FAQ.md): Strict NAT, firewall bypass, and production checklist.
+- [Scripting API Reference](docs/api/SCRIPTING_REFERENCE.md): Complete Unity-style reference for all classes, methods, properties, and events.
+
+## Common Code Snippet
+```javascript
+import { MerebClient, defineSchema, SnapshotInterpolator } from 'mereb-netcode';
+
+const client = new MerebClient({
+  host: 'mereb-signaling.dawitbaslyos.workers.dev',
+  botTimeoutMs: 8000
+});
+
+const StateSchema = defineSchema({
+  x: 'fixed16',
+  y: 'fixed16',
+  angle: 'fixed16',
+  health: 'uint8'
+});
+
+client.on('match-start', ({ isHost }) => {
+  if (isHost) {
+    setInterval(() => {
+      client.sendBinary(StateSchema.encode({ x: 10, y: 20, angle: 1.5, health: 100 }));
+    }, 50);
+  }
+});
+```

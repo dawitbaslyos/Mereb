@@ -12,10 +12,13 @@ yarn-debug.log*
 yarn-error.log*
 *.log
 
-# Environment variables
+# Environment variables & secrets
 .env
 .env.local
 .env.*.local
+.dev.vars
+.dev.vars.*
+*.pem
 
 # PartyKit / Cloudflare temp
 .partykit/

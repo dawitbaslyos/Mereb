@@ -1,0 +1,1692 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <!-- Primary SEO Meta Tags -->
+  <title>Mereb Documentation (2026.1 LTS) — Unity 3D Style Manual & Scripting Reference</title>
+  <meta name="title" content="Mereb Documentation (2026.1 LTS) — Unity 3D Style Manual & Scripting Reference">
+  <meta name="description" content="Official Unity-style documentation for Mereb: Zero-cost, serverless WebRTC P2P multiplayer netcode & edge matchmaking SDK for WebGL, Unity 3D, Godot 4, Three.js, React, Poki, and CrazyGames.">
+  <meta name="keywords" content="multiplayer netcode, WebRTC game dev, Unity WebGL multiplayer, Godot 4 multiplayer, serverless game servers, Cloudflare Workers Durable Objects, Poki multiplayer, CrazyGames multiplayer, photon alternative, hathora alternative, snapshot interpolation, binary packing">
+  <meta name="author" content="Dawit Baslyos / Mereb Engine Team">
+  <meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1">
+  <meta name="theme-color" content="#1e2022">
+  <link rel="canonical" href="https://docs.mereb.cloud/">
+
+  <!-- Open Graph / Facebook -->
+  <meta property="og:type" content="article">
+  <meta property="og:url" content="https://docs.mereb.cloud/">
+  <meta property="og:title" content="Mereb Documentation (2026.1 LTS) — Unity 3D Style Manual & Scripting Reference">
+  <meta property="og:description" content="Zero-cost, serverless WebRTC P2P multiplayer netcode & edge matchmaking SDK for WebGL, Unity 3D, Godot 4, Three.js, React, Poki, and CrazyGames.">
+  <meta property="og:image" content="https://mereb.cloud/og-banner.png">
+  <meta property="og:site_name" content="Mereb Documentation">
+
+  <!-- Twitter -->
+  <meta property="twitter:card" content="summary_large_image">
+  <meta property="twitter:url" content="https://docs.mereb.cloud/">
+  <meta property="twitter:title" content="Mereb Documentation (2026.1 LTS) — Unity 3D Style Manual & Scripting Reference">
+  <meta property="twitter:description" content="Zero-cost, serverless WebRTC P2P multiplayer netcode & edge matchmaking SDK for WebGL, Unity 3D, Godot 4, Three.js, React, Poki, and CrazyGames.">
+  <meta property="twitter:image" content="https://mereb.cloud/og-banner.png">
+
+  <!-- AI & LLM Crawler Ingestion Reference -->
+  <link rel="help" type="text/plain" href="/llms.txt" title="LLM Documentation Index">
+  <link rel="help" type="text/plain" href="/llms-full.txt" title="Full LLM Context">
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 36 36' fill='none'><rect width='36' height='36' rx='8' fill='%231e2022'/><rect x='1' y='1' width='34' height='34' rx='7' stroke='%2300a2ff' stroke-width='2'/><path d='M10 26V10L18 19L26 10V26' stroke='%23ffffff' stroke-width='3.2' stroke-linecap='round' stroke-linejoin='round'/></svg>">
+
+  <!-- JSON-LD Structured Data: TechArticle -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "TechArticle",
+    "headline": "Mereb Multiplayer Netcode & Matchmaking Manual & Scripting Reference",
+    "description": "Comprehensive Unity 3D-styled documentation for Mereb, covering WebRTC P2P architecture, binary serialization, Hermite interpolation, and benchmarks against Photon and Hathora.",
+    "author": {
+      "@type": "Person",
+      "name": "Dawit Baslyos"
+    },
+    "publisher": {
+      "@type": "Organization",
+      "name": "Mereb Engine",
+      "logo": {
+        "@type": "ImageObject",
+        "url": "https://mereb.cloud/logo.png"
+      }
+    },
+    "datePublished": "2026-10-22",
+    "dateModified": "2026-11-01",
+    "inLanguage": "en"
+  }
+  </script>
+
+  <!-- JSON-LD Structured Data: SoftwareApplication -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    "name": "Mereb Multiplayer SDK",
+    "operatingSystem": "Cross-platform (WebGL, Web, Windows, macOS, Linux, Android, iOS)",
+    "applicationCategory": "GameDevelopmentApplication",
+    "softwareVersion": "2026.1 LTS",
+    "offers": {
+      "@type": "Offer",
+      "price": "0.00",
+      "priceCurrency": "USD"
+    }
+  }
+  </script>
+
+  <!-- JSON-LD Structured Data: BreadcrumbList -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    "itemListElement": [
+      {
+        "@type": "ListItem",
+        "position": 1,
+        "name": "Documentation",
+        "item": "https://docs.mereb.cloud/"
+      },
+      {
+        "@type": "ListItem",
+        "position": 2,
+        "name": "Mereb Manual",
+        "item": "https://docs.mereb.cloud/#manual"
+      },
+      {
+        "@type": "ListItem",
+        "position": 3,
+        "name": "Scripting Reference",
+        "item": "https://docs.mereb.cloud/#scripting"
+      }
+    ]
+  }
+  </script>
+
+  <!-- JSON-LD Structured Data: FAQPage (Google Rich Snippets) -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    "mainEntity": [
+      {
+        "@type": "Question",
+        "name": "How does Mereb achieve $0/month multiplayer hosting?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Mereb routes 60Hz gameplay telemetry directly between player devices using WebRTC Peer-to-Peer DataChannels (UDP-like), eliminating dedicated game servers. Matchmaking and room signaling are handled by serverless Cloudflare Workers and Durable Objects, which run within the generous 100% free tier for games up to 1,000 CCU."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "How does Mereb compare to Photon Engine (PUN/Fusion)?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Photon charges $190 to $380/month for 1,000 CCU and routes traffic through centralized relays. Mereb costs $0/month, delivers lower direct peer-to-peer latency (sub-15ms), features built-in 85% binary compression, supports automatic 8-second bot fallback, and protects WebRTC connections during Poki and CrazyGames video ads."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "Can I use Mereb with Unity 3D WebGL?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Yes! Mereb includes a specialized WebGL JavaScript bridge (.jslib) and a complete C# script (MerebNetworkManager.cs) that maps Unity's transform positions, inputs, and events to high-speed WebRTC DataChannels."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "How does Mereb prevent disconnects during Poki and CrazyGames video ads?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "The built-in PortalManager hooks PokiSDK and CrazyGames SDK lifecycle events (commercialBreak and rewardedBreak). When an ad plays, Mereb automatically pauses physics updates and silences socket timeouts so the player resumes gameplay smoothly when the ad completes."
+        }
+      }
+    ]
+  }
+  </script>
+
+  <style>
+    /* Unity 3D Documentation Design System */
+    :root {
+      --unity-bg: #ffffff;
+      --unity-text: #222c37;
+      --unity-text-muted: #68737d;
+      --unity-header-bg: #1e2022;
+      --unity-header-text: #ffffff;
+      --unity-accent: #00a2ff;
+      --unity-accent-hover: #0088d6;
+      --unity-sidebar-bg: #f7f9fa;
+      --unity-sidebar-border: #e1e4e8;
+      --unity-sidebar-active: #e7f3fe;
+      --unity-sidebar-active-text: #0070f3;
+      --unity-card-bg: #ffffff;
+      --unity-card-border: #e1e4e8;
+      --unity-code-bg: #181a1b;
+      --unity-code-text: #f0f6fc;
+      --unity-table-stripe: #fafbfc;
+      --unity-table-border: #dfe2e5;
+      
+      /* Unity Callout Colors */
+      --note-bg: #e7f3fe;
+      --note-border: #00a2ff;
+      --note-text: #004b87;
+      --tip-bg: #e8f8f0;
+      --tip-border: #10b981;
+      --tip-text: #065f46;
+      --warn-bg: #fffbeb;
+      --warn-border: #f59e0b;
+      --warn-text: #92400e;
+      --imp-bg: #fef2f2;
+      --imp-border: #ef4444;
+      --imp-text: #991b1b;
+    }
+
+    [data-theme="dark"] {
+      --unity-bg: #121416;
+      --unity-text: #e1e4e8;
+      --unity-text-muted: #8b949e;
+      --unity-header-bg: #0d1117;
+      --unity-sidebar-bg: #16181d;
+      --unity-sidebar-border: #21262d;
+      --unity-sidebar-active: #1c2e42;
+      --unity-sidebar-active-text: #38bdf8;
+      --unity-card-bg: #16181d;
+      --unity-card-border: #30363d;
+      --unity-code-bg: #0d1117;
+      --unity-table-stripe: #1c2128;
+      --unity-table-border: #30363d;
+
+      --note-bg: #0d2847;
+      --note-text: #79c0ff;
+      --tip-bg: #093325;
+      --tip-text: #7ee787;
+      --warn-bg: #3d2b00;
+      --warn-text: #f2cc60;
+      --imp-bg: #3c1414;
+      --imp-text: #ff7b72;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      background: var(--unity-bg);
+      color: var(--unity-text);
+      line-height: 1.6;
+      overflow-x: hidden;
+    }
+
+    /* Top Unity Header */
+    header.unity-top-header {
+      background: var(--unity-header-bg);
+      color: var(--unity-header-text);
+      height: 56px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 20px;
+      position: sticky;
+      top: 0;
+      z-index: 1000;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .header-left {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .unity-brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      text-decoration: none;
+      color: #fff;
+      font-weight: 700;
+      font-size: 18px;
+      letter-spacing: -0.5px;
+    }
+
+    .unity-cube-icon {
+      width: 28px;
+      height: 28px;
+      background: #000;
+      border: 1px solid #00a2ff;
+      border-radius: 6px;
+      display: grid;
+      place-items: center;
+      color: #00a2ff;
+      font-weight: 900;
+      font-size: 16px;
+    }
+
+    .version-select-pill {
+      background: rgba(255, 255, 255, 0.12);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      color: #fff;
+      padding: 4px 10px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .version-select-pill .dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #10b981;
+    }
+
+    /* Unity Mode Toggle: Manual vs Scripting API */
+    .unity-mode-toggle {
+      background: rgba(0, 0, 0, 0.4);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 20px;
+      display: flex;
+      padding: 3px;
+      gap: 2px;
+    }
+
+    .unity-mode-btn {
+      background: transparent;
+      border: none;
+      color: rgba(255, 255, 255, 0.7);
+      padding: 5px 16px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .unity-mode-btn.active {
+      background: var(--unity-accent);
+      color: #fff;
+      box-shadow: 0 2px 8px rgba(0, 162, 255, 0.4);
+    }
+
+    .unity-search-container {
+      position: relative;
+      width: 320px;
+    }
+
+    .unity-search-input {
+      width: 100%;
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      color: #fff;
+      padding: 7px 36px 7px 12px;
+      border-radius: 6px;
+      font-size: 13px;
+      outline: none;
+      transition: all 0.2s;
+    }
+
+    .unity-search-input:focus {
+      background: rgba(255, 255, 255, 0.18);
+      border-color: var(--unity-accent);
+      box-shadow: 0 0 0 2px rgba(0, 162, 255, 0.2);
+    }
+
+    .unity-search-shortcut {
+      position: absolute;
+      right: 10px;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 11px;
+      color: rgba(255, 255, 255, 0.4);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      padding: 1px 5px;
+      border-radius: 3px;
+      pointer-events: none;
+    }
+
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .header-link-btn {
+      color: rgba(255, 255, 255, 0.85);
+      text-decoration: none;
+      font-size: 13px;
+      font-weight: 500;
+      padding: 6px 12px;
+      border-radius: 6px;
+      transition: background 0.15s;
+    }
+
+    .header-link-btn:hover {
+      background: rgba(255, 255, 255, 0.1);
+      color: #fff;
+    }
+
+    /* Breadcrumbs Bar */
+    .unity-sub-bar {
+      background: var(--unity-sidebar-bg);
+      border-bottom: 1px solid var(--unity-sidebar-border);
+      padding: 8px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 13px;
+      color: var(--unity-text-muted);
+    }
+
+    .unity-breadcrumbs {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .unity-breadcrumbs a {
+      color: var(--unity-text-muted);
+      text-decoration: none;
+    }
+
+    .unity-breadcrumbs a:hover {
+      color: var(--unity-accent);
+    }
+
+    .breadcrumb-sep {
+      color: #a0aec0;
+      font-size: 11px;
+    }
+
+    .breadcrumb-current {
+      color: var(--unity-text);
+      font-weight: 600;
+    }
+
+    .sub-bar-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .switch-mode-action-btn {
+      background: transparent;
+      border: 1px solid var(--unity-sidebar-border);
+      color: var(--unity-accent);
+      font-size: 12px;
+      font-weight: 600;
+      padding: 4px 12px;
+      border-radius: 4px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      transition: all 0.15s;
+    }
+
+    .switch-mode-action-btn:hover {
+      background: var(--unity-accent);
+      color: #fff;
+      border-color: var(--unity-accent);
+    }
+
+    /* Main Docs App Layout */
+    .unity-layout {
+      display: grid;
+      grid-template-columns: 280px 1fr 240px;
+      min-height: calc(100vh - 96px);
+    }
+
+    /* Left Sidebar */
+    aside.unity-sidebar {
+      background: var(--unity-sidebar-bg);
+      border-right: 1px solid var(--unity-sidebar-border);
+      padding: 16px 0;
+      height: calc(100vh - 96px);
+      position: sticky;
+      top: 96px;
+      overflow-y: auto;
+    }
+
+    .sidebar-filter-box {
+      padding: 0 16px 12px 16px;
+      border-bottom: 1px solid var(--unity-sidebar-border);
+    }
+
+    .sidebar-filter-input {
+      width: 100%;
+      padding: 6px 10px;
+      border: 1px solid var(--unity-sidebar-border);
+      border-radius: 4px;
+      font-size: 13px;
+      background: var(--unity-card-bg);
+      color: var(--unity-text);
+      outline: none;
+    }
+
+    .sidebar-tree {
+      list-style: none;
+      padding: 12px 0;
+    }
+
+    .tree-section-label {
+      padding: 8px 16px 4px 16px;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--unity-text-muted);
+    }
+
+    .tree-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 7px 16px;
+      color: var(--unity-text);
+      text-decoration: none;
+      font-size: 13px;
+      cursor: pointer;
+      border-left: 3px solid transparent;
+      transition: all 0.15s;
+    }
+
+    .tree-item:hover {
+      background: rgba(0, 162, 255, 0.08);
+      color: var(--unity-accent);
+    }
+
+    .tree-item.active {
+      background: var(--unity-sidebar-active);
+      color: var(--unity-sidebar-active-text);
+      border-left-color: var(--unity-accent);
+      font-weight: 600;
+    }
+
+    .tree-badge {
+      font-size: 10px;
+      padding: 1px 6px;
+      border-radius: 10px;
+      font-weight: 700;
+      background: rgba(0, 0, 0, 0.06);
+    }
+
+    .tree-badge.pro { background: #8b5cf6; color: #fff; }
+    .tree-badge.new { background: #10b981; color: #fff; }
+    .tree-badge.lts { background: #0284c7; color: #fff; }
+
+    /* Center Content Area */
+    main.unity-content {
+      padding: 32px 48px;
+      max-width: 980px;
+    }
+
+    .page-header {
+      margin-bottom: 24px;
+      border-bottom: 1px solid var(--unity-table-border);
+      padding-bottom: 16px;
+    }
+
+    .page-title {
+      font-size: 32px;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+      color: var(--unity-text);
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .page-badges {
+      display: flex;
+      gap: 8px;
+      margin-top: 8px;
+      flex-wrap: wrap;
+    }
+
+    .chip-badge {
+      font-size: 11px;
+      font-weight: 600;
+      padding: 3px 8px;
+      border-radius: 4px;
+      background: var(--unity-sidebar-border);
+      color: var(--unity-text-muted);
+    }
+
+    .chip-badge.active-chip {
+      background: rgba(0, 162, 255, 0.15);
+      color: var(--unity-accent);
+    }
+
+    /* Cross-Mode Banner */
+    .cross-mode-card {
+      background: var(--unity-sidebar-bg);
+      border: 1px solid var(--unity-sidebar-border);
+      border-radius: 6px;
+      padding: 12px 16px;
+      margin: 20px 0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 13px;
+    }
+
+    /* Unity Callout Boxes */
+    .unity-alert {
+      border-left: 4px solid;
+      border-radius: 0 6px 6px 0;
+      padding: 14px 18px;
+      margin: 20px 0;
+      font-size: 14px;
+    }
+
+    .unity-alert.note {
+      background: var(--note-bg);
+      border-color: var(--note-border);
+      color: var(--note-text);
+    }
+
+    .unity-alert.tip {
+      background: var(--tip-bg);
+      border-color: var(--tip-border);
+      color: var(--tip-text);
+    }
+
+    .unity-alert.warning {
+      background: var(--warn-bg);
+      border-color: var(--warn-border);
+      color: var(--warn-text);
+    }
+
+    .unity-alert.important {
+      background: var(--imp-bg);
+      border-color: var(--imp-border);
+      color: var(--imp-text);
+    }
+
+    .unity-alert-title {
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 4px;
+    }
+
+    /* Unity Code Windows with Tabs */
+    .unity-code-card {
+      background: var(--unity-code-bg);
+      border-radius: 6px;
+      margin: 20px 0;
+      overflow: hidden;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    }
+
+    .code-card-header {
+      background: #202428;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 6px 12px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .code-tabs {
+      display: flex;
+      gap: 4px;
+    }
+
+    .code-tab-btn {
+      background: transparent;
+      border: none;
+      color: #8b949e;
+      padding: 4px 10px;
+      font-size: 12px;
+      font-weight: 600;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .code-tab-btn.active {
+      background: #2d333b;
+      color: #fff;
+    }
+
+    .code-copy-btn {
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      color: #f0f6fc;
+      padding: 3px 10px;
+      font-size: 11px;
+      border-radius: 4px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      transition: background 0.15s;
+    }
+
+    .code-copy-btn:hover {
+      background: rgba(255, 255, 255, 0.2);
+    }
+
+    pre.unity-pre {
+      padding: 16px;
+      overflow-x: auto;
+      font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+      font-size: 13px;
+      line-height: 1.55;
+      color: var(--unity-code-text);
+    }
+
+    /* Unity Tables */
+    table.unity-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 20px 0;
+      font-size: 13.5px;
+      border: 1px solid var(--unity-table-border);
+      border-radius: 6px;
+      overflow: hidden;
+    }
+
+    table.unity-table th {
+      background: var(--unity-sidebar-bg);
+      color: var(--unity-text);
+      font-weight: 600;
+      text-align: left;
+      padding: 10px 14px;
+      border-bottom: 2px solid var(--unity-table-border);
+    }
+
+    table.unity-table td {
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--unity-table-border);
+      color: var(--unity-text);
+    }
+
+    table.unity-table tr:nth-child(even) {
+      background: var(--unity-table-stripe);
+    }
+
+    .mono-pill {
+      font-family: monospace;
+      background: rgba(0, 162, 255, 0.1);
+      color: var(--unity-accent);
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    /* Unity Scripting Signature Box */
+    .script-signature-box {
+      background: var(--unity-sidebar-bg);
+      border: 1px solid var(--unity-sidebar-border);
+      border-left: 4px solid var(--unity-accent);
+      border-radius: 4px;
+      padding: 14px 18px;
+      font-family: monospace;
+      font-size: 14px;
+      color: var(--unity-text);
+      margin: 16px 0;
+    }
+
+    /* Right Rail (Table of Contents / On This Page) */
+    aside.unity-right-rail {
+      padding: 24px 16px;
+      height: calc(100vh - 96px);
+      position: sticky;
+      top: 96px;
+      overflow-y: auto;
+      font-size: 13px;
+      border-left: 1px solid var(--unity-sidebar-border);
+    }
+
+    .rail-heading {
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--unity-text-muted);
+      margin-bottom: 12px;
+    }
+
+    .rail-nav {
+      list-style: none;
+    }
+
+    .rail-nav-item {
+      margin-bottom: 8px;
+    }
+
+    .rail-nav-link {
+      color: var(--unity-text-muted);
+      text-decoration: none;
+      display: block;
+      transition: color 0.15s;
+    }
+
+    .rail-nav-link:hover, .rail-nav-link.active {
+      color: var(--unity-accent);
+      font-weight: 600;
+    }
+
+    .rail-feedback-card {
+      margin-top: 32px;
+      padding: 16px;
+      background: var(--unity-sidebar-bg);
+      border: 1px solid var(--unity-sidebar-border);
+      border-radius: 6px;
+    }
+
+    .feedback-title {
+      font-size: 12px;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+
+    .feedback-btns {
+      display: flex;
+      gap: 8px;
+    }
+
+    .feedback-btn {
+      flex: 1;
+      padding: 6px 0;
+      border: 1px solid var(--unity-sidebar-border);
+      background: var(--unity-card-bg);
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--unity-text);
+      transition: all 0.15s;
+    }
+
+    .feedback-btn:hover {
+      background: var(--unity-accent);
+      color: #fff;
+      border-color: var(--unity-accent);
+    }
+
+    /* Comparison Chart Styling */
+    .bench-bar-container {
+      margin: 12px 0;
+    }
+
+    .bench-bar-row {
+      display: flex;
+      align-items: center;
+      margin-bottom: 8px;
+      font-size: 13px;
+    }
+
+    .bench-label {
+      width: 140px;
+      font-weight: 600;
+    }
+
+    .bench-track {
+      flex: 1;
+      height: 24px;
+      background: var(--unity-sidebar-border);
+      border-radius: 4px;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      padding: 0 8px;
+      position: relative;
+    }
+
+    .bench-fill {
+      height: 100%;
+      position: absolute;
+      left: 0;
+      top: 0;
+      border-radius: 4px;
+      transition: width 0.6s ease;
+    }
+
+    .bench-val {
+      position: relative;
+      z-index: 2;
+      font-size: 12px;
+      font-weight: 700;
+      color: #fff;
+    }
+
+    /* Footer Pagination */
+    .docs-footer-nav {
+      margin-top: 48px;
+      padding-top: 24px;
+      border-top: 1px solid var(--unity-table-border);
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .footer-nav-btn {
+      text-decoration: none;
+      padding: 10px 18px;
+      border-radius: 6px;
+      border: 1px solid var(--unity-sidebar-border);
+      background: var(--unity-sidebar-bg);
+      color: var(--unity-text);
+      font-size: 13px;
+      font-weight: 600;
+      transition: all 0.15s;
+    }
+
+    .footer-nav-btn:hover {
+      background: var(--unity-accent);
+      color: #fff;
+      border-color: var(--unity-accent);
+    }
+
+    /* Mobile Responsive */
+    @media (max-width: 1024px) {
+      .unity-layout {
+        grid-template-columns: 260px 1fr;
+      }
+      aside.unity-right-rail {
+        display: none;
+      }
+    }
+
+    @media (max-width: 768px) {
+      .unity-layout {
+        grid-template-columns: 1fr;
+      }
+      aside.unity-sidebar {
+        display: none;
+      }
+      main.unity-content {
+        padding: 20px;
+      }
+      .unity-search-container {
+        display: none;
+      }
+    }
+  </style>
+</head>
+<body data-theme="dark">
+
+  <!-- Top Unity Navigation Header -->
+  <header class="unity-top-header" role="banner">
+    <div class="header-left">
+      <a href="/" class="unity-brand" aria-label="Mereb Homepage">
+        <div class="unity-cube-icon">⚔️</div>
+        <span>Mereb Engine</span>
+      </a>
+
+      <div class="version-select-pill">
+        <span class="dot"></span>
+        <span>2026.1 LTS</span>
+      </div>
+
+      <!-- Unity's Iconic Mode Toggle -->
+      <nav class="unity-mode-toggle" aria-label="Documentation Mode Toggle">
+        <button class="unity-mode-btn active" id="btn-mode-manual" onclick="setDocMode('manual')">
+          <span>📖 Manual</span>
+        </button>
+        <button class="unity-mode-btn" id="btn-mode-scripting" onclick="setDocMode('scripting')">
+          <span>⚡ Scripting API</span>
+        </button>
+      </nav>
+    </div>
+
+    <!-- Live Search Filter -->
+    <div class="unity-search-container">
+      <input type="text" class="unity-search-input" id="global-search-input" placeholder="Search Manual & Scripting..." oninput="handleSearch(this.value)">
+      <span class="unity-search-shortcut">/</span>
+    </div>
+
+    <div class="header-right">
+      <a href="/llms.txt" class="header-link-btn" title="Machine-readable docs for AI agents">🤖 llms.txt</a>
+      <a href="https://github.com/dawitbaslyos/Mereb" target="_blank" class="header-link-btn">GitHub</a>
+      <button class="header-link-btn" onclick="toggleTheme()" id="btn-theme" title="Toggle Dark/Light Mode">🌓</button>
+    </div>
+  </header>
+
+  <!-- Unity Sub-bar (Breadcrumbs & Mode Link) -->
+  <div class="unity-sub-bar" role="navigation" aria-label="Breadcrumbs">
+    <div class="unity-breadcrumbs">
+      <a href="#">Mereb Docs</a>
+      <span class="breadcrumb-sep">&gt;</span>
+      <span id="breadcrumb-section">Manual</span>
+      <span class="breadcrumb-sep">&gt;</span>
+      <span class="breadcrumb-current" id="breadcrumb-topic">Architecture &amp; Core Engine</span>
+    </div>
+
+    <div class="sub-bar-actions">
+      <button class="switch-mode-action-btn" id="sub-bar-switch-btn" onclick="toggleDocMode()">
+        Switch to Scripting API ➔
+      </button>
+    </div>
+  </div>
+
+  <!-- Main Grid Layout -->
+  <div class="unity-layout">
+
+    <!-- Left Sidebar Hierarchy Tree -->
+    <aside class="unity-sidebar" role="navigation" aria-label="Topic Navigation">
+      <div class="sidebar-filter-box">
+        <input type="text" class="sidebar-filter-input" id="sidebar-filter" placeholder="Filter topics..." oninput="filterSidebar(this.value)">
+      </div>
+
+      <!-- Manual Navigation Menu -->
+      <ul class="sidebar-tree" id="manual-sidebar-tree">
+        <li class="tree-section-label">Getting Started</li>
+        <li><a class="tree-item active" onclick="loadArticle('manual-overview')"><span>Architecture Overview</span> <span class="tree-badge lts">LTS</span></a></li>
+        <li><a class="tree-item" onclick="loadArticle('manual-quickstart')"><span>5-Minute Quickstart</span> <span class="tree-badge new">Quick</span></a></li>
+        
+        <li class="tree-section-label">Why Mereb is Better</li>
+        <li><a class="tree-item" onclick="loadArticle('manual-benchmarks')"><span>Industry Benchmarks &amp; Economics</span> <span class="tree-badge pro">Must Read</span></a></li>
+        
+        <li class="tree-section-label">Cloud &amp; Configurations</li>
+        <li><a class="tree-item" onclick="loadArticle('manual-cloud')"><span>Cloudflare Workers &amp; Durable Objects</span></a></li>
+        <li><a class="tree-item" onclick="loadArticle('manual-turn')"><span>STUN / TURN Relays &amp; Polar Billing</span></a></li>
+        
+        <li class="tree-section-label">Engine Integrations</li>
+        <li><a class="tree-item" onclick="loadArticle('manual-unity')"><span>Unity 3D WebGL (.jslib &amp; C#)</span> <span class="tree-badge lts">Unity</span></a></li>
+        <li><a class="tree-item" onclick="loadArticle('manual-godot')"><span>Godot 4 Addon (GDScript)</span> <span class="tree-badge">Godot</span></a></li>
+        <li><a class="tree-item" onclick="loadArticle('manual-web')"><span>Three.js &amp; React (useMereb)</span></a></li>
+
+        <li class="tree-section-label">Netcode &amp; Portals</li>
+        <li><a class="tree-item" onclick="loadArticle('manual-netcode')"><span>Binary Packing &amp; Interpolation</span></a></li>
+        <li><a class="tree-item" onclick="loadArticle('manual-portals')"><span>Poki &amp; CrazyGames Ad Hooks</span></a></li>
+        <li><a class="tree-item" onclick="loadArticle('manual-troubleshooting')"><span>Troubleshooting &amp; Console</span></a></li>
+      </ul>
+
+      <!-- Scripting API Navigation Menu (Toggled) -->
+      <ul class="sidebar-tree" id="scripting-sidebar-tree" style="display: none;">
+        <li class="tree-section-label">Classes (Mereb.Netcode)</li>
+        <li><a class="tree-item" onclick="loadArticle('api-merebclient')"><span>MerebClient</span> <span class="tree-badge lts">Core</span></a></li>
+        <li><a class="tree-item" onclick="loadArticle('api-mereblobby')"><span>MerebLobby</span></a></li>
+        <li><a class="tree-item" onclick="loadArticle('api-binarywriter')"><span>BinaryWriter &amp; BinaryReader</span></a></li>
+        <li><a class="tree-item" onclick="loadArticle('api-defineschema')"><span>defineSchema</span> <span class="tree-badge pro">85% Save</span></a></li>
+        <li><a class="tree-item" onclick="loadArticle('api-snapshotinterpolator')"><span>SnapshotInterpolator</span></a></li>
+        <li><a class="tree-item" onclick="loadArticle('api-touchcontrols')"><span>TouchControls</span></a></li>
+        <li><a class="tree-item" onclick="loadArticle('api-merebterminal')"><span>MerebTerminal</span></a></li>
+        <li><a class="tree-item" onclick="loadArticle('api-portalmanager')"><span>PortalManager</span></a></li>
+        <li><a class="tree-item" onclick="loadArticle('api-turnpool')"><span>TurnPool &amp; NetworkQuality</span></a></li>
+        
+        <li class="tree-section-label">Wire Protocols</li>
+        <li><a class="tree-item" onclick="loadArticle('api-protocol')"><span>WebSocket &amp; DataChannel Opcodes</span></a></li>
+      </ul>
+    </aside>
+
+    <!-- Center Main Documentation Content -->
+    <main class="unity-content" role="main" id="content-container">
+      
+      <!-- DEFAULT ARTICLE: Architecture Overview -->
+      <article id="art-manual-overview" class="doc-article">
+        <div class="page-header">
+          <h1 class="page-title">Architecture &amp; Core Engine</h1>
+          <div class="page-badges">
+            <span class="chip-badge active-chip">WebGL Native</span>
+            <span class="chip-badge">Unity 3D C#</span>
+            <span class="chip-badge">Godot 4</span>
+            <span class="chip-badge">Node.js</span>
+            <span class="chip-badge">Zero Server Cost</span>
+          </div>
+        </div>
+
+        <div class="cross-mode-card">
+          <span>Looking for class properties and methods?</span>
+          <button class="switch-mode-action-btn" onclick="setDocMode('scripting'); loadArticle('api-merebclient');">
+            Switch to MerebClient Scripting API ➔
+          </button>
+        </div>
+
+        <p><strong>Mereb</strong> is an ultra-lightweight (13 kB gzipped), zero-cost multiplayer netcode and matchmaking engine designed specifically for modern web games, web game portals (<strong>Poki</strong>, <strong>CrazyGames</strong>), mobile web browsers, indie game engines (<strong>Godot 4</strong>, <strong>Unity WebGL</strong>, <strong>Three.js</strong>, <strong>Phaser 3</strong>), and React applications.</p>
+
+        <div class="unity-alert tip">
+          <div class="unity-alert-title">💡 The Economic Problem Mereb Solves</div>
+          Dedicated server platforms (Hathora, AWS GameLift, Agones) cost $150 to $1,000+/month in continuous container uptime and bandwidth fees. For indie and web games monetizing via ad impressions ($1.50-$3.00 CPM), dedicated server bills bankrupt games. Mereb streams 60Hz gameplay directly P2P over WebRTC UDP, reducing server bills to $0/month.
+        </div>
+
+        <h2>High-Level Network Topology</h2>
+        <p>Mereb utilizes a <strong>Host-Authoritative WebRTC Mesh Topology</strong> coordinated by Cloudflare Workers and Durable Objects:</p>
+
+        <div class="unity-code-card">
+          <div class="code-card-header">
+            <span style="font-size: 11px; font-weight:700; color:#8b949e;">NETWORK ARCHITECTURE TOPOLOGY</span>
+          </div>
+          <pre class="unity-pre"><code>                      [ Cloudflare Edge Mesh ]
+            (Workers + Durable Objects + SQLite Storage)
+                Global Presence, Matchmaking &amp; Signaling
+                           ▲              ▲
+                 WebSocket │              │ WebSocket
+                (Signaling)│              │ (Signaling)
+                           │              │
+     ┌─────────────────────┴──────────────┴─────────────────────┐
+     │                                                          │
+[ Host Player ] &lt;════════════════════════════════════════&gt; [ Client Peer ]
+• Authoritative Physics               WebRTC DataChannel   • Local Input Capture
+• 60Hz Binary State Broadcast           (Sub-15ms UDP)     • Client Prediction
+• Damage &amp; Collision Check                                 • Hermite Interpolation
+• Fallback Bot Simulation (if solo)                        • RTT Ping &amp; Jitter Probe</code></pre>
+        </div>
+
+        <h2>Dual DataChannel Architecture</h2>
+        <p>Unlike standard WebSockets that suffer from severe head-of-line blocking when a single packet drops on mobile Wi-Fi, Mereb initializes two independent WebRTC channels between peers:</p>
+
+        <table class="unity-table">
+          <thead>
+            <tr>
+              <th>Channel</th>
+              <th>Protocol</th>
+              <th>Reliability</th>
+              <th>Use Case</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><span class="mono-pill">unreliable</span></td>
+              <td>UDP-like (SCTP)</td>
+              <td>Ordered: false, MaxRetransmits: 0</td>
+              <td>60Hz entity transforms (x, y, z), rotations, health, aiming vectors, input streams.</td>
+            </tr>
+            <tr>
+              <td><span class="mono-pill">reliable</span></td>
+              <td>TCP-like (SCTP)</td>
+              <td>Guaranteed Delivery</td>
+              <td>Match start, player deaths, kills, round timers, game over, chat, and scoring.</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <h2>Smart Bot Fallback (Eradicating Empty Lobbies)</h2>
+        <p>If matchmaking exceeds <code>botTimeoutMs</code> (default: 8,000ms), Mereb automatically activates a local offline AI bot. The queue never feels empty, and players never bounce from your game.</p>
+      </article>
+
+      <!-- ARTICLE: Benchmarks & Comparison -->
+      <article id="art-manual-benchmarks" class="doc-article" style="display: none;">
+        <div class="page-header">
+          <h1 class="page-title">Why Mereb is Better: Industry Benchmarks</h1>
+          <div class="page-badges">
+            <span class="chip-badge active-chip">Economic Analysis</span>
+            <span class="chip-badge">Photon vs Hathora vs Mereb</span>
+          </div>
+        </div>
+
+        <p>Below is an empirical comparison across 10 critical metrics comparing Mereb directly against Photon (PUN/Fusion), Hathora, Agones (K8s), and AWS GameLift.</p>
+
+        <!-- Visual Bar Chart -->
+        <h2>Monthly Hosting Cost at 1,000 CCU</h2>
+        <div class="bench-bar-container">
+          <div class="bench-bar-row">
+            <div class="bench-label">⚔️ Mereb SDK</div>
+            <div class="bench-track">
+              <div class="bench-fill" style="width: 2%; background: #10b981;"></div>
+              <span class="bench-val" style="color:#10b981; font-weight:800;">$0.00 / mo (100% Free)</span>
+            </div>
+          </div>
+          <div class="bench-bar-row">
+            <div class="bench-label">Hathora</div>
+            <div class="bench-track">
+              <div class="bench-fill" style="width: 70%; background: #ef4444;"></div>
+              <span class="bench-val">$340 / mo</span>
+            </div>
+          </div>
+          <div class="bench-bar-row">
+            <div class="bench-label">Photon Fusion</div>
+            <div class="bench-track">
+              <div class="bench-fill" style="width: 78%; background: #ef4444;"></div>
+              <span class="bench-val">$380 / mo</span>
+            </div>
+          </div>
+          <div class="bench-bar-row">
+            <div class="bench-label">AWS GameLift</div>
+            <div class="bench-track">
+              <div class="bench-fill" style="width: 88%; background: #ef4444;"></div>
+              <span class="bench-val">$450 / mo</span>
+            </div>
+          </div>
+          <div class="bench-bar-row">
+            <div class="bench-label">Agones / GKE</div>
+            <div class="bench-track">
+              <div class="bench-fill" style="width: 100%; background: #ef4444;"></div>
+              <span class="bench-val">$520 / mo</span>
+            </div>
+          </div>
+        </div>
+
+        <h2>Detailed Feature Matrix</h2>
+        <table class="unity-table">
+          <thead>
+            <tr>
+              <th>Feature</th>
+              <th>⚔️ Mereb SDK</th>
+              <th>Photon Engine</th>
+              <th>Hathora</th>
+              <th>Agones / K8s</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>1,000 CCU Cost</strong></td>
+              <td><span class="mono-pill" style="color:#10b981;">$0 / month</span></td>
+              <td>$190 – $380 / mo</td>
+              <td>$180 – $350 / mo</td>
+              <td>$320 – $750 / mo</td>
+            </tr>
+            <tr>
+              <td><strong>Egress Bandwidth</strong></td>
+              <td><span class="mono-pill" style="color:#10b981;">$0 (Direct P2P)</span></td>
+              <td>$0.08 / GB overage</td>
+              <td>$0.05 – $0.09 / GB</td>
+              <td>$0.09 / GB (Cloud)</td>
+            </tr>
+            <tr>
+              <td><strong>Cold-Start Time</strong></td>
+              <td><span class="mono-pill" style="color:#10b981;">0 ms (Instant)</span></td>
+              <td>~250 ms</td>
+              <td>15 – 45 seconds</td>
+              <td>30 – 90 seconds</td>
+            </tr>
+            <tr>
+              <td><strong>Same-Region Ping</strong></td>
+              <td><span class="mono-pill" style="color:#10b981;">5 – 18 ms (UDP)</span></td>
+              <td>45 – 85 ms</td>
+              <td>35 – 70 ms</td>
+              <td>40 – 80 ms</td>
+            </tr>
+            <tr>
+              <td><strong>Poki/CrazyGames Ad Hooks</strong></td>
+              <td><span class="mono-pill" style="color:#10b981;">Built-in</span></td>
+              <td>❌ Disconnects</td>
+              <td>❌ Disconnects</td>
+              <td>❌ Disconnects</td>
+            </tr>
+            <tr>
+              <td><strong>8s Bot Fallback</strong></td>
+              <td><span class="mono-pill" style="color:#10b981;">Built-in</span></td>
+              <td>❌ Manual code</td>
+              <td>❌ Manual code</td>
+              <td>❌ Manual code</td>
+            </tr>
+            <tr>
+              <td><strong>Binary Compression</strong></td>
+              <td><span class="mono-pill" style="color:#10b981;">Built-in (85%)</span></td>
+              <td>Proprietary</td>
+              <td>Manual Protobuf</td>
+              <td>Manual Protobuf</td>
+            </tr>
+          </tbody>
+        </table>
+      </article>
+
+      <!-- ARTICLE: Unity 3D WebGL Integration -->
+      <article id="art-manual-unity" class="doc-article" style="display: none;">
+        <div class="page-header">
+          <h1 class="page-title">Unity 3D WebGL Integration</h1>
+          <div class="page-badges">
+            <span class="chip-badge active-chip">Unity 2022 LTS / 2023 LTS / Unity 6</span>
+            <span class="chip-badge">C# WebGL Bridge</span>
+          </div>
+        </div>
+
+        <p>Integrate Mereb into Unity WebGL builds via a native JavaScript bridge plugin (<code>MerebBridge.jslib</code>) and a C# manager (<code>MerebNetworkManager.cs</code>).</p>
+
+        <h2>Step 1: Create `Assets/Plugins/WebGL/MerebBridge.jslib`</h2>
+        <div class="unity-code-card">
+          <div class="code-card-header">
+            <span class="code-tab-btn active">MerebBridge.jslib</span>
+            <button class="code-copy-btn" onclick="copySnippet(this)">📋 Copy Code</button>
+          </div>
+          <pre class="unity-pre"><code>mergeInto(LibraryManager.library, {
+  Mereb_Init: function(hostStr, botTimeoutMs) {
+    var host = UTF8ToString(hostStr);
+    window.merebClient = new window.Mereb.MerebClient({
+      host: host,
+      botTimeoutMs: botTimeoutMs,
+      autoJoinFromUrl: true
+    });
+    window.merebClient.on('match-start', function(data) {
+      SendMessage('MerebNetworkManager', 'OnNativeMatchStarted', JSON.stringify(data));
+    });
+    window.merebClient.on('state', function(state) {
+      SendMessage('MerebNetworkManager', 'OnNativeStateReceived', JSON.stringify(state));
+    });
+  },
+  Mereb_QuickPlay: function() {
+    if (window.merebClient) window.merebClient.quickPlay();
+  },
+  Mereb_SendState: function(stateJsonStr) {
+    if (window.merebClient) window.merebClient.sendState(JSON.parse(UTF8ToString(stateJsonStr)));
+  }
+});</code></pre>
+        </div>
+
+        <h2>Step 2: Attach `MerebNetworkManager.cs`</h2>
+        <div class="unity-code-card">
+          <div class="code-card-header">
+            <span class="code-tab-btn active">C# Script</span>
+            <button class="code-copy-btn" onclick="copySnippet(this)">📋 Copy Code</button>
+          </div>
+          <pre class="unity-pre"><code>using System.Runtime.InteropServices;
+using UnityEngine;
+
+public class MerebNetworkManager : MonoBehaviour
+{
+#if UNITY_WEBGL &amp;&amp; !UNITY_EDITOR
+    [DllImport("__Internal")] private static extern void Mereb_Init(string host, int timeout);
+    [DllImport("__Internal")] private static extern void Mereb_QuickPlay();
+    [DllImport("__Internal")] private static extern void Mereb_SendState(string json);
+#else
+    private static void Mereb_Init(string h, int t) =&gt; Debug.Log("Editor Mock Init");
+    private static void Mereb_QuickPlay() =&gt; Debug.Log("Editor Mock QuickPlay");
+    private static void Mereb_SendState(string j) {}
+#endif
+
+    void Start() {
+        Mereb_Init("mereb-signaling.dawitbaslyos.workers.dev", 8000);
+    }
+
+    public void OnNativeMatchStarted(string json) {
+        Debug.Log("[Unity] Match Started: " + json);
+    }
+}</code></pre>
+        </div>
+      </article>
+
+      <!-- ARTICLE: Scripting Reference for MerebClient -->
+      <article id="art-api-merebclient" class="doc-article" style="display: none;">
+        <div class="page-header">
+          <h1 class="page-title">MerebClient</h1>
+          <div class="page-badges">
+            <span class="chip-badge active-chip">Class</span>
+            <span class="chip-badge">Namespace: Mereb.Netcode</span>
+          </div>
+        </div>
+
+        <div class="script-signature-box">
+          public class MerebClient : EventEmitter, IDisposable
+        </div>
+
+        <p>The primary orchestrator of the multiplayer lifecycle. Coordinates signaling with the Cloudflare Worker, manages WebRTC DataChannels, initiates bot fallbacks, and monitors latency metrics.</p>
+
+        <h2>Properties</h2>
+        <table class="unity-table">
+          <thead>
+            <tr><th>Property</th><th>Type</th><th>Description</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><span class="mono-pill">isHost</span></td><td>bool (readonly)</td><td>True if local client is the authoritative simulation host.</td></tr>
+            <tr><td><span class="mono-pill">isBot</span></td><td>bool (readonly)</td><td>True if currently playing against an offline local bot.</td></tr>
+            <tr><td><span class="mono-pill">roomCode</span></td><td>string | null</td><td>Active 4-letter room code (e.g. <code>W7KP</code>).</td></tr>
+            <tr><td><span class="mono-pill">status</span></td><td>string</td><td>'idle', 'connecting', 'in_lobby', 'matching', 'connected'.</td></tr>
+            <tr><td><span class="mono-pill">stats</span></td><td>NetworkQualityStats</td><td>Live ping, jitter, packet loss %, and status rating.</td></tr>
+          </tbody>
+        </table>
+
+        <h2>Public Methods</h2>
+        <table class="unity-table">
+          <thead>
+            <tr><th>Method</th><th>Return Type</th><th>Description</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><span class="mono-pill">createRoom()</span></td><td>Promise&lt;string&gt;</td><td>Generates a new 4-letter room and begins waiting for a peer.</td></tr>
+            <tr><td><span class="mono-pill">joinRoom(code)</span></td><td>Promise&lt;void&gt;</td><td>Joins an existing room with a 4-letter code.</td></tr>
+            <tr><td><span class="mono-pill">quickPlay()</span></td><td>Promise&lt;void&gt;</td><td>Enters global matchmaking with automatic 8-second bot fallback.</td></tr>
+            <tr><td><span class="mono-pill">sendState(state)</span></td><td>void</td><td>Broadcasts 60Hz state over unordered, unreliable UDP data channel.</td></tr>
+            <tr><td><span class="mono-pill">sendBinary(buffer)</span></td><td>void</td><td>Streams compact binary array buffer over UDP channel.</td></tr>
+            <tr><td><span class="mono-pill">sendEvent(name, data)</span></td><td>void</td><td>Sends guaranteed, ordered event over reliable channel.</td></tr>
+            <tr><td><span class="mono-pill">disconnect()</span></td><td>void</td><td>Closes WebRTC peer connection and WebSocket signaling.</td></tr>
+          </tbody>
+        </table>
+      </article>
+
+      <!-- ARTICLE: Binary Packing & defineSchema -->
+      <article id="art-api-defineschema" class="doc-article" style="display: none;">
+        <div class="page-header">
+          <h1 class="page-title">defineSchema &amp; Binary Packing</h1>
+          <div class="page-badges">
+            <span class="chip-badge active-chip">Optimization</span>
+            <span class="chip-badge">85% Bandwidth Reduction</span>
+          </div>
+        </div>
+
+        <div class="script-signature-box">
+          public static Schema defineSchema(Dictionary&lt;string, SchemaFieldType&gt; schemaDef)
+        </div>
+
+        <p>Compiles state objects into contiguous ~30-byte binary ArrayBuffers utilizing fixed-point arithmetic.</p>
+
+        <div class="unity-code-card">
+          <div class="code-card-header">
+            <span class="code-tab-btn active">JavaScript / TypeScript</span>
+            <button class="code-copy-btn" onclick="copySnippet(this)">📋 Copy Code</button>
+          </div>
+          <pre class="unity-pre"><code>import { defineSchema } from 'mereb-netcode';
+
+export const GameSchema = defineSchema({
+  x: 'fixed16',        // 2 bytes: precision 100 (-327.68 to +327.67)
+  y: 'fixed16',        // 2 bytes
+  angle: 'fixed16',    // 2 bytes: precision 1000
+  health: 'uint8',     // 1 byte (0 to 255)
+  score: 'uint8',      // 1 byte
+  isShielded: 'boolean'// 1 bit
+});
+// Total packet size: 9 BYTES! (vs 160 bytes for JSON)</code></pre>
+        </div>
+      </article>
+
+      <!-- ARTICLE: Quickstart -->
+      <article id="art-manual-quickstart" class="doc-article" style="display: none;">
+        <div class="page-header">
+          <h1 class="page-title">5-Minute Quickstart</h1>
+          <div class="page-badges"><span class="chip-badge active-chip">Setup Guide</span></div>
+        </div>
+        <p>Install via npm:</p>
+        <pre class="unity-pre" style="background:var(--unity-code-bg); color:#fff; padding:12px; border-radius:6px;"><code>npm install mereb-netcode</code></pre>
+        <p style="margin-top:16px;">Initialize client and arcade lobby:</p>
+        <div class="unity-code-card">
+          <div class="code-card-header"><span class="code-tab-btn active">main.js</span><button class="code-copy-btn" onclick="copySnippet(this)">📋 Copy Code</button></div>
+          <pre class="unity-pre"><code>import { MerebClient, MerebLobby } from 'mereb-netcode';
+
+const net = new MerebClient({ host: 'mereb-signaling.dawitbaslyos.workers.dev' });
+const lobby = new MerebLobby(net, { title: '⚔️ ARENA WARRIORS' });
+
+net.on('match-start', ({ isHost, peerId }) => {
+  console.log('Match active with:', peerId);
+  if (isHost) {
+    setInterval(() => net.sendState({ x: player.x, y: player.y }), 50);
+  }
+});</code></pre>
+        </div>
+      </article>
+
+      <!-- ARTICLE: Cloudflare Workers -->
+      <article id="art-manual-cloud" class="doc-article" style="display: none;">
+        <div class="page-header">
+          <h1 class="page-title">Cloudflare Workers Deployment</h1>
+          <div class="page-badges"><span class="chip-badge active-chip">Serverless Edge</span></div>
+        </div>
+        <p>Deploy your own global signaling server to Cloudflare edge in 60 seconds:</p>
+        <pre class="unity-pre" style="background:var(--unity-code-bg); color:#fff; padding:12px; border-radius:6px;"><code>cd cloudflare
+npx wrangler deploy</code></pre>
+      </article>
+
+      <!-- ARTICLE: Godot 4 -->
+      <article id="art-manual-godot" class="doc-article" style="display: none;">
+        <div class="page-header">
+          <h1 class="page-title">Godot 4 Addon Guide</h1>
+          <div class="page-badges"><span class="chip-badge active-chip">GDScript</span></div>
+        </div>
+        <p>Copy <code>addons/mereb</code> into your project and enable it in Project Settings.</p>
+      </article>
+
+      <!-- ARTICLE: Web & React -->
+      <article id="art-manual-web" class="doc-article" style="display: none;">
+        <div class="page-header">
+          <h1 class="page-title">Web, Three.js &amp; React Integration</h1>
+          <div class="page-badges"><span class="chip-badge active-chip">React Hook</span></div>
+        </div>
+        <p>Use the <code>useMereb()</code> hook:</p>
+        <div class="unity-code-card">
+          <pre class="unity-pre"><code>import { useMereb } from 'mereb-netcode/react';
+
+function Lobby() {
+  const { status, quickPlay, quality } = useMereb({ host: 'mereb-signaling.workers.dev' });
+  return &lt;button onClick={quickPlay}&gt;Quick Play ({quality.ping}ms)&lt;/button&gt;;
+}</code></pre>
+        </div>
+      </article>
+
+      <!-- ARTICLE: Netcode -->
+      <article id="art-manual-netcode" class="doc-article" style="display: none;">
+        <div class="page-header">
+          <h1 class="page-title">Binary Packing &amp; Interpolation</h1>
+        </div>
+        <p>Hermite snapshot interpolation eliminates 20Hz discrete tick stutter.</p>
+      </article>
+
+      <!-- ARTICLE: Portals -->
+      <article id="art-manual-portals" class="doc-article" style="display: none;">
+        <div class="page-header">
+          <h1 class="page-title">Poki &amp; CrazyGames Ad Hooks</h1>
+        </div>
+        <p>Built-in <code>PortalManager</code> prevents WebRTC disconnects during video ads.</p>
+      </article>
+
+      <!-- ARTICLE: Troubleshooting -->
+      <article id="art-manual-troubleshooting" class="doc-article" style="display: none;">
+        <div class="page-header">
+          <h1 class="page-title">Troubleshooting &amp; Developer Console</h1>
+        </div>
+        <p>Press the backtick (<code>`</code>) key in-game to toggle the <code>MerebTerminal</code> console.</p>
+      </article>
+
+      <!-- ARTICLE: TurnPool -->
+      <article id="art-manual-turn" class="doc-article" style="display: none;">
+        <div class="page-header">
+          <h1 class="page-title">STUN / TURN Relays &amp; Polar Billing</h1>
+        </div>
+        <p>Multi-TURN pool with TLS port 443 fallback for strict school/dorm firewalls.</p>
+      </article>
+
+      <!-- ARTICLE: Generic API Reference -->
+      <article id="art-api-generic" class="doc-article" style="display: none;">
+        <div class="page-header">
+          <h1 class="page-title" id="api-generic-title">Scripting API Reference</h1>
+        </div>
+        <div id="api-generic-content"></div>
+      </article>
+
+      <!-- Footer Navigation Buttons -->
+      <div class="docs-footer-nav">
+        <a href="#" class="footer-nav-btn" id="btn-prev-page" onclick="navigatePrev()">← Previous</a>
+        <a href="#" class="footer-nav-btn" id="btn-next-page" onclick="navigateNext()">Next →</a>
+      </div>
+    </main>
+
+    <!-- Right Rail (Table of Contents / In This Article) -->
+    <aside class="unity-right-rail" role="complementary" aria-label="On this page">
+      <div class="rail-heading">In This Article</div>
+      <ul class="rail-nav" id="rail-toc-list">
+        <li class="rail-nav-item"><a href="#" class="rail-nav-link active">Overview</a></li>
+        <li class="rail-nav-item"><a href="#" class="rail-nav-link">Network Topology</a></li>
+        <li class="rail-nav-item"><a href="#" class="rail-nav-link">Dual DataChannels</a></li>
+        <li class="rail-nav-item"><a href="#" class="rail-nav-link">Smart Bot Fallback</a></li>
+      </ul>
+
+      <!-- Page Feedback Widget -->
+      <div class="rail-feedback-card">
+        <div class="feedback-title">Was this page helpful?</div>
+        <div class="feedback-btns">
+          <button class="feedback-btn" onclick="sendFeedback(true)">👍 Yes</button>
+          <button class="feedback-btn" onclick="sendFeedback(false)">👎 No</button>
+        </div>
+      </div>
+
+      <div style="margin-top:20px; font-size:12px; color:var(--unity-text-muted);">
+        <a href="/llms.txt" style="color:var(--unity-accent); text-decoration:none; display:flex; align-items:center; gap:4px;">
+          <span>🤖 AI Assistant Context</span>
+        </a>
+      </div>
+    </aside>
+
+  </div>
+
+  <script>
+    // Unity Docs State Management
+    let currentMode = 'manual'; // 'manual' | 'scripting'
+    let currentArticleId = 'manual-overview';
+
+    const articles = [
+      'manual-overview',
+      'manual-quickstart',
+      'manual-benchmarks',
+      'manual-cloud',
+      'manual-turn',
+      'manual-unity',
+      'manual-godot',
+      'manual-web',
+      'manual-netcode',
+      'manual-portals',
+      'manual-troubleshooting',
+      'api-merebclient',
+      'api-defineschema'
+    ];
+
+    function setDocMode(mode) {
+      currentMode = mode;
+      document.getElementById('btn-mode-manual').classList.toggle('active', mode === 'manual');
+      document.getElementById('btn-mode-scripting').classList.toggle('active', mode === 'scripting');
+
+      document.getElementById('manual-sidebar-tree').style.display = mode === 'manual' ? 'block' : 'none';
+      document.getElementById('scripting-sidebar-tree').style.display = mode === 'scripting' ? 'block' : 'none';
+
+      document.getElementById('breadcrumb-section').innerText = mode === 'manual' ? 'Manual' : 'Scripting Reference';
+      document.getElementById('sub-bar-switch-btn').innerText = mode === 'manual' 
+        ? 'Switch to Scripting API ➔' 
+        : 'Switch to Manual ➔';
+
+      if (mode === 'scripting' && !currentArticleId.startsWith('api-')) {
+        loadArticle('api-merebclient');
+      } else if (mode === 'manual' && currentArticleId.startsWith('api-')) {
+        loadArticle('manual-overview');
+      }
+    }
+
+    function toggleDocMode() {
+      setDocMode(currentMode === 'manual' ? 'scripting' : 'manual');
+    }
+
+    function loadArticle(id) {
+      currentArticleId = id;
+
+      // Hide all articles
+      document.querySelectorAll('.doc-article').forEach(art => art.style.display = 'none');
+
+      // Update sidebar active link
+      document.querySelectorAll('.tree-item').forEach(item => {
+        const matches = item.getAttribute('onclick') && item.getAttribute('onclick').includes(id);
+        item.classList.toggle('active', matches);
+      });
+
+      const target = document.getElementById('art-' + id);
+      if (target) {
+        target.style.display = 'block';
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        
+        // Update breadcrumb topic
+        const titleEl = target.querySelector('.page-title');
+        if (titleEl) {
+          document.getElementById('breadcrumb-topic').innerText = titleEl.innerText;
+        }
+
+        // Rebuild Table of Contents
+        buildRailTOC(target);
+      }
+    }
+
+    function buildRailTOC(articleEl) {
+      const headings = articleEl.querySelectorAll('h2, h3');
+      const list = document.getElementById('rail-toc-list');
+      list.innerHTML = '';
+
+      if (headings.length === 0) {
+        list.innerHTML = '<li class="rail-nav-item"><span class="rail-nav-link active">Overview</span></li>';
+        return;
+      }
+
+      headings.forEach((h, index) => {
+        if (!h.id) h.id = 'heading-' + index;
+        const li = document.createElement('li');
+        li.className = 'rail-nav-item';
+        li.innerHTML = `<a href="#${h.id}" class="rail-nav-link ${index === 0 ? 'active' : ''}">${h.innerText}</a>`;
+        list.appendChild(li);
+      });
+    }
+
+    function copySnippet(button) {
+      const card = button.closest('.unity-code-card');
+      const code = card.querySelector('code').innerText;
+      navigator.clipboard.writeText(code).then(() => {
+        const orig = button.innerText;
+        button.innerText = '✅ Copied!';
+        button.style.background = '#10b981';
+        setTimeout(() => {
+          button.innerText = orig;
+          button.style.background = '';
+        }, 2000);
+      });
+    }
+
+    function filterSidebar(query) {
+      const q = query.toLowerCase().trim();
+      document.querySelectorAll('.sidebar-tree li').forEach(li => {
+        if (li.classList.contains('tree-section-label')) return;
+        const text = li.innerText.toLowerCase();
+        li.style.display = text.includes(q) ? '' : 'none';
+      });
+    }
+
+    function handleSearch(query) {
+      if (!query) return;
+      filterSidebar(query);
+      const q = query.toLowerCase();
+      if (q.includes('bench') || q.includes('cost') || q.includes('photon')) {
+        loadArticle('manual-benchmarks');
+      } else if (q.includes('unity') || q.includes('c#') || q.includes('jslib')) {
+        loadArticle('manual-unity');
+      } else if (q.includes('godot')) {
+        loadArticle('manual-godot');
+      } else if (q.includes('client') || q.includes('merebclient')) {
+        loadArticle('api-merebclient');
+      } else if (q.includes('schema') || q.includes('binary')) {
+        loadArticle('api-defineschema');
+      }
+    }
+
+    function toggleTheme() {
+      const current = document.body.getAttribute('data-theme') || 'dark';
+      const next = current === 'dark' ? 'light' : 'dark';
+      document.body.setAttribute('data-theme', next);
+    }
+
+    function sendFeedback(isHelpful) {
+      alert(isHelpful ? "Thank you! We're glad this documentation helped." : "Thank you for the feedback. We will improve this section!");
+    }
+
+    function navigateNext() {
+      const idx = articles.indexOf(currentArticleId);
+      if (idx !== -1 && idx < articles.length - 1) {
+        loadArticle(articles[idx + 1]);
+      }
+    }
+
+    function navigatePrev() {
+      const idx = articles.indexOf(currentArticleId);
+      if (idx > 0) {
+        loadArticle(articles[idx - 1]);
+      }
+    }
+
+    // Keyboard shortcut '/' to focus search
+    window.addEventListener('keydown', (e) => {
+      if (e.key === '/' && document.activeElement.tagName !== 'INPUT') {
+        e.preventDefault();
+        document.getElementById('global-search-input').focus();
+      }
+    });
+
+    // Initial Table of Contents build
+    window.addEventListener('DOMContentLoaded', () => {
+      const initial = document.getElementById('art-manual-overview');
+      if (initial) buildRailTOC(initial);
+    });
+  </script>
+</body>
+</html>

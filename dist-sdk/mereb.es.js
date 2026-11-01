@@ -347,6 +347,21 @@ var b = [
 		}
 		return Array.isArray(e) && e.length > 0 ? e : [...b, ...x];
 	}
+	static async fetchManagedTurn(e, t, n) {
+		if (!e) return b;
+		try {
+			let r = new URL(`${e.replace(/\/+$/, "")}/api/turn-credentials`);
+			t && r.searchParams.set("apiKey", t), n && r.searchParams.set("appId", n);
+			let i = await fetch(r.toString());
+			if (i.ok) {
+				let e = await i.json();
+				if (Array.isArray(e.iceServers) && e.iceServers.length > 0) return e.iceServers;
+			}
+		} catch (e) {
+			console.warn("[Mereb:TurnPool] Managed TURN discovery notice:", e.message);
+		}
+		return [...b, ...x];
+	}
 }, C = /* @__PURE__ */ t({
 	DC: () => O,
 	DEFAULT_ICE_SERVERS: () => w,

@@ -17,9 +17,97 @@ const INITIAL_GAMES = [
     name: 'Starter App',
     apiKey: 'pk_live_mereb_starter_key',
     createdAt: '2026-10-22',
-    status: 'active'
+    status: 'active',
+    plan: 'free',
+    ownerId: 'dev_local'
   }
 ];
+
+export const PLAN_TIERS = {
+  free: {
+    name: 'Free',
+    maxGames: 1,
+    maxCCU: 25,
+    turnEnabled: false,
+    rateLimitPerMin: 120
+  },
+  pro: {
+    name: 'Pro',
+    maxGames: 10,
+    maxCCU: 250,
+    turnEnabled: true,
+    rateLimitPerMin: 1200
+  },
+  studio: {
+    name: 'Studio',
+    maxGames: 50,
+    maxCCU: 1000,
+    turnEnabled: true,
+    rateLimitPerMin: 6000
+  }
+};
+
+/**
+ * Generates RFC 5766 TURN REST API HMAC-SHA1 credential
+ */
+async function generateTurnHmac(secret, username) {
+  const enc = new TextEncoder();
+  const key = await crypto.subtle.importKey(
+    'raw',
+    enc.encode(secret),
+    { name: 'HMAC', hash: 'SHA-1' },
+    false,
+    ['sign']
+  );
+  const sig = await crypto.subtle.sign('HMAC', key, enc.encode(username));
+  let bin = '';
+  const bytes = new Uint8Array(sig);
+  for (let i = 0; i < bytes.byteLength; i++) {
+    bin += String.fromCharCode(bytes[i]);
+  }
+  return btoa(bin);
+}
+
+/**
+ * Validates Polar Standard Webhook signature
+ */
+async function verifyPolarWebhook(request, rawBody, webhookSecret) {
+  if (!webhookSecret) return true; // dev mode bypass when secret not yet set in .dev.vars
+  const signatureHeader = request.headers.get('webhook-signature') || request.headers.get('polar-signature');
+  const webhookId = request.headers.get('webhook-id');
+  const timestamp = request.headers.get('webhook-timestamp');
+
+  if (!signatureHeader) return false;
+
+  try {
+    const cleanSecret = webhookSecret.startsWith('whsec_')
+      ? atob(webhookSecret.slice(6))
+      : webhookSecret;
+
+    const enc = new TextEncoder();
+    const key = await crypto.subtle.importKey(
+      'raw',
+      typeof cleanSecret === 'string' ? enc.encode(cleanSecret) : cleanSecret,
+      { name: 'HMAC', hash: 'SHA-256' },
+      false,
+      ['sign']
+    );
+
+    const payloadToSign = webhookId && timestamp ? `${webhookId}.${timestamp}.${rawBody}` : rawBody;
+    const sigBytes = await crypto.subtle.sign('HMAC', key, enc.encode(payloadToSign));
+    let bin = '';
+    const bytes = new Uint8Array(sigBytes);
+    for (let i = 0; i < bytes.byteLength; i++) {
+      bin += String.fromCharCode(bytes[i]);
+    }
+    const computedSignature = btoa(bin);
+    const signatures = signatureHeader.split(' ').map(s => s.replace(/^v1,/, ''));
+    return signatures.includes(computedSignature);
+  } catch (err) {
+    console.error('Polar signature verification failed:', err);
+    return false;
+  }
+}
 
 export class GameRoom {
   constructor(state, env) {
@@ -43,8 +131,15 @@ export class GameRoom {
     if (url.searchParams.has('appId')) this.appId = url.searchParams.get('appId');
     if (url.searchParams.has('roomId')) this.roomId = url.searchParams.get('roomId');
 
-    // Studio Catalog REST API handler
-    if (url.pathname.startsWith('/api/games') || url.pathname.startsWith('/api/catalog') || url.pathname.startsWith('/api/apps') || url.pathname.startsWith('/api/leaderboard')) {
+    // Studio Catalog, Polar Billing & Managed TURN REST API handler
+    if (
+      url.pathname.startsWith('/api/games') ||
+      url.pathname.startsWith('/api/catalog') ||
+      url.pathname.startsWith('/api/apps') ||
+      url.pathname.startsWith('/api/leaderboard') ||
+      url.pathname.startsWith('/api/billing') ||
+      url.pathname.startsWith('/api/turn-credentials')
+    ) {
       return this.handleCatalogAPI(request, url);
     }
 
@@ -232,6 +327,194 @@ export class GameRoom {
     const parts = url.pathname.split('/').filter(Boolean);
 
     // ==========================================
+    // 0A. POLAR BILLING API (/api/billing/polar/*)
+    // ==========================================
+    if (url.pathname.startsWith('/api/billing')) {
+      // 1. Polar Webhook: subscription.created, updated, canceled, order.created
+      if (url.pathname === '/api/billing/polar/webhook' && request.method === 'POST') {
+        const rawBody = await request.text();
+        const secret = this.env?.POLAR_WEBHOOK_SECRET;
+        const isValid = await verifyPolarWebhook(request, rawBody, secret);
+        if (!isValid) {
+          return new Response(JSON.stringify({ error: 'Invalid Polar webhook signature' }), { status: 401, headers });
+        }
+
+        let event;
+        try {
+          event = JSON.parse(rawBody);
+        } catch {
+          return new Response(JSON.stringify({ error: 'Invalid JSON body' }), { status: 400, headers });
+        }
+
+        const eventType = event.type || event.event;
+        const data = event.data || {};
+        const customer = data.customer || {};
+        const userId = data.metadata?.userId || data.custom_field_data?.userId || customer.metadata?.userId;
+        const email = customer.email || data.customer_email;
+
+        const productName = (data.product?.name || '').toLowerCase();
+        let targetPlan = 'free';
+        if (eventType?.startsWith('subscription.') || eventType === 'order.created') {
+          if (data.status === 'active' || data.status === 'trialing' || eventType === 'order.created') {
+            targetPlan = productName.includes('studio') ? 'studio' : 'pro';
+          }
+        }
+        if (eventType === 'subscription.canceled' || eventType === 'subscription.revoked') {
+          targetPlan = 'free';
+        }
+
+        // Persist plan state to user profile
+        if (userId) {
+          const userKey = `user:${userId}`;
+          let userProfile = (await this.state.storage.get(userKey)) || { id: userId, email, plan: 'free' };
+          userProfile.plan = targetPlan;
+          userProfile.polarSubscriptionId = data.id || null;
+          userProfile.polarCustomerId = data.customer_id || customer.id || null;
+          userProfile.updatedAt = new Date().toISOString();
+          await this.state.storage.put(userKey, userProfile);
+
+          // Update user's games to reflect new plan
+          let updated = false;
+          games = games.map(g => {
+            if (g.ownerId === userId || (!g.ownerId && userId === 'dev_local')) {
+              updated = true;
+              return { ...g, plan: targetPlan };
+            }
+            return g;
+          });
+          if (updated) {
+            await this.state.storage.put('catalog_games', games);
+          }
+
+          this._addLog(`[Polar] Plan changed to ${targetPlan.toUpperCase()} for user ${userId}`, targetPlan === 'free' ? 'close' : 'create');
+        }
+
+        return new Response(JSON.stringify({ received: true, event: eventType, plan: targetPlan }), { headers });
+      }
+
+      // 2. Polar Checkout Generator
+      if (url.pathname === '/api/billing/polar/checkout' && request.method === 'POST') {
+        const body = await request.json().catch(() => ({}));
+        const plan = (body.plan || 'pro').toLowerCase();
+        const userId = body.userId || 'dev_local';
+        const email = body.email || '';
+        const origin = url.origin;
+
+        // Direct checkout URL from wrangler env vars if configured
+        const directUrl = plan === 'studio' ? this.env?.POLAR_CHECKOUT_STUDIO_URL : this.env?.POLAR_CHECKOUT_PRO_URL;
+        if (directUrl) {
+          const checkoutUrl = new URL(directUrl);
+          if (email) checkoutUrl.searchParams.set('customer_email', email);
+          checkoutUrl.searchParams.set('metadata[userId]', userId);
+          return new Response(JSON.stringify({ status: 'ok', url: checkoutUrl.toString() }), { headers });
+        }
+
+        // Dynamic Polar API Checkout session
+        if (this.env?.POLAR_ACCESS_TOKEN) {
+          try {
+            const polarRes = await fetch('https://api.polar.sh/v1/checkouts/custom/', {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${this.env.POLAR_ACCESS_TOKEN}`,
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({
+                product_price_id: body.productPriceId || undefined,
+                customer_email: email || undefined,
+                metadata: { userId },
+                success_url: `${origin}/?upgraded=true`
+              })
+            });
+            if (polarRes.ok) {
+              const session = await polarRes.json();
+              if (session.url) {
+                return new Response(JSON.stringify({ status: 'ok', url: session.url }), { headers });
+              }
+            }
+          } catch (e) {
+            console.warn('[Polar:Checkout] API generation fallback', e);
+          }
+        }
+
+        // Fallback info for instant developer onboarding
+        return new Response(JSON.stringify({
+          status: 'ok',
+          mode: 'demo',
+          message: 'Polar checkout link ready. Configure POLAR_CHECKOUT_PRO_URL or POLAR_ACCESS_TOKEN in cloudflare/.dev.vars for live redirect.',
+          url: 'https://polar.sh/'
+        }), { headers });
+      }
+
+      // 3. User Subscription & Plan Status
+      if (url.pathname === '/api/billing/subscription' && request.method === 'GET') {
+        const userId = url.searchParams.get('userId') || 'dev_local';
+        const userProfile = (await this.state.storage.get(`user:${userId}`)) || { id: userId, plan: 'free' };
+        const tier = PLAN_TIERS[userProfile.plan] || PLAN_TIERS.free;
+        return new Response(JSON.stringify({
+          status: 'ok',
+          userId,
+          plan: userProfile.plan,
+          tier,
+          subscription: {
+            id: userProfile.polarSubscriptionId || null,
+            customerId: userProfile.polarCustomerId || null
+          }
+        }, null, 2), { headers });
+      }
+    }
+
+    // ==========================================
+    // 0B. MANAGED TURN CREDENTIALS API (/api/turn-credentials)
+    // ==========================================
+    if (url.pathname === '/api/turn-credentials' && request.method === 'GET') {
+      const apiKey = url.searchParams.get('apiKey') || request.headers.get('Authorization')?.replace('Bearer ', '');
+      const appId = url.searchParams.get('appId');
+
+      let matchedGame = null;
+      if (apiKey) matchedGame = games.find(g => g.apiKey === apiKey);
+      if (!matchedGame && appId) matchedGame = games.find(g => g.id === appId);
+
+      const plan = matchedGame?.plan || 'free';
+      const isPaid = plan === 'pro' || plan === 'studio';
+
+      if (!isPaid) {
+        return new Response(JSON.stringify({
+          status: 'ok',
+          plan: 'free',
+          turnEnabled: false,
+          iceServers: CLOUDFLARE_ICE_SERVERS,
+          message: 'Managed TURN relay requires Pro or Studio plan. Fast STUN servers returned.'
+        }, null, 2), { headers });
+      }
+
+      // Generate time-limited HMAC TURN credentials (RFC 5766)
+      const ttl = 86400; // 24 hours
+      const expiry = Math.floor(Date.now() / 1000) + ttl;
+      const username = `${expiry}:${matchedGame?.id || 'mereb'}`;
+      const turnSecret = this.env?.TURN_SECRET || 'mereb_default_turn_secret_dev_32b';
+      const credential = await generateTurnHmac(turnSecret, username);
+
+      return new Response(JSON.stringify({
+        status: 'ok',
+        plan,
+        turnEnabled: true,
+        ttl,
+        iceServers: [
+          ...CLOUDFLARE_ICE_SERVERS,
+          {
+            urls: [
+              'turn:turn.mereb.dev:3478?transport=udp',
+              'turn:turn.mereb.dev:3478?transport=tcp',
+              'turns:turn.mereb.dev:443?transport=tcp'
+            ],
+            username,
+            credential
+          }
+        ]
+      }, null, 2), { headers });
+    }
+
+    // ==========================================
     // 1. LEADERBOARD API: /api/apps/:appId/leaderboard or /api/leaderboard(s)
     // ==========================================
     const isLbRoute = (
@@ -335,6 +618,8 @@ export class GameRoom {
           apiKey: g.apiKey || `mb_live_${g.id.replace(/[^a-z0-9]/g, '').slice(0, 16)}`,
           createdAt: g.createdAt,
           status: g.status || 'active',
+          plan: g.plan || 'free',
+          ownerId: g.ownerId || 'dev_local',
           activeCCU: gameCCU,
           activeRooms: gameRooms.length
         };
@@ -394,11 +679,28 @@ export class GameRoom {
           return new Response(JSON.stringify({ error: 'An App with this App ID already exists' }), { status: 409, headers });
         }
 
+        const userId = body.userId || request.headers.get('X-Mereb-User-Id') || 'dev_local';
+        const userProfile = (await this.state.storage.get(`user:${userId}`)) || { id: userId, plan: 'free' };
+        const userPlan = userProfile.plan || 'free';
+        const tier = PLAN_TIERS[userPlan] || PLAN_TIERS.free;
+
+        const userGames = games.filter(g => g.ownerId === userId || (!g.ownerId && userId === 'dev_local'));
+        if (userGames.length >= tier.maxGames) {
+          return new Response(JSON.stringify({
+            error: `${tier.name} tier limit reached (${tier.maxGames} game${tier.maxGames > 1 ? 's' : ''}). Upgrade your plan via Polar ($20/mo) to create up to 10 games.`,
+            code: 'PLAN_LIMIT_EXCEEDED',
+            plan: userPlan,
+            maxGames: tier.maxGames
+          }), { status: 403, headers });
+        }
+
         const origin = url.origin;
         const newGame = {
           id,
           name,
           apiKey,
+          ownerId: userId,
+          plan: userPlan,
           createdAt: new Date().toISOString().split('T')[0],
           status: 'active',
           apiLink: `${origin}/api/apps/${id}`
@@ -1067,8 +1369,15 @@ export default {
       }
     }
 
-    // Route Studio Catalog & Leaderboard API to singleton catalog Durable Object
-    if (url.pathname.startsWith('/api/games') || url.pathname.startsWith('/api/catalog') || url.pathname.startsWith('/api/apps') || url.pathname.startsWith('/api/leaderboard')) {
+    // Route Studio Catalog, Polar Billing & Managed TURN API to singleton catalog Durable Object
+    if (
+      url.pathname.startsWith('/api/games') ||
+      url.pathname.startsWith('/api/catalog') ||
+      url.pathname.startsWith('/api/apps') ||
+      url.pathname.startsWith('/api/leaderboard') ||
+      url.pathname.startsWith('/api/billing') ||
+      url.pathname.startsWith('/api/turn-credentials')
+    ) {
       const catalogDoId = env.GAME_ROOM.idFromName('system:studio_catalog');
       const catalogStub = env.GAME_ROOM.get(catalogDoId);
       return catalogStub.fetch(new Request(url.toString(), request));

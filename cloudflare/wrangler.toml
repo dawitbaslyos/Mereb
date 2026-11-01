@@ -12,8 +12,15 @@ tag = "v1"
 new_sqlite_classes = ["GameRoom"]
 
 [vars]
+# Public OAuth Client ID (Safe to commit)
 GITHUB_CLIENT_ID = "Ov23lizozUDKwKt6LRJr"
-GITHUB_CLIENT_SECRET = "f4d2c8a05fdda42f545235e562b23841a20a556d"
+
+# Polar Billing Configuration (Public checkout URLs / Org ID)
+# Secret tokens (POLAR_ACCESS_TOKEN, POLAR_WEBHOOK_SECRET, GITHUB_CLIENT_SECRET)
+# must be placed in cloudflare/.dev.vars locally or added via `wrangler secret put <KEY>` in production.
+POLAR_ORGANIZATION_ID = ""
+POLAR_CHECKOUT_PRO_URL = ""
+POLAR_CHECKOUT_STUDIO_URL = ""
 
 [observability]
 enabled = true

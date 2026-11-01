@@ -5,6 +5,7 @@ import { defineConfig } from 'vite';
 export default defineConfig(({ mode }) => {
   if (mode === 'lib') {
     return {
+      publicDir: false,
       build: {
         outDir: 'dist-sdk',
         lib: {
