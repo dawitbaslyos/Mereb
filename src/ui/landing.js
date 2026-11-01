@@ -30,6 +30,7 @@ export class LandingUI {
   render() {
     const user = auth.getUser();
     const isSigned = user && !user.isGuest;
+    const docsUrl = typeof window !== 'undefined' && window.location.hostname === 'localhost' ? '/docs' : 'https://docs.mereb.cloud';
 
     const universalAiPrompt = `You are an expert game multiplayer engineer integrating Mereb Netcode Cloud into this game.
 
@@ -64,7 +65,7 @@ Inspect my game files (Three.js, Godot 4, or Unity) and implement Mereb netcode 
           </div>
 
           <div class="landing-header-right">
-            <a href="/docs" class="landing-header-link">Docs</a>
+            <a href="${docsUrl}" class="landing-header-link">Docs</a>
             <a href="https://github.com/dawitbaslyos/Mereb" target="_blank" class="landing-header-link">GitHub</a>
             ${isSigned
               ? `<button class="origin-btn origin-btn-primary origin-btn-sm" id="btn-nav-console">Open Console →</button>`
@@ -251,18 +252,18 @@ Inspect my game files (Three.js, Godot 4, or Unity) and implement Mereb netcode 
           <div class="footer-col">
             <h4>Platforms</h4>
             <ul>
-              <li><a href="/docs">HTML5 / Three.js</a></li>
-              <li><a href="/docs">Godot 4 Addon</a></li>
-              <li><a href="/docs">Unity C# WebGL</a></li>
-              <li><a href="/docs">Poki &amp; CrazyGames</a></li>
+              <li><a href="${docsUrl}">HTML5 / Three.js</a></li>
+              <li><a href="${docsUrl}">Godot 4 Addon</a></li>
+              <li><a href="${docsUrl}">Unity C# WebGL</a></li>
+              <li><a href="${docsUrl}">Poki &amp; CrazyGames</a></li>
             </ul>
           </div>
 
           <div class="footer-col">
             <h4>Resources</h4>
             <ul>
-              <li><a href="/docs">Documentation (2026.1 LTS)</a></li>
-              <li><a href="/llms.txt" target="_blank">AI Context (llms.txt)</a></li>
+              <li><a href="${docsUrl}">Documentation</a></li>
+              <li><a href="${docsUrl}/manual/03_WHY_MEREB_IS_BETTER_BENCHMARKS.md">Benchmarks</a></li>
               <li><a href="https://github.com/dawitbaslyos/Mereb" target="_blank">GitHub</a></li>
               <li><a href="https://discord.gg/mereb" target="_blank">Discord</a></li>
             </ul>
