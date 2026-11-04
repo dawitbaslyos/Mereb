@@ -106,10 +106,20 @@ export class DashboardUI {
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
                 <span>Landing Page</span>
               </button>
-              <div class="user-profile-badge">
-                <img src="${user.avatar || 'https://api.dicebear.com/7.x/identicon/svg?seed=mereb'}" alt="Avatar" class="user-avatar" />
-                <span class="user-name">${user.username || 'Developer'}</span>
-              </div>
+              ${auth.isSignedIn() ? `
+                <div class="user-profile-badge">
+                  <img src="${user.avatar || 'https://api.dicebear.com/7.x/identicon/svg?seed=' + (user.username || 'user')}" alt="Avatar" class="user-avatar" />
+                  <span class="user-name">@${user.username}</span>
+                </div>
+                <button class="origin-btn origin-btn-sm" id="btn-dash-logout" title="Sign out of GitHub">
+                  <span>Sign Out</span>
+                </button>
+              ` : `
+                <button class="origin-btn origin-btn-primary origin-btn-sm" id="btn-dash-auth">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+                  <span>Log in with GitHub</span>
+                </button>
+              `}
             </div>
           </div>
         </header>
@@ -631,6 +641,17 @@ npx wrangler deploy</code></pre>
   // Event Bindings
   // ==========================================
   _bindEvents() {
+    // Auth Controls
+    this.element.querySelector('#btn-dash-auth')?.addEventListener('click', () => {
+      auth.loginWithGithub();
+    });
+
+    this.element.querySelector('#btn-dash-logout')?.addEventListener('click', () => {
+      auth.logout();
+      this.render();
+      this._showToast('Signed out of GitHub.');
+    });
+
     // Navigation
     this.element.querySelector('#btn-dash-home')?.addEventListener('click', () => {
       this.currentView = 'overview';
@@ -751,7 +772,7 @@ npx wrangler deploy</code></pre>
 Inspect my game files and implement Mereb netcode end-to-end with full production-ready code.`;
 
       navigator.clipboard.writeText(promptText).then(() => {
-        alert('Copied Game Netcode Prompt to clipboard! Paste it into Cursor, Claude Code, or Antigravity.');
+        this._showToast('Copied Game Netcode Prompt to clipboard!');
       });
     };
 
@@ -795,6 +816,7 @@ Inspect my game files and implement Mereb netcode end-to-end with full productio
         this.selectedGameId = null;
         this.currentView = 'overview';
         this.render();
+        this._showToast(`Deleted "${game.name}"`);
       }
     });
 
@@ -806,14 +828,15 @@ Inspect my game files and implement Mereb netcode end-to-end with full productio
 
     this.element.querySelector('#btn-mock-score')?.addEventListener('click', async (e) => {
       const appId = e.target.getAttribute('data-app-id');
-      const player = prompt('Enter player name:', 'StrikerAce');
-      if (!player) return;
+      const currentUser = auth.getUser();
+      const player = (currentUser?.username && currentUser.username !== 'Developer') ? currentUser.username : 'Striker_' + Math.floor(100 + Math.random() * 900);
       const score = Math.floor(100 + Math.random() * 900);
       try {
         await auth.submitScore(appId, player, score);
         this._loadLeaderboard(appId);
+        this._showToast(`Added score: ${player} — ${score} pts`);
       } catch (err) {
-        alert(err.message);
+        this._showToast(err.message, 'error');
       }
     });
 
@@ -822,8 +845,27 @@ Inspect my game files and implement Mereb netcode end-to-end with full productio
       if (confirm('Clear all scores for this game?')) {
         await auth.clearLeaderboard(appId);
         this._loadLeaderboard(appId);
+        this._showToast('Leaderboard reset successfully');
       }
     });
+  }
+
+  // ==========================================
+  // Toast Notification Helper
+  // ==========================================
+  _showToast(message, type = 'info') {
+    let toast = document.querySelector('.origin-toast');
+    if (!toast) {
+      toast = document.createElement('div');
+      toast.className = 'origin-toast';
+      document.body.appendChild(toast);
+    }
+    toast.textContent = message;
+    toast.className = `origin-toast origin-toast-visible ${type === 'error' ? 'origin-toast-error' : ''}`;
+    clearTimeout(this._toastTimeout);
+    this._toastTimeout = setTimeout(() => {
+      toast.className = 'origin-toast';
+    }, 2800);
   }
 
   // ==========================================
@@ -868,7 +910,7 @@ Inspect my game files and implement Mereb netcode end-to-end with full productio
     modal.querySelector('#modal-create-btn').onclick = () => {
       const title = modal.querySelector('#new-game-title').value;
       if (!title || !title.trim()) {
-        alert('Please enter a valid game title.');
+        this._showToast('Please enter a valid game title.', 'error');
         return;
       }
       try {
@@ -877,8 +919,9 @@ Inspect my game files and implement Mereb netcode end-to-end with full productio
         this.selectedGameId = created.id;
         this.currentView = 'detail';
         this.render();
+        this._showToast(`Game "${title.trim()}" created successfully!`);
       } catch (err) {
-        alert(err.message);
+        this._showToast(err.message, 'error');
       }
     };
   }
@@ -895,7 +938,7 @@ Inspect my game files and implement Mereb netcode end-to-end with full productio
           if (checkout.mode === 'demo') {
             if (confirm(`${checkout.message}\n\nActivate Pro locally for testing now?`)) {
               auth.setPlan('pro');
-              alert('🎉 Workspace activated as Pro ($20/month) for testing!');
+              this._showToast('Workspace activated as Pro for testing!');
               this.render();
             }
           } else {
@@ -903,7 +946,7 @@ Inspect my game files and implement Mereb netcode end-to-end with full productio
           }
         }
       } catch (e) {
-        alert('Could not start checkout: ' + e.message);
+        this._showToast('Could not start checkout: ' + e.message, 'error');
       }
     }
   }

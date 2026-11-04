@@ -1,7 +1,6 @@
 /**
- * Mereb Cloud - Landing Page
- * Aesthetic: Pure Black & White (#000000 / #ffffff) + San Francisco (SF Pro)
- * Inspired by Mobbin's 2026 Editorial Minimalism ("Where developers and agents build")
+ * Mereb Cloud - Official Landing Page
+ * Clean, high-performance, developer-first presentation.
  */
 import { auth } from './auth.js';
 
@@ -12,10 +11,6 @@ export class LandingUI {
     this.element = document.createElement('div');
     this.element.className = 'landing-root';
 
-    // Interactive Widget States
-    this.widgetVpsMode = 'p2p'; // 'p2p' | 'vps'
-    this.adSimState = 'idle'; // 'idle' | 'simulating' | 'preserved'
-
     auth.onChange(() => {
       this.render();
     });
@@ -24,31 +19,13 @@ export class LandingUI {
   }
 
   destroy() {
-    // Cleanup if needed
+    // Cleanup
   }
 
   render() {
     const user = auth.getUser();
-    const isSigned = user && !user.isGuest;
+    const isSigned = auth.isSignedIn();
     const docsUrl = typeof window !== 'undefined' && window.location.hostname === 'localhost' ? '/docs' : 'https://docs.mereb.cloud';
-
-    const universalAiPrompt = `You are an expert game multiplayer engineer integrating Mereb Netcode Cloud into this game.
-
-Mereb is a high-performance, zero-cost WebRTC UDP multiplayer engine with Cloudflare Edge signaling.
-
-### Mereb Cloud Public Endpoints:
-- WebSocket & WebRTC Edge Signaling: wss://mereb-signaling.dawitbaslyos.workers.dev/v1/{YOUR_APP_ID}/{ROOM_ID}?key={YOUR_API_KEY}
-- HTTP Broadcast API: https://mereb-signaling.dawitbaslyos.workers.dev/v1/{YOUR_APP_ID}/{ROOM_ID}/broadcast
-- Global Leaderboard API: https://mereb-signaling.dawitbaslyos.workers.dev/api/apps/{YOUR_APP_ID}/leaderboard
-
-### Integration Architecture:
-1. P2P Direct WebRTC UDP DataChannels: Use 'unreliable' channel (ordered: false, maxRetransmits: 0, binaryType: 'arraybuffer') for 30-60Hz physics transforms (positions, velocities, rotations).
-2. Reliable Channel: Use 'reliable' channel (ordered: true) for match events (game over, score updates, weapon triggers).
-3. Cloudflare WebSocket Fallback: Keep WebSocket signaling connection open as an automatic zero-downtime fallback.
-4. Compact Binary Stream: Pack transforms with fixed-point int16 coordinates (* 100) and 1-byte bitmasks for player states (95% bandwidth reduction).
-5. Frame-0 Client Prediction: Predict local player actions immediately on frame 0, then smoothly interpolate remote state.
-
-Inspect my game files (Three.js, Godot 4, or Unity) and implement Mereb netcode end-to-end with full production-ready code.`;
 
     this.element.innerHTML = `
       <!-- Floating Navigation Header -->
@@ -61,7 +38,7 @@ Inspect my game files (Three.js, Godot 4, or Unity) and implement Mereb netcode 
 
           <div class="landing-header-status">
             <span class="live-green-pulse"></span>
-            <span>All Systems Operational</span>
+            <span>Edge Mesh Operational</span>
           </div>
 
           <div class="landing-header-right">
@@ -75,38 +52,49 @@ Inspect my game files (Three.js, Godot 4, or Unity) and implement Mereb netcode 
         </div>
       </header>
 
-      <!-- SECTION 1: THE HERO (Mobbin "Teams and Agents" Pattern) -->
+      <!-- SECTION 1: HERO -->
       <section class="landing-hero" id="hero">
         <div class="hero-authority-badge">
           <span class="live-green-pulse"></span>
-          <span>The #1 way to build multiplayer games</span>
+          <span>Serverless WebRTC Netcode &amp; Matchmaking</span>
         </div>
 
         <h1 class="hero-headline">
-          Where developers and agents<br />build multiplayer games.
+          The multiplayer engine<br />for web &amp; indie games.
         </h1>
 
         <p class="hero-subline">
-          Multiplayer used to take months of netcode and surprise server bills. Now, it's one prompt. Free forever for your first game.
+          Zero dedicated game servers. Zero surprise bills. Authoritative 60Hz physics streams directly peer-to-peer over low-latency WebRTC UDP, backed by Cloudflare edge matchmaking.
         </p>
 
         <div class="hero-actions">
-          <button class="origin-btn origin-btn-primary origin-btn-pill" id="btn-hero-copy-prompt">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
-            <span>Copy prompt</span>
-          </button>
+          ${isSigned
+            ? `<button class="origin-btn origin-btn-primary origin-btn-pill" id="btn-hero-console">
+                 <span>Open Console →</span>
+               </button>`
+            : `<button class="origin-btn origin-btn-primary origin-btn-pill" id="btn-hero-auth">
+                 <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
+                 <span>Log in with GitHub</span>
+               </button>`
+          }
 
           <button class="origin-btn origin-btn-pill" id="btn-hero-test-game">
-            <span>Test 3D game →</span>
+            <span>Play 3D Demo →</span>
           </button>
+          
+          <a href="${docsUrl}" class="origin-btn origin-btn-pill" style="text-decoration:none;">
+            <span>Documentation</span>
+          </a>
         </div>
 
         <div class="hero-trust-bar">
           <span>Three.js</span>
           <span>•</span>
-          <span>Godot</span>
+          <span>Godot 4</span>
           <span>•</span>
-          <span>Unity</span>
+          <span>Unity WebGL</span>
+          <span>•</span>
+          <span>React</span>
           <span>•</span>
           <span>Poki</span>
           <span>•</span>
@@ -114,29 +102,21 @@ Inspect my game files (Three.js, Godot 4, or Unity) and implement Mereb netcode 
         </div>
       </section>
 
-      <!-- SECTION 2: THE EDITORIAL "BEFORE VS. NOW" SHOWCASES -->
+      <!-- SECTION 2: SHOWCASE FEATURES -->
       <section class="landing-showcase-section" id="features">
-        <!-- Feature 1: The AI Agent & MCP Angle -->
+        <!-- Feature 1: 60-Second Setup -->
         <div class="showcase-block">
           <div class="showcase-block-content">
-            <span class="sub-tag">MCP & AGENT SKILL</span>
-            <h3>Multiplayer took months. Now, it's one prompt.</h3>
-            <p>Every indie developer has a folder of unfinished game prototypes. Building the networking alone meant weeks of WebSockets, NAT traversal, and state sync. With Mereb, your AI coding agent connects your game in 60 seconds.</p>
+            <span class="sub-tag">MINIMAL NETCODE</span>
+            <h3>Real-time multiplayer in 5 lines of code.</h3>
+            <p>Skip weeks of WebSocket plumbing, ICE signaling, and NAT punchthrough. Instantiate <code>MerebClient</code>, hook match start, and let the engine negotiate low-latency WebRTC DataChannels automatically.</p>
           </div>
           <div class="widget-interactive-box">
-            <div class="agent-chat-bubble">
-              <div style="font-size: 11px; font-family: var(--font-mono); color: var(--text-dim); display: flex; align-items: center; gap: 6px;">
-                <span>🤖 AGENT PROMPT</span>
-              </div>
-              <div>"Make my Three.js arena multiplayer with room lobbies and 60Hz transform sync using Mereb."</div>
-            </div>
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 4px;">
-              <div class="prompt-sim-terminal">
-                ✔ 2 peers connected via WebRTC in 28ms
-              </div>
-              <button class="origin-copy-pill" id="btn-widget-copy-prompt">
-                <span>Copy Prompt</span>
-              </button>
+            <div style="font-family: var(--font-mono); font-size: 12px; line-height: 1.6; color: #e2e8f0; background: #0d1117; padding: 16px; border-radius: 8px; border: 1px solid var(--border);">
+              <span style="color: #ff7b72;">import</span> { MerebClient } <span style="color: #ff7b72;">from</span> <span style="color: #a5d6ff;">'mereb-netcode'</span>;<br/>
+              <span style="color: #ff7b72;">const</span> net = <span style="color: #ff7b72;">new</span> MerebClient({ host: <span style="color: #a5d6ff;">'mereb-signaling.workers.dev'</span> });<br/>
+              net.<span style="color: #d2a8ff;">quickPlay</span>();<br/>
+              net.<span style="color: #d2a8ff;">on</span>(<span style="color: #a5d6ff;">'state'</span>, (state) =&gt; updatePlayer(state));
             </div>
           </div>
         </div>
@@ -144,45 +124,41 @@ Inspect my game files (Three.js, Godot 4, or Unity) and implement Mereb netcode 
         <!-- Feature 2: Web Portal Ad Shield -->
         <div class="showcase-block">
           <div class="showcase-block-content">
-            <span class="sub-tag">WEB PORTAL DEFENSE</span>
-            <h3>Video ads used to disconnect your players. Not anymore.</h3>
-            <p>When players watch rewarded or interstitial ads on Poki or CrazyGames, browser tabs freeze and standard WebSocket servers drop the connection. Mereb pauses state gracefully and restores sync the instant the ad finishes.</p>
+            <span class="sub-tag">PORTAL MONETIZATION</span>
+            <h3>Video ads don't disconnect your players anymore.</h3>
+            <p>When players trigger commercial breaks or rewarded videos on Poki and CrazyGames, web browsers aggressively throttle background execution. Mereb's <code>PortalManager</code> buffers state and pauses timeouts so connections survive cleanly.</p>
           </div>
           <div class="widget-interactive-box">
-            <div class="ad-sim-bar">
-              <button class="ad-sim-btn origin-btn-primary" id="btn-ad-sim">
-                ${this.adSimState === 'simulating' ? 'Simulating 5s Ad...' : 'Simulate Video Ad'}
-              </button>
-              <div class="ad-sim-result" id="ad-sim-display">
-                ${this.adSimState === 'simulating'
-                  ? `<span style="color: #eab308;">⏳ Tab paused for ad...</span>`
-                  : `<span style="color: #4ade80;">🟢 Connection Preserved · 0 Drops</span>`
-                }
+            <div style="padding: 18px; background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border); border-radius: 8px;">
+              <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+                <span style="font-size: 13px; font-weight: 600; color: #fff;">Portal Lifecycle Handshake</span>
+                <span style="font-size: 11px; font-family: var(--font-mono); color: #4ade80;">Active</span>
               </div>
-            </div>
-            <div style="font-size: 11px; font-family: var(--font-mono); color: var(--text-dim);">
-              SDK auto-buffers position deltas during iframe ad pauses.
+              <p style="font-size: 12px; color: var(--text-dim); margin-bottom: 12px;">Automatic WebRTC freeze prevention for PokiSDK and CrazyGames SDK integrations.</p>
+              <div style="font-family: var(--font-mono); font-size: 11px; color: #a5d6ff; background: #000; padding: 8px 12px; border-radius: 4px;">
+                net.usePortal('poki', window.PokiSDK);
+              </div>
             </div>
           </div>
         </div>
 
-        <!-- Feature 3: Architecture on Demand -->
+        <!-- Feature 3: Binary Packing -->
         <div class="showcase-block">
           <div class="showcase-block-content">
-            <span class="sub-tag">ARCHITECTURE ON DEMAND</span>
-            <h3>Start free on P2P. Switch to dedicated VPS when you go viral.</h3>
-            <p>Zero server bills while you build and test. When your game hits the front page and needs authoritative physics or anti-cheat, flip one switch in your dashboard. Zero client code changes.</p>
+            <span class="sub-tag">PERFORMANCE</span>
+            <h3>85% bandwidth reduction with binary packing.</h3>
+            <p>Stop serializing heavy JSON strings at 60Hz. Mereb's <code>defineSchema</code> packs continuous world telemetry into tiny ~35-byte binary ArrayBuffers with fixed-point precision, eliminating Garbage Collector micro-stutter.</p>
           </div>
           <div class="widget-interactive-box">
-            <div class="vps-toggle-bar">
-              <button class="vps-toggle-btn ${this.widgetVpsMode === 'p2p' ? 'active' : ''}" id="toggle-mode-p2p">Free P2P Mesh</button>
-              <button class="vps-toggle-btn ${this.widgetVpsMode === 'vps' ? 'active' : ''}" id="toggle-mode-vps">Dedicated VPS</button>
-            </div>
-            <div class="vps-toggle-status" id="vps-status-display">
-              ${this.widgetVpsMode === 'p2p'
-                ? `<span>🟢 Sub-15ms direct peer data</span><span>$0.00 / month</span>`
-                : `<span>⚡ Authoritative server ticks</span><span>$20.00 / month</span>`
-              }
+            <div style="padding: 18px; background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border); border-radius: 8px;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                <span style="font-size: 13px; font-weight: 600;">Standard JSON: 240 bytes / tick</span>
+                <span style="font-size: 12px; color: #ef4444;">High Overhead</span>
+              </div>
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span style="font-size: 13px; font-weight: 600; color: #4ade80;">Mereb Binary: 35 bytes / tick</span>
+                <span style="font-size: 12px; color: #4ade80;">85.4% Saved</span>
+              </div>
             </div>
           </div>
         </div>
@@ -190,22 +166,22 @@ Inspect my game files (Three.js, Godot 4, or Unity) and implement Mereb netcode 
         <!-- Feature 4: Honest Transparent Pricing -->
         <div class="showcase-block">
           <div class="showcase-block-content">
-            <span class="sub-tag">TRANSPARENT HOSTING</span>
-            <h3>Free forever for your first game. No credit card traps.</h3>
-            <p>Host your first web or mobile game with unlimited players for free. Upgrade to Pro for $20/month flat only when you publish your second game.</p>
+            <span class="sub-tag">ECONOMICS</span>
+            <h3>Free forever for your first game. No credit card required.</h3>
+            <p>Launch your first game with unlimited CCU and zero hosting bills. Upgrade to Pro ($20/month flat) only when scaling across multiple titles.</p>
           </div>
           <div class="widget-interactive-box">
             <div class="pricing-pill-row">
               <div>
                 <strong style="font-size: 14px; color: #ffffff;">Game 1: Free Forever</strong>
-                <div style="font-size: 12px; color: var(--text-dim);">Unlimited players · Full P2P + Edge WebRTC</div>
+                <div style="font-size: 12px; color: var(--text-dim);">Unlimited players · Direct P2P WebRTC UDP</div>
               </div>
               <div style="font-size: 20px; font-weight: 800; color: #ffffff;">$0</div>
             </div>
             <div class="pricing-pill-row">
               <div>
                 <strong style="font-size: 14px; color: #ffffff;">Game 2+: Pro Tier</strong>
-                <div style="font-size: 12px; color: var(--text-dim);">Unlimited Games + Dedicated VPS Matchmaker</div>
+                <div style="font-size: 12px; color: var(--text-dim);">Up to 10 Games · Managed Port 443 TLS TURN</div>
               </div>
               <div style="font-size: 20px; font-weight: 800; color: #ffffff;">$20<span style="font-size: 12px; font-weight: normal; color: var(--text-dim);">/mo</span></div>
             </div>
@@ -213,22 +189,22 @@ Inspect my game files (Three.js, Godot 4, or Unity) and implement Mereb netcode 
         </div>
       </section>
 
-      <!-- SECTION 3: THE AUTHENTIC HUMAN STORY (Mobbin 0:42 pattern) -->
+      <!-- SECTION 3: EDITORIAL ORIGIN -->
       <section class="landing-origin-section">
         <div class="landing-origin-card">
           <span style="font-size: 28px; line-height: 1;">❝</span>
-          <h3>Built because game hosting was broken.</h3>
+          <h3>Built because game multiplayer hosting was broken.</h3>
           <p>
-            Mereb started because making a simple 2-player web game shouldn't require configuring Kubernetes or paying $100/month for server bandwidth before you even have players. It's built for indie creators and AI agents who just want games to work with zero friction.
+            Building a simple 2-player indie web game shouldn't require managing Kubernetes clusters or paying $150 to $1,000/month in cloud container bills before you even have active players. Mereb routes 60Hz gameplay directly between peers so you focus purely on the game.
           </p>
         </div>
       </section>
 
-      <!-- SECTION 4: EDITORIAL CLOSING CTA -->
+      <!-- SECTION 4: CALL TO ACTION -->
       <section class="landing-cta-section">
         <div class="landing-cta-card">
-          <h2>Find what works. Build what's next.</h2>
-          <p>Copy the prompt, open your editor, and see your players moving together in under 60 seconds.</p>
+          <h2>Ready to ship real-time multiplayer?</h2>
+          <p>Connect your GitHub account and launch your first zero-cost multiplayer endpoint in 60 seconds.</p>
           ${isSigned
             ? `<button class="origin-btn origin-btn-primary origin-btn-pill" id="btn-cta-console" style="padding: 14px 32px; font-size: 15px;">Open Console →</button>`
             : `<button class="origin-btn origin-btn-primary origin-btn-pill" id="btn-cta-auth" style="padding: 14px 32px; font-size: 15px;">Continue with GitHub</button>`
@@ -236,7 +212,7 @@ Inspect my game files (Three.js, Godot 4, or Unity) and implement Mereb netcode 
         </div>
       </section>
 
-      <!-- SECTION 5: THE SEXY MINIMAL FOOTER -->
+      <!-- SECTION 5: FOOTER -->
       <footer class="landing-footer">
         <div class="landing-footer-inner">
           <div class="footer-col">
@@ -245,7 +221,7 @@ Inspect my game files (Three.js, Godot 4, or Unity) and implement Mereb netcode 
               <span>MEREB</span>
             </div>
             <p style="font-size: 13px; color: var(--text-dim); max-width: 240px; line-height: 1.5;">
-              The #1 way to build multiplayer games. Pure black and white. Zero bloat.
+              Serverless WebRTC P2P multiplayer netcode &amp; edge matchmaking engine.
             </p>
           </div>
 
@@ -274,46 +250,27 @@ Inspect my game files (Three.js, Godot 4, or Unity) and implement Mereb netcode 
             <ul>
               <li><a href="#hero">Terms of Service</a></li>
               <li><a href="#hero">Privacy Policy</a></li>
-              <li><a href="#hero">Security</a></li>
             </ul>
           </div>
-        </div>
-
-        <div class="footer-bottom-bar">
-          <span>© 2026 Mereb Inc. All rights reserved.</span>
-          <span>Free forever for your first game.</span>
         </div>
       </footer>
     `;
 
-    this._bindEvents(universalAiPrompt);
+    this._bindEvents();
   }
 
-  _bindEvents(universalAiPrompt) {
-    const copyPrompt = () => {
-      navigator.clipboard.writeText(universalAiPrompt).then(() => {
-        alert('Copied 1-Prompt Integration to clipboard! Paste into Cursor, Claude Code, or Antigravity.');
-      });
-    };
-
-    // Copy Prompt Buttons
-    this.element.querySelector('#btn-hero-copy-prompt')?.addEventListener('click', copyPrompt);
-    this.element.querySelector('#btn-widget-copy-prompt')?.addEventListener('click', copyPrompt);
-
-    // Test Game Button
+  _bindEvents() {
+    // Play 3D Demo Button
     this.element.querySelector('#btn-hero-test-game')?.addEventListener('click', () => {
       if (this.onLaunchGame) this.onLaunchGame();
     });
 
-    // Navigation & Auth Buttons
+    // Navigation & Auth Action Handler
     const handleAuthOrConsole = () => {
-      const user = auth.getUser();
-      if (user && !user.isGuest) {
+      if (auth.isSignedIn()) {
         if (this.onNavigateDashboard) this.onNavigateDashboard();
       } else {
-        auth.showGithubLoginModal(() => {
-          if (this.onNavigateDashboard) this.onNavigateDashboard();
-        });
+        auth.loginWithGithub();
       }
     };
 
@@ -321,30 +278,14 @@ Inspect my game files (Three.js, Godot 4, or Unity) and implement Mereb netcode 
       if (this.onNavigateDashboard) this.onNavigateDashboard();
     });
     this.element.querySelector('#btn-nav-auth')?.addEventListener('click', handleAuthOrConsole);
+    this.element.querySelector('#btn-hero-console')?.addEventListener('click', () => {
+      if (this.onNavigateDashboard) this.onNavigateDashboard();
+    });
+    this.element.querySelector('#btn-hero-auth')?.addEventListener('click', handleAuthOrConsole);
     this.element.querySelector('#btn-cta-console')?.addEventListener('click', () => {
       if (this.onNavigateDashboard) this.onNavigateDashboard();
     });
     this.element.querySelector('#btn-cta-auth')?.addEventListener('click', handleAuthOrConsole);
-
-    // Interactive Widget 1: P2P ⇄ VPS Switch
-    this.element.querySelector('#toggle-mode-p2p')?.addEventListener('click', () => {
-      this.widgetVpsMode = 'p2p';
-      this.render();
-    });
-    this.element.querySelector('#toggle-mode-vps')?.addEventListener('click', () => {
-      this.widgetVpsMode = 'vps';
-      this.render();
-    });
-
-    // Interactive Widget 2: Ad Simulator
-    this.element.querySelector('#btn-ad-sim')?.addEventListener('click', () => {
-      this.adSimState = 'simulating';
-      this.render();
-      setTimeout(() => {
-        this.adSimState = 'preserved';
-        this.render();
-      }, 1500);
-    });
   }
 
   getElement() {

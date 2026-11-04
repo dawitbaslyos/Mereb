@@ -305,120 +305,18 @@ export class AuthService {
   }
 
   isAuthenticated() {
-    return !!this.user;
+    return this.isSignedIn();
   }
 
-  showGithubLoginModal(onSuccess = null) {
-    const existing = document.querySelector('.auth-modal-backdrop');
-    if (existing) existing.remove();
-
-    const modal = document.createElement('div');
-    modal.className = 'modal-backdrop auth-modal-backdrop';
-    modal.innerHTML = `
-      <div class="modal-dialog">
-        <div class="modal-header">
-          <div style="display: flex; align-items: center; gap: 8px;">
-            <div class="dash-brand-icon" style="width: 22px; height: 22px; font-size: 11px;">M</div>
-            <h3 style="font-size: 16px;">Sign in to Mereb</h3>
-          </div>
-          <button class="modal-close" id="auth-modal-close">&times;</button>
-        </div>
-
-        <div class="modal-body">
-          <div style="background: rgba(255, 255, 255, 0.04); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 14px; margin-bottom: 16px;">
-            <div style="font-size: 13px; font-weight: 600; color: #ffffff; margin-bottom: 2px;">Your first game is free forever</div>
-            <div style="font-size: 12px; color: var(--text-dim);">No credit card required. Connect your GitHub profile to manage multiplayer endpoints.</div>
-          </div>
-
-          <label class="modal-label">GITHUB USERNAME</label>
-          <input type="text" id="auth-github-input" class="modal-input" placeholder="e.g. dawitbaslyos" value="${this.user?.username && this.user.username !== 'Developer' ? this.user.username : ''}" autofocus />
-        </div>
-
-        <div class="modal-footer">
-          <button class="origin-btn origin-btn-sm" id="auth-modal-cancel">Cancel</button>
-          <button class="origin-btn origin-btn-primary origin-btn-sm" id="auth-modal-submit">Continue with GitHub</button>
-        </div>
-      </div>
-    `;
-
-    document.body.appendChild(modal);
-
-    const close = () => modal.remove();
-    modal.querySelector('#auth-modal-close').onclick = close;
-    modal.querySelector('#auth-modal-cancel').onclick = close;
-
-    const submit = async () => {
-      const input = modal.querySelector('#auth-github-input').value.trim();
-      const username = input || 'dawitbaslyos';
-      close();
-      await this.loginWithGithub(username);
-      if (onSuccess) onSuccess();
-    };
-
-    modal.querySelector('#auth-modal-submit').onclick = submit;
-    modal.querySelector('#auth-github-input').addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') submit();
-    });
+  isSignedIn() {
+    return !!(this.user && !this.user.isGuest && this.user.id && this.user.id !== 'dev_local');
   }
 
-  async loginWithGithub(customUsername = null, host = 'https://mereb-signaling.dawitbaslyos.workers.dev') {
-    // 1. Check if OAuth app is configured on Cloudflare Edge
-    try {
-      const configRes = await fetch(`${host}/api/auth/github/config`);
-      if (configRes.ok) {
-        const { clientId, configured } = await configRes.json();
-        if (configured && clientId) {
-          // Official GitHub OAuth Redirect
-          const redirectUri = window.location.origin.replace(/\/+$/, '') + window.location.pathname.replace(/\/+$/, '');
-          const authUrl = `https://github.com/login/oauth/authorize?client_id=${clientId}&scope=read:user,user:email&redirect_uri=${encodeURIComponent(redirectUri)}`;
-          window.location.href = authUrl;
-          return;
-        }
-      }
-    } catch {}
-
-    // 2. Instant Live GitHub Profile Connection (Zero-setup mode)
-    let username = customUsername;
-    if (!username) {
-      username = prompt('Enter your GitHub username to connect your live profile:', this.user?.username || 'dawitbaslyos');
-      if (!username || !username.trim()) return null;
-      username = username.trim();
-    }
-
-    try {
-      const res = await fetch(`${host}/api/auth/github/profile?username=${encodeURIComponent(username)}`);
-      if (res.ok) {
-        const data = await res.json();
-        if (data.user) {
-          this.user = data.user;
-          try {
-            localStorage.setItem(STORAGE_KEY_USER, JSON.stringify(this.user));
-          } catch {}
-          this._notify();
-          return this.user;
-        }
-      }
-    } catch (err) {
-      console.warn('Profile fetch warning:', err);
-    }
-
-    // 3. Fallback
-    const fallbackUser = {
-      id: 'gh_' + Math.floor(Math.random() * 1000000),
-      username: username || 'dawitbaslyos',
-      name: username || 'Dawit Abiy',
-      avatar: `https://github.com/${username || 'dawitbaslyos'}.png`,
-      email: `${username || 'dawitbaslyos'}@users.noreply.github.com`,
-      plan: 'free',
-      maxProjects: 1
-    };
-
-    this.user = fallbackUser;
-    try {
-      localStorage.setItem(STORAGE_KEY_USER, JSON.stringify(fallbackUser));
-    } catch {}
-    this._notify();
-    return fallbackUser;
+  loginWithGithub() {
+    const clientId = 'Ov23lizozUDKwKt6LRJr';
+    const redirectUri = window.location.origin.replace(/\/+$/, '') + window.location.pathname.replace(/\/+$/, '');
+    const authUrl = `https://github.com/login/oauth/authorize?client_id=${clientId}&scope=read:user,user:email&redirect_uri=${encodeURIComponent(redirectUri)}`;
+    window.location.href = authUrl;
   }
 
   async handleAuthCallback(code, host = 'https://mereb-signaling.dawitbaslyos.workers.dev') {
@@ -433,7 +331,10 @@ export class AuthService {
       if (res.ok) {
         const data = await res.json();
         if (data.user) {
-          this.user = data.user;
+          this.user = {
+            ...data.user,
+            isGuest: false
+          };
           try {
             localStorage.setItem(STORAGE_KEY_USER, JSON.stringify(this.user));
           } catch {}

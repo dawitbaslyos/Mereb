@@ -1561,6 +1561,37 @@ body.in-game-mode {
   margin-top: 8px;
 }
 
+/* Sleek Toast Notifications */
+.origin-toast {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  background: #111115;
+  border: 1px solid var(--border-active);
+  color: #ffffff;
+  padding: 10px 18px;
+  border-radius: var(--radius-md);
+  font-size: 13px;
+  font-weight: 500;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  z-index: 99999;
+  opacity: 0;
+  transform: translateY(12px);
+  pointer-events: none;
+  transition: opacity 0.2s ease, transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.origin-toast.origin-toast-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+.origin-toast-error {
+  border-color: #ef4444 !important;
+  color: #fca5a5 !important;
+}
+
 /* Responsive queries */
 @media (max-width: 768px) {
   .tremor-grid { grid-template-columns: 1fr; }
