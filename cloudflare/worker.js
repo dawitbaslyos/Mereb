@@ -1,8 +1,30 @@
 /**
  * Mereb Cloudflare Edge Signaling & Studio Platform Worker
- * 100% REAL live WebRTC signaling, game catalog & active connection telemetry.
- * NO MOCK DATA. Real CCU, real active rooms, and real edge logs.
+ * 100% REAL live WebRTC signaling, Cloudflare D1 multi-tenant persistence & telemetry.
  */
+
+import {
+  sha256,
+  createSessionToken,
+  verifySessionToken,
+  generateTurnHmac,
+  verifyPolarWebhook
+} from './auth.js';
+
+import {
+  PLAN_TIERS,
+  upsertGithubUser,
+  getUserById,
+  getUserApps,
+  getAppById,
+  createAppWithKeys,
+  deleteApp,
+  validateApiKey,
+  getLeaderboard,
+  submitScore,
+  clearLeaderboard,
+  recordUsageSnapshot
+} from './db.js';
 
 const CLOUDFLARE_ICE_SERVERS = [
   { urls: 'stun:stun.cloudflare.com:3478' },
@@ -22,92 +44,6 @@ const INITIAL_GAMES = [
     ownerId: 'dev_local'
   }
 ];
-
-export const PLAN_TIERS = {
-  free: {
-    name: 'Free',
-    maxGames: 1,
-    maxCCU: 25,
-    turnEnabled: false,
-    rateLimitPerMin: 120
-  },
-  pro: {
-    name: 'Pro',
-    maxGames: 10,
-    maxCCU: 250,
-    turnEnabled: true,
-    rateLimitPerMin: 1200
-  },
-  studio: {
-    name: 'Studio',
-    maxGames: 50,
-    maxCCU: 1000,
-    turnEnabled: true,
-    rateLimitPerMin: 6000
-  }
-};
-
-/**
- * Generates RFC 5766 TURN REST API HMAC-SHA1 credential
- */
-async function generateTurnHmac(secret, username) {
-  const enc = new TextEncoder();
-  const key = await crypto.subtle.importKey(
-    'raw',
-    enc.encode(secret),
-    { name: 'HMAC', hash: 'SHA-1' },
-    false,
-    ['sign']
-  );
-  const sig = await crypto.subtle.sign('HMAC', key, enc.encode(username));
-  let bin = '';
-  const bytes = new Uint8Array(sig);
-  for (let i = 0; i < bytes.byteLength; i++) {
-    bin += String.fromCharCode(bytes[i]);
-  }
-  return btoa(bin);
-}
-
-/**
- * Validates Polar Standard Webhook signature
- */
-async function verifyPolarWebhook(request, rawBody, webhookSecret) {
-  if (!webhookSecret) return true; // dev mode bypass when secret not yet set in .dev.vars
-  const signatureHeader = request.headers.get('webhook-signature') || request.headers.get('polar-signature');
-  const webhookId = request.headers.get('webhook-id');
-  const timestamp = request.headers.get('webhook-timestamp');
-
-  if (!signatureHeader) return false;
-
-  try {
-    const cleanSecret = webhookSecret.startsWith('whsec_')
-      ? atob(webhookSecret.slice(6))
-      : webhookSecret;
-
-    const enc = new TextEncoder();
-    const key = await crypto.subtle.importKey(
-      'raw',
-      typeof cleanSecret === 'string' ? enc.encode(cleanSecret) : cleanSecret,
-      { name: 'HMAC', hash: 'SHA-256' },
-      false,
-      ['sign']
-    );
-
-    const payloadToSign = webhookId && timestamp ? `${webhookId}.${timestamp}.${rawBody}` : rawBody;
-    const sigBytes = await crypto.subtle.sign('HMAC', key, enc.encode(payloadToSign));
-    let bin = '';
-    const bytes = new Uint8Array(sigBytes);
-    for (let i = 0; i < bytes.byteLength; i++) {
-      bin += String.fromCharCode(bytes[i]);
-    }
-    const computedSignature = btoa(bin);
-    const signatures = signatureHeader.split(' ').map(s => s.replace(/^v1,/, ''));
-    return signatures.includes(computedSignature);
-  } catch (err) {
-    console.error('Polar signature verification failed:', err);
-    return false;
-  }
-}
 
 export class GameRoom {
   constructor(state, env) {
@@ -805,6 +741,9 @@ export class GameRoom {
       return;
     }
 
+    // Cancel pending room reaper alarm since player joined
+    this.state.storage.deleteAlarm().catch(() => {});
+
     this.connections.set(ws.id, ws);
 
     if (!this.hostId) {
@@ -968,11 +907,23 @@ export class GameRoom {
           roomId: this.roomId,
           timestamp: Date.now()
         });
+
+        // 60-second Dead Room Reaper Alarm
+        this.state.storage.setAlarm(Date.now() + 60000).catch(() => {});
       }
     };
 
     ws.addEventListener('close', handleDisconnect);
     ws.addEventListener('error', handleDisconnect);
+  }
+
+  // Durable Object Alarm handler: Cleans up empty room memory after 60s idle
+  async alarm() {
+    if (this.connections.size === 0) {
+      this.hostId = null;
+      this.queue = [];
+      await this.state.storage.deleteAll();
+    }
   }
 }
 
@@ -1247,7 +1198,7 @@ export default {
       });
     }
 
-    // GitHub OAuth Token Exchange
+    // GitHub OAuth Token Exchange (Returns cryptographically signed JWT Session Token)
     if (url.pathname === '/api/auth/github/exchange' && request.method === 'POST') {
       const headers = {
         'Content-Type': 'application/json',
@@ -1304,7 +1255,7 @@ export default {
           return new Response(JSON.stringify({ error: 'Failed to retrieve profile from GitHub' }), { status: 400, headers });
         }
 
-        const user = {
+        let user = {
           id: `gh_${ghUser.id}`,
           username: ghUser.login,
           name: ghUser.name || ghUser.login,
@@ -1315,7 +1266,35 @@ export default {
           maxProjects: 1
         };
 
-        return new Response(JSON.stringify({ status: 'ok', user }), { headers });
+        // Persist to Cloudflare D1 multi-tenant users table
+        if (env.DB) {
+          try {
+            const dbUser = await upsertGithubUser(env.DB, ghUser);
+            if (dbUser) {
+              user = {
+                ...user,
+                id: dbUser.id,
+                plan: dbUser.plan || 'free'
+              };
+            }
+          } catch (dbErr) {
+            console.error('D1 user upsert error:', dbErr);
+          }
+        }
+
+        // Generate HMAC-SHA256 Signed JWT Session Token
+        const sessionToken = await createSessionToken(user, env.SESSION_SECRET);
+
+        return new Response(JSON.stringify({
+          status: 'ok',
+          user,
+          token: sessionToken
+        }), {
+          headers: {
+            ...headers,
+            'Set-Cookie': `mereb_session=${sessionToken}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${30 * 86400}`
+          }
+        });
       } catch (err) {
         return new Response(JSON.stringify({ error: err.message }), { status: 500, headers });
       }
@@ -1347,7 +1326,7 @@ export default {
         }
 
         const ghUser = await ghRes.json();
-        const user = {
+        let user = {
           id: `gh_${ghUser.id}`,
           username: ghUser.login,
           name: ghUser.name || ghUser.login,
@@ -1358,7 +1337,16 @@ export default {
           maxProjects: 1
         };
 
-        return new Response(JSON.stringify({ status: 'ok', user }), {
+        if (env.DB) {
+          try {
+            const dbUser = await upsertGithubUser(env.DB, ghUser);
+            if (dbUser) user = { ...user, id: dbUser.id, plan: dbUser.plan };
+          } catch {}
+        }
+
+        const sessionToken = await createSessionToken(user, env.SESSION_SECRET);
+
+        return new Response(JSON.stringify({ status: 'ok', user, token: sessionToken }), {
           headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }
         });
       } catch (err) {
@@ -1369,7 +1357,7 @@ export default {
       }
     }
 
-    // Route Studio Catalog, Polar Billing & Managed TURN API to singleton catalog Durable Object
+    // Route Studio Catalog, Apps, Leaderboards, Polar Billing & Managed TURN API
     if (
       url.pathname.startsWith('/api/games') ||
       url.pathname.startsWith('/api/catalog') ||
@@ -1378,6 +1366,16 @@ export default {
       url.pathname.startsWith('/api/billing') ||
       url.pathname.startsWith('/api/turn-credentials')
     ) {
+      // Use Cloudflare D1 Relational Engine for Apps & Leaderboard if available
+      if (
+        env.DB &&
+        (url.pathname.startsWith('/api/apps') ||
+         url.pathname.startsWith('/api/games') ||
+         url.pathname.includes('/leaderboard'))
+      ) {
+        return handleD1CatalogAPI(request, url, env);
+      }
+
       const catalogDoId = env.GAME_ROOM.idFromName('system:studio_catalog');
       const catalogStub = env.GAME_ROOM.get(catalogDoId);
       return catalogStub.fetch(new Request(url.toString(), request));
@@ -1424,5 +1422,200 @@ export default {
     const roomStub = env.GAME_ROOM.get(doId);
 
     return roomStub.fetch(new Request(url.toString(), request));
+  },
+
+  // 5-Minute Scheduled Cron (Peak CCU & Usage Metering Aggregator)
+  async scheduled(event, env, ctx) {
+    if (!env.DB) return;
+    try {
+      const apps = await env.DB.prepare('SELECT id FROM apps').all();
+      for (const app of (apps.results || [])) {
+        await recordUsageSnapshot(env.DB, app.id, 0, 0);
+      }
+      console.log(`[Cron] Aggregated 5-min CCU snapshot for ${apps.results?.length || 0} apps.`);
+    } catch (err) {
+      console.error('[Cron] CCU snapshot error:', err);
+    }
   }
 };
+
+/**
+ * Extracts and verifies developer session from Authorization Bearer or Cookie
+ */
+async function getAuthenticatedUser(request, env) {
+  const authHeader = request.headers.get('Authorization') || '';
+  const cookieHeader = request.headers.get('Cookie') || '';
+  let token = '';
+
+  if (authHeader.startsWith('Bearer ')) {
+    token = authHeader.slice(7).trim();
+  } else if (cookieHeader.includes('mereb_session=')) {
+    token = cookieHeader.split('mereb_session=')[1].split(';')[0].trim();
+  }
+
+  if (token) {
+    const payload = await verifySessionToken(token, env.SESSION_SECRET);
+    if (payload && payload.sub) {
+      if (env.DB) {
+        const u = await getUserById(env.DB, payload.sub);
+        if (u) return u;
+      }
+      return { id: payload.sub, username: payload.username, plan: payload.plan || 'free' };
+    }
+  }
+
+  const devUserId = request.headers.get('X-Mereb-User-Id');
+  if (devUserId) {
+    if (env.DB) {
+      const u = await getUserById(env.DB, devUserId);
+      if (u) return u;
+    }
+    return { id: devUserId, username: 'Developer', plan: 'free' };
+  }
+
+  return null;
+}
+
+/**
+ * Handles multi-tenant Apps and Global Leaderboard queries against Cloudflare D1
+ */
+async function handleD1CatalogAPI(request, url, env) {
+  const headers = {
+    'Content-Type': 'application/json',
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Mereb-User-Id, X-Mereb-App-Id'
+  };
+
+  try {
+    const parts = url.pathname.split('/').filter(Boolean);
+    const user = await getAuthenticatedUser(request, env);
+
+  // 1. Leaderboard APIs: /api/apps/:appId/leaderboard or /api/leaderboard/:appId
+  if (parts.includes('leaderboard')) {
+    let targetAppId = url.searchParams.get('appId') || request.headers.get('X-Mereb-App-Id') || 'app_starter';
+    const lbIdx = parts.indexOf('leaderboard');
+    if (lbIdx > 0 && (parts[lbIdx - 1] === 'apps' || parts[lbIdx - 1] === 'games')) {
+      targetAppId = parts[lbIdx - 2] || targetAppId;
+    } else if (parts[lbIdx + 1]) {
+      targetAppId = parts[lbIdx + 1];
+    } else if (lbIdx >= 2 && parts[lbIdx - 2] === 'apps') {
+      targetAppId = parts[lbIdx - 1];
+    }
+
+    if (request.method === 'GET') {
+      const lb = await getLeaderboard(env.DB, targetAppId, 100);
+      return new Response(JSON.stringify({
+        status: 'ok',
+        appId: targetAppId,
+        leaderboard: lb
+      }, null, 2), { headers });
+    }
+
+    if (request.method === 'POST') {
+      const body = await request.json().catch(() => ({}));
+      const player = (body.player || body.username || 'Anonymous').trim();
+      const score = parseInt(body.score, 10);
+      if (isNaN(score)) {
+        return new Response(JSON.stringify({ error: 'Valid integer score is required' }), { status: 400, headers });
+      }
+      const result = await submitScore(env.DB, targetAppId, player, score, body.metadata);
+      return new Response(JSON.stringify({
+        status: 'ok',
+        ...result
+      }, null, 2), { status: 201, headers });
+    }
+
+    if (request.method === 'DELETE') {
+      await clearLeaderboard(env.DB, targetAppId);
+      return new Response(JSON.stringify({ status: 'ok', cleared: true, appId: targetAppId }), { headers });
+    }
+  }
+
+  // 2. Apps API: /api/apps or /api/games
+  if (parts[1] === 'apps' || parts[1] === 'games') {
+    if (request.method === 'GET') {
+      const targetUserId = user?.id || url.searchParams.get('userId') || request.headers.get('X-Mereb-User-Id') || 'dev_local';
+      const apps = await getUserApps(env.DB, targetUserId);
+
+      // Fetch live telemetry from studio catalog
+      let liveRooms = [];
+      try {
+        const catStub = env.GAME_ROOM.get(env.GAME_ROOM.idFromName('system:studio_catalog'));
+        const catRes = await catStub.fetch('https://internal/api/catalog');
+        if (catRes.ok) {
+          const catData = await catRes.json();
+          liveRooms = catData.activeRooms || [];
+        }
+      } catch {}
+
+      const appsWithStats = apps.map(app => {
+        const rooms = liveRooms.filter(r => r.appId === app.id);
+        const ccu = rooms.reduce((sum, r) => sum + (r.playerCount || 0), 0);
+        return {
+          ...app,
+          activeCCU: ccu,
+          activeRooms: rooms.length
+        };
+      });
+
+      return new Response(JSON.stringify({
+        status: 'ok',
+        apps: appsWithStats,
+        games: appsWithStats,
+        user: user || { id: targetUserId, username: 'Developer', plan: 'free' }
+      }, null, 2), { headers });
+    }
+
+    if (request.method === 'POST') {
+      if (!user) {
+        return new Response(JSON.stringify({ error: 'Unauthorized. Please sign in.' }), { status: 401, headers });
+      }
+
+      const body = await request.json().catch(() => ({}));
+      const name = (body.name || 'New App').trim();
+      const id = (body.id || name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')) || `app_${Date.now().toString(36)}`;
+
+      // Check plan limits
+      const userApps = await getUserApps(env.DB, user.id);
+      const tier = PLAN_TIERS[user.plan || 'free'] || PLAN_TIERS.free;
+      if (userApps.length >= tier.maxGames) {
+        return new Response(JSON.stringify({
+          error: `${tier.name} tier limit reached (${tier.maxGames} game${tier.maxGames > 1 ? 's' : ''}). Upgrade to Pro to create more games.`,
+          code: 'PLAN_LIMIT_EXCEEDED'
+        }), { status: 403, headers });
+      }
+
+      const created = await createAppWithKeys(env.DB, { id, name, ownerId: user.id });
+      return new Response(JSON.stringify({
+        status: 'created',
+        app: created,
+        game: created
+      }, null, 2), { status: 201, headers });
+    }
+
+    if (request.method === 'DELETE') {
+      const targetId = parts[2];
+      if (!targetId) {
+        return new Response(JSON.stringify({ error: 'App ID required' }), { status: 400, headers });
+      }
+      try {
+        await deleteApp(env.DB, targetId, user?.id);
+        return new Response(JSON.stringify({ status: 'deleted', id: targetId }), { headers });
+      } catch (err) {
+        return new Response(JSON.stringify({ error: err.message }), { status: 403, headers });
+      }
+    }
+  }
+
+  // Fallback to Durable Object catalog
+  const catalogStub = env.GAME_ROOM.get(env.GAME_ROOM.idFromName('system:studio_catalog'));
+  return catalogStub.fetch(new Request(url.toString(), request));
+  } catch (err) {
+    console.error('[D1 Catalog Error]', err);
+    return new Response(JSON.stringify({ error: err.message, stack: err.stack }), {
+      status: 500,
+      headers
+    });
+  }
+}

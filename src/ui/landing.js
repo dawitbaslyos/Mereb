@@ -248,8 +248,8 @@ export class LandingUI {
           <div class="footer-col">
             <h4>Legal</h4>
             <ul>
-              <li><a href="#hero">Terms of Service</a></li>
-              <li><a href="#hero">Privacy Policy</a></li>
+              <li><a href="/terms.html">Terms of Service</a></li>
+              <li><a href="/privacy.html">Privacy Policy</a></li>
             </ul>
           </div>
         </div>

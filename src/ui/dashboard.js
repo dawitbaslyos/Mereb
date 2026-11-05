@@ -477,12 +477,22 @@ curl -X POST "${restBroadcastUrl}" \\
           </div>
 
           <div class="endpoint-item">
-            <div class="endpoint-label">APP API KEY</div>
+            <div class="endpoint-label">CLIENT PUBLISHABLE KEY (SAFE IN BROWSER / ENGINE)</div>
             <div class="origin-key-box">
-              <input type="password" readonly class="origin-key-input" value="${game.apiKey || 'pk_live_' + game.id}" id="input-api-key" />
-              <button class="origin-btn origin-btn-sm" id="btn-toggle-key" style="padding: 3px 8px;">Reveal</button>
-              <button class="origin-copy-pill btn-copy-inline" data-copy="${game.apiKey || 'pk_live_' + game.id}">Copy</button>
+              <input type="text" readonly class="origin-key-input" value="${game.publishableKey || game.apiKey || 'pk_live_' + game.id}" />
+              <button class="origin-copy-pill btn-copy-inline" data-copy="${game.publishableKey || game.apiKey || 'pk_live_' + game.id}">Copy</button>
             </div>
+            <p class="endpoint-hint" style="margin-top: 8px;">Safe for WebGL, Three.js, Godot, or Unity client code to join rooms and submit scores.</p>
+          </div>
+
+          <div class="endpoint-item">
+            <div class="endpoint-label">SERVER SECRET KEY (ADMINISTRATIVE / REST BROADCAST)</div>
+            <div class="origin-key-box">
+              <input type="password" readonly class="origin-key-input" value="${game.secretKey || 'sk_live_' + game.id}" id="input-sec-key" />
+              <button class="origin-btn origin-btn-sm" id="btn-toggle-sec-key" style="padding: 3px 8px;">Reveal</button>
+              <button class="origin-copy-pill btn-copy-inline" data-copy="${game.secretKey || 'sk_live_' + game.id}">Copy</button>
+            </div>
+            <p class="endpoint-hint" style="margin-top: 8px;">Never expose in client code. Use on authoritative game servers or backend webhooks.</p>
           </div>
 
           <!-- Origin UI Code Snippet Switcher -->
@@ -790,17 +800,17 @@ Inspect my game files and implement Mereb netcode end-to-end with full productio
       });
     });
 
-    // Reveal Key Toggle
-    const toggleKeyBtn = this.element.querySelector('#btn-toggle-key');
-    if (toggleKeyBtn) {
-      toggleKeyBtn.addEventListener('click', () => {
-        const inp = this.element.querySelector('#input-api-key');
+    // Reveal Secret Key Toggle
+    const toggleSecKeyBtn = this.element.querySelector('#btn-toggle-sec-key');
+    if (toggleSecKeyBtn) {
+      toggleSecKeyBtn.addEventListener('click', () => {
+        const inp = this.element.querySelector('#input-sec-key');
         if (inp.type === 'password') {
           inp.type = 'text';
-          toggleKeyBtn.textContent = 'Hide';
+          toggleSecKeyBtn.textContent = 'Hide';
         } else {
           inp.type = 'password';
-          toggleKeyBtn.textContent = 'Reveal';
+          toggleSecKeyBtn.textContent = 'Reveal';
         }
       });
     }
@@ -907,20 +917,25 @@ Inspect my game files and implement Mereb netcode end-to-end with full productio
     modal.querySelector('#modal-close-btn').onclick = close;
     modal.querySelector('#modal-cancel-btn').onclick = close;
 
-    modal.querySelector('#modal-create-btn').onclick = () => {
+    modal.querySelector('#modal-create-btn').onclick = async () => {
       const title = modal.querySelector('#new-game-title').value;
       if (!title || !title.trim()) {
         this._showToast('Please enter a valid game title.', 'error');
         return;
       }
+      const createBtn = modal.querySelector('#modal-create-btn');
+      createBtn.disabled = true;
+      createBtn.textContent = 'Creating in D1...';
       try {
-        const created = auth.createApp(title);
+        const created = await auth.createApp(title);
         close();
         this.selectedGameId = created.id;
         this.currentView = 'detail';
         this.render();
-        this._showToast(`Game "${title.trim()}" created successfully!`);
+        this._showToast(`Game "${title.trim()}" created with dual API keys!`);
       } catch (err) {
+        createBtn.disabled = false;
+        createBtn.textContent = 'Create Game';
         this._showToast(err.message, 'error');
       }
     };

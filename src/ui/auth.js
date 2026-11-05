@@ -6,6 +6,7 @@
 const STORAGE_KEY_USER = 'mereb_cloud_user';
 const STORAGE_KEY_PROJECTS = 'mereb_cloud_projects';
 const STORAGE_KEY_GAMES = 'mereb_cloud_games';
+const STORAGE_KEY_TOKEN = 'mereb_cloud_token';
 export const CLOUD_EDGE_HOST = 'https://mereb-signaling.dawitbaslyos.workers.dev';
 
 const DEFAULT_GAMES = [
@@ -22,6 +23,7 @@ const DEFAULT_GAMES = [
 export class AuthService {
   constructor() {
     this.listeners = new Set();
+    this.token = this._loadToken();
     this.user = this._loadUser();
     this.projects = this._loadProjects();
     this.games = this._loadGames();
@@ -32,6 +34,25 @@ export class AuthService {
       totalCCU: 0,
       totalActiveRooms: 0
     };
+  }
+
+  _loadToken() {
+    try {
+      return localStorage.getItem(STORAGE_KEY_TOKEN) || null;
+    } catch {
+      return null;
+    }
+  }
+
+  getAuthHeaders() {
+    const headers = { 'Content-Type': 'application/json' };
+    if (this.token) {
+      headers['Authorization'] = `Bearer ${this.token}`;
+    }
+    if (this.user?.id) {
+      headers['X-Mereb-User-Id'] = this.user.id;
+    }
+    return headers;
   }
 
   _loadUser() {
@@ -89,7 +110,9 @@ export class AuthService {
 
   async syncWithEdge(host = 'https://mereb-signaling.dawitbaslyos.workers.dev') {
     try {
-      const res = await fetch(`${host}/api/apps`);
+      const res = await fetch(`${host}/api/apps`, {
+        headers: this.getAuthHeaders()
+      });
       if (res.ok) {
         const data = await res.json();
         const appList = data.apps || data.games;
@@ -105,6 +128,10 @@ export class AuthService {
         }
         if (data.recentLogs) {
           this.recentLogs = data.recentLogs;
+        }
+        if (data.user && !this.user?.isGuest) {
+          this.user = { ...this.user, plan: data.user.plan || this.user.plan };
+          try { localStorage.setItem(STORAGE_KEY_USER, JSON.stringify(this.user)); } catch {}
         }
         this._notify();
       }
@@ -162,7 +189,7 @@ export class AuthService {
     this._notify();
   }
 
-  createApp(name, host = 'https://mereb-signaling.dawitbaslyos.workers.dev') {
+  async createApp(name, host = CLOUD_EDGE_HOST) {
     if (!name || !name.trim()) throw new Error('App title is required');
 
     const check = this.canAddGame();
@@ -170,51 +197,60 @@ export class AuthService {
       throw new Error(check.message);
     }
 
-    const id = name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || `app-${Date.now().toString(36)}`;
-    const existing = this.games.find(g => g.id === id);
-    if (existing) throw new Error('An App with this App ID already exists');
+    const trimmed = name.trim();
+    let createdApp = null;
 
-    const apiKey = `mb_live_${Math.random().toString(36).slice(2, 10)}${Date.now().toString(36)}`;
+    try {
+      const res = await fetch(`${host}/api/apps`, {
+        method: 'POST',
+        headers: this.getAuthHeaders(),
+        body: JSON.stringify({ name: trimmed })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        createdApp = data.app || data.game;
+      } else {
+        const errData = await res.json().catch(() => ({ error: 'Failed to create game' }));
+        throw new Error(errData.error || 'Failed to create game');
+      }
+    } catch (err) {
+      if (err.message.includes('limit reached')) throw err;
+      console.warn('Edge app create notice, using local fallback:', err);
+    }
 
-    const newApp = {
-      id,
-      name: name.trim(),
-      apiKey,
-      createdAt: new Date().toISOString().split('T')[0],
-      activeCCU: 0,
-      activeRooms: 0,
-      status: 'active',
-      apiLink: `${host}/api/apps/${id}`
-    };
+    if (!createdApp) {
+      const id = trimmed.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || `app-${Date.now().toString(36)}`;
+      const pubKey = `pk_live_${Math.random().toString(36).slice(2, 10)}${Date.now().toString(36)}`;
+      const secKey = `sk_live_${Math.random().toString(36).slice(2, 10)}${Date.now().toString(36)}`;
+      createdApp = {
+        id,
+        name: trimmed,
+        publishableKey: pubKey,
+        secretKey: secKey,
+        publishableKeyDisplay: `${pubKey.slice(0, 10)}...`,
+        secretKeyDisplay: `${secKey.slice(0, 10)}...`,
+        apiKey: pubKey,
+        createdAt: new Date().toISOString().split('T')[0],
+        activeCCU: 0,
+        activeRooms: 0,
+        status: 'active',
+        apiLink: `${host}/api/apps/${id}`
+      };
+    }
 
-    this.games.push(newApp);
+    this.games = this.games.filter(g => g.id !== createdApp.id);
+    this.games.unshift(createdApp);
     this._saveGames();
     this._notify();
 
-    // Sync to Cloudflare Edge with User Ownership
-    try {
-      fetch(`${host}/api/apps`, {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'X-Mereb-User-Id': this.user?.id || 'dev_local'
-        },
-        body: JSON.stringify({ 
-          id, 
-          name: name.trim(),
-          userId: this.user?.id || 'dev_local'
-        })
-      }).catch(() => {});
-    } catch {}
-
-    return newApp;
+    return createdApp;
   }
 
   async createPolarCheckout(plan = 'pro', host = CLOUD_EDGE_HOST) {
     try {
       const res = await fetch(`${host}/api/billing/polar/checkout`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: this.getAuthHeaders(),
         body: JSON.stringify({
           plan,
           userId: this.user?.id || 'dev_local',
@@ -238,7 +274,9 @@ export class AuthService {
   async syncSubscription(host = CLOUD_EDGE_HOST) {
     if (!this.user?.id) return;
     try {
-      const res = await fetch(`${host}/api/billing/subscription?userId=${encodeURIComponent(this.user.id)}`);
+      const res = await fetch(`${host}/api/billing/subscription?userId=${encodeURIComponent(this.user.id)}`, {
+        headers: this.getAuthHeaders()
+      });
       if (res.ok) {
         const data = await res.json();
         if (data.plan && data.plan !== this.user.plan) {
@@ -253,13 +291,16 @@ export class AuthService {
     return this.createApp(name, host);
   }
 
-  deleteApp(appId, host = 'https://mereb-signaling.dawitbaslyos.workers.dev') {
+  deleteApp(appId, host = CLOUD_EDGE_HOST) {
     this.games = this.games.filter(g => g.id !== appId);
     this._saveGames();
     this._notify();
 
     try {
-      fetch(`${host}/api/apps/${appId}`, { method: 'DELETE' }).catch(() => {});
+      fetch(`${host}/api/apps/${appId}`, {
+        method: 'DELETE',
+        headers: this.getAuthHeaders()
+      }).catch(() => {});
     } catch {}
   }
 
@@ -267,9 +308,11 @@ export class AuthService {
     return this.deleteApp(gameId, host);
   }
 
-  async fetchLeaderboard(appId, host = 'https://mereb-signaling.dawitbaslyos.workers.dev') {
+  async fetchLeaderboard(appId, host = CLOUD_EDGE_HOST) {
     try {
-      const res = await fetch(`${host}/api/apps/${appId}/leaderboard`);
+      const res = await fetch(`${host}/api/apps/${appId}/leaderboard`, {
+        headers: this.getAuthHeaders()
+      });
       if (res.ok) {
         const data = await res.json();
         return data.leaderboard || [];
@@ -280,10 +323,10 @@ export class AuthService {
     return [];
   }
 
-  async submitScore(appId, player, score, host = 'https://mereb-signaling.dawitbaslyos.workers.dev') {
+  async submitScore(appId, player, score, host = CLOUD_EDGE_HOST) {
     const res = await fetch(`${host}/api/apps/${appId}/leaderboard`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: this.getAuthHeaders(),
       body: JSON.stringify({ player, score })
     });
     if (!res.ok) {
@@ -293,9 +336,10 @@ export class AuthService {
     return await res.json();
   }
 
-  async clearLeaderboard(appId, host = 'https://mereb-signaling.dawitbaslyos.workers.dev') {
+  async clearLeaderboard(appId, host = CLOUD_EDGE_HOST) {
     const res = await fetch(`${host}/api/apps/${appId}/leaderboard`, {
-      method: 'DELETE'
+      method: 'DELETE',
+      headers: this.getAuthHeaders()
     });
     return res.ok;
   }
@@ -319,7 +363,7 @@ export class AuthService {
     window.location.href = authUrl;
   }
 
-  async handleAuthCallback(code, host = 'https://mereb-signaling.dawitbaslyos.workers.dev') {
+  async handleAuthCallback(code, host = CLOUD_EDGE_HOST) {
     try {
       const redirect_uri = window.location.origin.replace(/\/+$/, '') + window.location.pathname.replace(/\/+$/, '');
       const res = await fetch(`${host}/api/auth/github/exchange`, {
@@ -338,7 +382,16 @@ export class AuthService {
           try {
             localStorage.setItem(STORAGE_KEY_USER, JSON.stringify(this.user));
           } catch {}
+
+          if (data.token) {
+            this.token = data.token;
+            try {
+              localStorage.setItem(STORAGE_KEY_TOKEN, data.token);
+            } catch {}
+          }
+
           this._notify();
+          await this.syncWithEdge(host);
           return this.user;
         }
       }
@@ -351,7 +404,9 @@ export class AuthService {
   logout() {
     try {
       localStorage.removeItem(STORAGE_KEY_USER);
+      localStorage.removeItem(STORAGE_KEY_TOKEN);
     } catch {}
+    this.token = null;
     this.user = {
       id: 'dev_local',
       username: 'Developer',

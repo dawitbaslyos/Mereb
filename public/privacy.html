@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Privacy Policy — Mereb Netcode Cloud</title>
+  <meta name="description" content="Privacy Policy for Mereb Netcode Cloud: WebRTC peer IP disclosure, data retention, and COPPA/GDPR compliance.">
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 36 36' fill='none'><rect width='36' height='36' rx='8' fill='%23000000'/><rect x='1' y='1' width='34' height='34' rx='7' stroke='%23333333' stroke-width='2'/><path d='M10 26V10L18 19L26 10V26' stroke='%23ffffff' stroke-width='3.2' stroke-linecap='round' stroke-linejoin='round'/></svg>">
+  <style>
+    :root {
+      --bg: #09090b;
+      --card-bg: #111115;
+      --border: #222228;
+      --text: #f4f4f6;
+      --text-dim: #8e8e99;
+      --accent: #ffffff;
+      --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font);
+      line-height: 1.6;
+      padding: 40px 20px 80px;
+    }
+    .container {
+      max-width: 820px;
+      margin: 0 auto;
+    }
+    .header {
+      margin-bottom: 40px;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 24px;
+    }
+    .nav-back {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      color: var(--text-dim);
+      text-decoration: none;
+      font-size: 14px;
+      margin-bottom: 16px;
+      transition: color 0.2s;
+    }
+    .nav-back:hover { color: var(--text); }
+    h1 { font-size: 32px; font-weight: 700; letter-spacing: -0.02em; margin-bottom: 8px; }
+    .updated { color: var(--text-dim); font-size: 14px; }
+    h2 { font-size: 20px; font-weight: 600; margin: 32px 0 12px; color: var(--accent); }
+    p { margin-bottom: 16px; color: #d4d4d8; font-size: 15px; }
+    ul { margin: 0 0 20px 24px; color: #d4d4d8; font-size: 15px; }
+    li { margin-bottom: 8px; }
+    .highlight-box {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px;
+      margin: 24px 0;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <a href="/" class="nav-back">← Back to Mereb Cloud</a>
+      <h1>Privacy Policy</h1>
+      <p class="updated">Last updated: November 5, 2026</p>
+    </div>
+
+    <div class="highlight-box">
+      <strong>Privacy-First Gaming Netcode:</strong> Mereb only collects developer profile data required for authentication and billing. Game binary packets (positions, velocities, inputs) are exchanged directly peer-to-peer or transiently relayed through encrypted edge WebSockets with zero persistent packet inspection.
+    </div>
+
+    <h2>1. Information We Collect</h2>
+    <p><strong>Developer Account Information:</strong> When you sign in with GitHub OAuth, we receive your public GitHub profile ID, username, email address, and avatar URL to provision your developer workspace and issue signed session tokens.</p>
+    <p><strong>Game Netcode Telemetry:</strong> We collect aggregate operational metrics including Concurrent Users (CCU), active room count, round-trip ping latency, and packet throughput. We do not store or inspect raw in-game player inputs or chat streams.</p>
+    <p><strong>Leaderboard Information:</strong> If you use Mereb's Global Leaderboard API, we store player display names, integer scores, and developer-provided metadata JSON in our Cloudflare D1 database.</p>
+
+    <h2>2. WebRTC & Peer-to-Peer Networking Disclosure</h2>
+    <p>Mereb facilitates direct peer-to-peer (P2P) WebRTC UDP DataChannel connections between players. To establish a direct connection across NAT firewalls, the WebRTC protocol standard exchanges public IP addresses and port numbers (ICE Candidates) between connecting peers through our signaling server.</p>
+    <p>For players behind symmetric NATs or corporate firewalls that block direct P2P connections, Mereb provides encrypted WebSocket relaying where no player IP addresses are exposed to opponents.</p>
+
+    <h2>3. Web Game Portal & COPPA Compliance (Poki / CrazyGames)</h2>
+    <p>Many web games powered by Mereb are hosted on web portals (such as Poki, CrazyGames, and itch.io). Mereb does not track personal identifying information of end-user players. Player identifiers in matchmaking queues are randomly generated ephemeral tokens (e.g. <code>pk_a9x2f...</code>) that expire immediately upon room termination.</p>
+
+    <h2>4. Data Storage & Security</h2>
+    <p>Developer profiles, game registrations, and leaderboard records are stored in Cloudflare D1 encrypted at rest and in transit. Developer sessions are secured using HMAC-SHA256 cryptographic tokens. Administrative operations require Secret Keys (<code>sk_live_...</code>) or verified session cookies.</p>
+
+    <h2>5. Third-Party Services</h2>
+    <p>We work with trusted infrastructure providers:</p>
+    <ul>
+      <li><strong>Cloudflare:</strong> Edge Workers, Durable Objects, and D1 database hosting.</li>
+      <li><strong>GitHub:</strong> Developer OAuth authentication.</li>
+      <li><strong>Polar.sh:</strong> Merchant of record and billing processing.</li>
+    </ul>
+
+    <h2>6. Developer Rights (GDPR & CCPA)</h2>
+    <p>You have the right to request access to, update, or permanently delete your developer account, games, and associated leaderboard records. Deleting an App from your dashboard immediately purges all associated API keys and leaderboard tables.</p>
+
+    <h2>7. Contact</h2>
+    <p>For privacy inquiries or data deletion requests, contact our Data Protection team at <code>privacy@mereb.cloud</code>.</p>
+  </div>
+</body>
+</html>

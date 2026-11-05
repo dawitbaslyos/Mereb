@@ -2,6 +2,13 @@ name = "mereb-signaling"
 main = "worker.js"
 compatibility_date = "2024-09-23"
 
+# 1. Cloudflare D1 Relational Multi-Tenant Database
+[[d1_databases]]
+binding = "DB"
+database_name = "mereb-db"
+database_id = "f5108cf7-e740-43b8-ac83-06b0c453c02b"
+
+# 2. Durable Objects (Stateful WebSockets & Real-Time Rooms)
 [durable_objects]
 bindings = [
   { name = "GAME_ROOM", class_name = "GameRoom" }
@@ -10,6 +17,10 @@ bindings = [
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["GameRoom"]
+
+# 3. Scheduled Crons (5-Minute Usage & Peak CCU Aggregator)
+[triggers]
+crons = ["*/5 * * * *"]
 
 [vars]
 # Public OAuth Client ID (Safe to commit)

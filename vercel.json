@@ -23,6 +23,14 @@
       "destination": "/llms-full.txt"
     },
     {
+      "source": "/terms",
+      "destination": "/terms.html"
+    },
+    {
+      "source": "/privacy",
+      "destination": "/privacy.html"
+    },
+    {
       "source": "/docs/:path*",
       "destination": "/docs/:path*"
     },
