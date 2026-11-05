@@ -358,14 +358,22 @@ export class AuthService {
 
   loginWithGithub() {
     const clientId = 'Ov23lizozUDKwKt6LRJr';
-    const redirectUri = window.location.origin.replace(/\/+$/, '') + window.location.pathname.replace(/\/+$/, '');
+    let origin = window.location.origin.replace(/\/+$/, '');
+    if (origin.includes('mereb.cloud') && !origin.includes('www.')) {
+      origin = 'https://www.mereb.cloud';
+    }
+    const redirectUri = `${origin}/`;
     const authUrl = `https://github.com/login/oauth/authorize?client_id=${clientId}&scope=read:user,user:email&redirect_uri=${encodeURIComponent(redirectUri)}`;
     window.location.href = authUrl;
   }
 
   async handleAuthCallback(code, host = CLOUD_EDGE_HOST) {
     try {
-      const redirect_uri = window.location.origin.replace(/\/+$/, '') + window.location.pathname.replace(/\/+$/, '');
+      let origin = window.location.origin.replace(/\/+$/, '');
+      if (origin.includes('mereb.cloud') && !origin.includes('www.')) {
+        origin = 'https://www.mereb.cloud';
+      }
+      const redirect_uri = `${origin}/`;
       const res = await fetch(`${host}/api/auth/github/exchange`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
