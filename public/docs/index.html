@@ -5,8 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
   <!-- Primary SEO Meta Tags -->
-  <title>Mereb Documentation (2026.1 LTS) — Unity 3D Style Manual &amp; Scripting Reference</title>
-  <meta name="title" content="Mereb Documentation (2026.1 LTS) — Unity 3D Style Manual &amp; Scripting Reference">
+  <title>Mereb Documentation — Serverless WebRTC Multiplayer Netcode &amp; Matchmaking</title>
+  <meta name="title" content="Mereb Documentation — Serverless WebRTC Multiplayer Netcode &amp; Matchmaking">
   <meta name="description" content="Official Unity-style documentation for Mereb: Zero-cost, serverless WebRTC P2P multiplayer netcode &amp; edge matchmaking SDK for WebGL, Unity 3D, Godot 4, Three.js, React, Poki, and CrazyGames.">
   <meta name="keywords" content="multiplayer netcode, WebRTC game dev, Unity WebGL multiplayer, Godot 4 multiplayer, serverless game servers, Cloudflare Workers Durable Objects, Poki multiplayer, CrazyGames multiplayer, photon alternative, hathora alternative, snapshot interpolation, binary packing">
   <meta name="author" content="Dawit Baslyos / Mereb Engine Team">
@@ -28,6 +28,12 @@
   <meta name="twitter:title" content="Mereb Documentation (2026.1 LTS) — Unity 3D Style Manual &amp; Scripting Reference">
   <meta name="twitter:description" content="Zero-cost, serverless WebRTC P2P multiplayer netcode &amp; edge matchmaking SDK for WebGL, Unity 3D, Godot 4, Three.js, React, Poki, and CrazyGames.">
   <meta name="twitter:image" content="https://mereb.cloud/og-banner.png">
+
+  <!-- Fonts & Styling matching mereb.cloud Landing Page -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap">
+  <meta name="theme-color" content="#050607">
 
   <!-- Alternate Markdown Links for Search Crawlers & Markdown Readers -->
   <link rel="alternate" type="text/markdown" href="/manual/01_OVERVIEW_AND_ARCHITECTURE.md" title="Raw Markdown Source">
@@ -149,32 +155,54 @@
   </script>
 
   <style>
-    /* Unity 3D Documentation Design System */
+    /* Mereb Documentation Design System — Matches mereb.cloud Landing Page */
     :root {
-      --unity-bg: #ffffff;
-      --unity-text: #222c37;
-      --unity-text-muted: #68737d;
-      --unity-header-bg: #1e2022;
-      --unity-header-text: #ffffff;
-      --unity-accent: #00a2ff;
-      --unity-accent-hover: #0088d6;
-      --unity-sidebar-bg: #f7f9fa;
-      --unity-sidebar-border: #e1e4e8;
-      --unity-sidebar-active: #e7f3fe;
-      --unity-sidebar-active-text: #0070f3;
-      --unity-card-bg: #ffffff;
-      --unity-card-border: #e1e4e8;
-      --unity-code-bg: #181a1b;
-      --unity-code-text: #f0f6fc;
-      --unity-table-stripe: #fafbfc;
-      --unity-table-border: #dfe2e5;
+      --bg: #050607;
+      --fg: #f4efe4;
+      --mut: #9a9da3;
+      --card: #0e1012;
+      --card-hover: #14171a;
+      --line: rgba(255, 255, 255, 0.1);
+      --line-subtle: rgba(255, 255, 255, 0.05);
+      --code: #121417;
+      --code-border: rgba(255, 255, 255, 0.08);
+      --acc: #ff5b3a;
+      --blue: #3a7bff;
+      --green: #1fa971;
+      --gold: #f2b632;
+      --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+      --font-mono: 'JetBrains Mono', ui-monospace, Menlo, monospace;
       
-      /* Unity Callout Colors */
+      /* Callout Colors aligned with Mereb palette */
+      --note-bg: rgba(58, 123, 255, 0.08);
+      --note-border: #3a7bff;
+      --note-text: #adc8ff;
+      --tip-bg: rgba(31, 169, 113, 0.08);
+      --tip-border: #1fa971;
+      --tip-text: #7ee8b7;
+      --warn-bg: rgba(242, 182, 50, 0.08);
+      --warn-border: #f2b632;
+      --warn-text: #ffe08a;
+      --imp-bg: rgba(255, 91, 58, 0.08);
+      --imp-border: #ff5b3a;
+      --imp-text: #ffaa94;
+    }
+
+    [data-theme="light"] {
+      --bg: #f6f3ec;
+      --fg: #0b0c0d;
+      --mut: #5d6066;
+      --card: #ffffff;
+      --card-hover: #ece7db;
+      --line: rgba(0, 0, 0, 0.1);
+      --line-subtle: rgba(0, 0, 0, 0.05);
+      --code: #eee9dc;
+      --code-border: rgba(0, 0, 0, 0.08);
       --note-bg: #e7f3fe;
-      --note-border: #00a2ff;
+      --note-border: #0070f3;
       --note-text: #004b87;
       --tip-bg: #e8f8f0;
-      --tip-border: #10b981;
+      --tip-border: #1fa971;
       --tip-text: #065f46;
       --warn-bg: #fffbeb;
       --warn-border: #f59e0b;
@@ -184,59 +212,43 @@
       --imp-text: #991b1b;
     }
 
-    [data-theme="dark"] {
-      --unity-bg: #121416;
-      --unity-text: #e1e4e8;
-      --unity-text-muted: #8b949e;
-      --unity-header-bg: #0d1117;
-      --unity-sidebar-bg: #16181d;
-      --unity-sidebar-border: #21262d;
-      --unity-sidebar-active: #1c2e42;
-      --unity-sidebar-active-text: #38bdf8;
-      --unity-card-bg: #16181d;
-      --unity-card-border: #30363d;
-      --unity-code-bg: #0d1117;
-      --unity-table-stripe: #1c2128;
-      --unity-table-border: #30363d;
-
-      --note-bg: #0d2847;
-      --note-text: #79c0ff;
-      --tip-bg: #093325;
-      --tip-text: #7ee787;
-      --warn-bg: #3d2b00;
-      --warn-text: #f2cc60;
-      --imp-bg: #3c1414;
-      --imp-text: #ff7b72;
-    }
-
     * { box-sizing: border-box; margin: 0; padding: 0; }
+    html {
+      scroll-behavior: smooth;
+      background: var(--bg);
+      color-scheme: dark;
+    }
     body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-      background: var(--unity-bg);
-      color: var(--unity-text);
+      font-family: var(--font-sans);
+      background: var(--bg);
+      color: var(--fg);
       line-height: 1.6;
       overflow-x: hidden;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
     }
 
-    /* Top Unity Header */
+    /* Top Navigation Header */
     header.unity-top-header {
-      background: var(--unity-header-bg);
-      color: var(--unity-header-text);
-      height: 56px;
+      background: color-mix(in srgb, var(--bg) 84%, transparent);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      color: var(--fg);
+      height: 60px;
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 0 20px;
+      padding: 0 24px;
       position: sticky;
       top: 0;
       z-index: 1000;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      border-bottom: 1px solid var(--line);
     }
 
     .header-left {
       display: flex;
       align-items: center;
-      gap: 16px;
+      gap: 18px;
     }
 
     .unity-brand {
@@ -244,33 +256,49 @@
       align-items: center;
       gap: 10px;
       text-decoration: none;
-      color: #fff;
-      font-weight: 700;
-      font-size: 18px;
-      letter-spacing: -0.5px;
+      color: var(--fg);
     }
 
-    .unity-cube-icon {
-      width: 28px;
-      height: 28px;
-      background: #000;
-      border: 1px solid #00a2ff;
-      border-radius: 6px;
-      display: grid;
-      place-items: center;
-      color: #00a2ff;
-      font-weight: 900;
-      font-size: 16px;
+    .logo {
+      font-weight: 700;
+      font-size: 20px;
+      letter-spacing: -0.02em;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--fg);
+    }
+
+    .logo i {
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: var(--acc);
+      box-shadow: 10px 0 0 -2px var(--blue);
+      display: inline-block;
+    }
+
+    .docs-tag {
+      font-size: 11px;
+      font-family: var(--font-mono);
+      background: rgba(255, 91, 58, 0.12);
+      color: var(--acc);
+      padding: 2px 7px;
+      border-radius: 999px;
+      border: 1px solid rgba(255, 91, 58, 0.25);
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
     }
 
     .version-select-pill {
-      background: rgba(255, 255, 255, 0.12);
-      border: 1px solid rgba(255, 255, 255, 0.2);
-      color: #fff;
-      padding: 4px 10px;
-      border-radius: 20px;
+      background: var(--card);
+      border: 1px solid var(--line);
+      color: var(--mut);
+      padding: 4px 12px;
+      border-radius: 999px;
       font-size: 12px;
-      font-weight: 600;
+      font-family: var(--font-mono);
       display: flex;
       align-items: center;
       gap: 6px;
@@ -280,131 +308,148 @@
       width: 7px;
       height: 7px;
       border-radius: 50%;
-      background: #10b981;
+      background: var(--green);
+      display: inline-block;
     }
 
-    /* Unity Mode Toggle: Manual vs Scripting API */
+    /* Mode Toggle: Manual vs Scripting API */
     .unity-mode-toggle {
-      background: rgba(0, 0, 0, 0.4);
-      border: 1px solid rgba(255, 255, 255, 0.2);
-      border-radius: 20px;
-      display: flex;
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      display: inline-flex;
       padding: 3px;
-      gap: 2px;
+      gap: 3px;
     }
 
     .unity-mode-btn {
       background: transparent;
       border: none;
-      color: rgba(255, 255, 255, 0.7);
-      padding: 5px 16px;
-      border-radius: 16px;
+      color: var(--mut);
+      padding: 5px 14px;
+      border-radius: 999px;
       font-size: 13px;
-      font-weight: 600;
+      font-weight: 500;
+      font-family: var(--font-sans);
       cursor: pointer;
-      transition: all 0.2s ease;
+      transition: all 0.15s ease;
       display: flex;
       align-items: center;
       gap: 6px;
     }
 
+    .unity-mode-btn:hover {
+      color: var(--fg);
+    }
+
     .unity-mode-btn.active {
-      background: var(--unity-accent);
-      color: #fff;
-      box-shadow: 0 2px 8px rgba(0, 162, 255, 0.4);
+      background: var(--fg);
+      color: var(--bg);
+      font-weight: 600;
+      box-shadow: none;
     }
 
     .unity-search-container {
       position: relative;
-      width: 300px;
+      width: 280px;
     }
 
     .unity-search-input {
       width: 100%;
-      background: rgba(255, 255, 255, 0.1);
-      border: 1px solid rgba(255, 255, 255, 0.2);
-      color: #fff;
-      padding: 7px 36px 7px 12px;
-      border-radius: 6px;
+      background: var(--card);
+      border: 1px solid var(--line);
+      color: var(--fg);
+      padding: 7px 36px 7px 14px;
+      border-radius: 999px;
       font-size: 13px;
+      font-family: var(--font-sans);
       outline: none;
-      transition: all 0.2s;
+      transition: border-color 0.15s;
     }
 
     .unity-search-input:focus {
-      background: rgba(255, 255, 255, 0.18);
-      border-color: var(--unity-accent);
-      box-shadow: 0 0 0 2px rgba(0, 162, 255, 0.2);
+      border-color: var(--acc);
+      box-shadow: 0 0 0 2px rgba(255, 91, 58, 0.15);
     }
 
     .unity-search-shortcut {
       position: absolute;
-      right: 10px;
+      right: 12px;
       top: 50%;
       transform: translateY(-50%);
       font-size: 11px;
-      color: rgba(255, 255, 255, 0.4);
-      border: 1px solid rgba(255, 255, 255, 0.2);
-      padding: 1px 5px;
-      border-radius: 3px;
+      font-family: var(--font-mono);
+      color: var(--mut);
+      border: 1px solid var(--line);
+      background: rgba(255, 255, 255, 0.04);
+      padding: 1px 6px;
+      border-radius: 4px;
       pointer-events: none;
     }
 
     .header-right {
       display: flex;
       align-items: center;
-      gap: 12px;
+      gap: 10px;
     }
 
     .header-link-btn {
-      color: rgba(255, 255, 255, 0.85);
+      color: var(--mut);
       text-decoration: none;
       font-size: 13px;
       font-weight: 500;
-      padding: 6px 12px;
-      border-radius: 6px;
-      transition: background 0.15s;
+      padding: 6px 14px;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      background: transparent;
+      cursor: pointer;
+      transition: all 0.15s;
+      font-family: var(--font-sans);
     }
 
     .header-link-btn:hover {
-      background: rgba(255, 255, 255, 0.1);
-      color: #fff;
+      color: var(--fg);
+      border-color: var(--fg);
+      background: rgba(255, 255, 255, 0.04);
     }
 
     /* Sub-bar (Breadcrumbs & Source Button) */
     .unity-sub-bar {
-      background: var(--unity-sidebar-bg);
-      border-bottom: 1px solid var(--unity-sidebar-border);
-      padding: 8px 24px;
+      background: var(--card);
+      border-bottom: 1px solid var(--line);
+      padding: 10px 24px;
       display: flex;
       align-items: center;
       justify-content: space-between;
       font-size: 13px;
-      color: var(--unity-text-muted);
+      color: var(--mut);
     }
 
     .unity-breadcrumbs {
       display: flex;
       align-items: center;
-      gap: 8px;
+      gap: 6px;
     }
 
     .unity-breadcrumbs a {
-      color: var(--unity-text-muted);
+      color: var(--mut);
       text-decoration: none;
+      transition: color 0.15s;
     }
 
     .unity-breadcrumbs a:hover {
-      color: var(--unity-accent);
+      color: var(--fg);
     }
 
     .breadcrumb-sep {
-      color: #a0aec0;
+      color: var(--mut);
+      opacity: 0.5;
       font-size: 11px;
+      margin: 0 2px;
     }
 
     .breadcrumb-current {
-      color: var(--unity-text);
+      color: var(--fg);
       font-weight: 600;
     }
 
@@ -416,218 +461,309 @@
 
     .source-btn {
       background: transparent;
-      border: 1px solid var(--unity-sidebar-border);
-      color: var(--unity-text);
+      border: 1px solid var(--line);
+      color: var(--mut);
       font-size: 12px;
-      font-weight: 600;
-      padding: 4px 12px;
-      border-radius: 4px;
+      font-weight: 500;
+      padding: 5px 14px;
+      border-radius: 999px;
       cursor: pointer;
       display: flex;
       align-items: center;
-      gap: 5px;
+      gap: 6px;
       text-decoration: none;
       transition: all 0.15s;
     }
 
     .source-btn:hover {
-      background: var(--unity-card-bg);
-      border-color: var(--unity-accent);
-      color: var(--unity-accent);
+      color: var(--fg);
+      border-color: var(--fg);
     }
 
     .switch-mode-action-btn {
       background: transparent;
-      border: 1px solid var(--unity-sidebar-border);
-      color: var(--unity-accent);
+      border: 1px solid var(--line);
+      color: var(--fg);
       font-size: 12px;
       font-weight: 600;
-      padding: 4px 12px;
-      border-radius: 4px;
+      padding: 5px 14px;
+      border-radius: 999px;
       cursor: pointer;
       display: flex;
       align-items: center;
-      gap: 5px;
+      gap: 6px;
       transition: all 0.15s;
+      font-family: var(--font-sans);
     }
 
     .switch-mode-action-btn:hover {
-      background: var(--unity-accent);
-      color: #fff;
-      border-color: var(--unity-accent);
+      background: var(--fg);
+      color: var(--bg);
     }
 
     /* Main Docs App Layout */
     .unity-layout {
       display: grid;
       grid-template-columns: 280px 1fr 240px;
-      min-height: calc(100vh - 96px);
+      min-height: calc(100vh - 105px);
     }
 
     /* Left Sidebar */
     aside.unity-sidebar {
-      background: var(--unity-sidebar-bg);
-      border-right: 1px solid var(--unity-sidebar-border);
-      padding: 16px 0;
-      height: calc(100vh - 96px);
+      background: var(--bg);
+      border-right: 1px solid var(--line);
+      padding: 20px 0;
+      height: calc(100vh - 105px);
       position: sticky;
-      top: 96px;
+      top: 105px;
       overflow-y: auto;
     }
 
     .sidebar-filter-box {
-      padding: 0 16px 12px 16px;
-      border-bottom: 1px solid var(--unity-sidebar-border);
+      padding: 0 16px 14px 16px;
+      border-bottom: 1px solid var(--line);
     }
 
     .sidebar-filter-input {
       width: 100%;
-      padding: 6px 10px;
-      border: 1px solid var(--unity-sidebar-border);
-      border-radius: 4px;
+      padding: 7px 12px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
       font-size: 13px;
-      background: var(--unity-card-bg);
-      color: var(--unity-text);
+      background: var(--card);
+      color: var(--fg);
+      font-family: var(--font-sans);
       outline: none;
+      transition: border-color 0.15s;
+    }
+
+    .sidebar-filter-input:focus {
+      border-color: var(--acc);
     }
 
     .sidebar-tree {
       list-style: none;
-      padding: 12px 0;
+      padding: 12px 8px;
     }
 
     .tree-section-label {
-      padding: 8px 16px 4px 16px;
+      padding: 12px 14px 6px 14px;
       font-size: 11px;
       font-weight: 700;
       text-transform: uppercase;
-      letter-spacing: 0.5px;
-      color: var(--unity-text-muted);
+      letter-spacing: 0.06em;
+      color: var(--mut);
     }
 
     .tree-item {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 7px 16px;
-      color: var(--unity-text);
+      padding: 8px 14px;
+      margin: 2px 0;
+      color: var(--mut);
       text-decoration: none;
-      font-size: 13px;
+      font-size: 13.5px;
       cursor: pointer;
-      border-left: 3px solid transparent;
+      border-radius: 8px;
       transition: all 0.15s;
+      border-left: none;
     }
 
     .tree-item:hover {
-      background: rgba(0, 162, 255, 0.08);
-      color: var(--unity-accent);
+      background: var(--card);
+      color: var(--fg);
     }
 
     .tree-item.active {
-      background: var(--unity-sidebar-active);
-      color: var(--unity-sidebar-active-text);
-      border-left-color: var(--unity-accent);
+      background: var(--card);
+      color: var(--fg);
       font-weight: 600;
+      border-left: 3px solid var(--acc);
+      padding-left: 11px;
     }
 
     .tree-badge {
       font-size: 10px;
-      padding: 1px 6px;
-      border-radius: 10px;
+      padding: 2px 7px;
+      border-radius: 999px;
       font-weight: 700;
-      background: rgba(0, 0, 0, 0.06);
+      font-family: var(--font-mono);
+      letter-spacing: 0.02em;
     }
 
-    .tree-badge.pro { background: #8b5cf6; color: #fff; }
-    .tree-badge.new { background: #10b981; color: #fff; }
-    .tree-badge.lts { background: #0284c7; color: #fff; }
+    .tree-badge.pro {
+      background: rgba(255, 91, 58, 0.15);
+      color: var(--acc);
+      border: 1px solid rgba(255, 91, 58, 0.3);
+    }
+
+    .tree-badge.new {
+      background: rgba(31, 169, 113, 0.15);
+      color: var(--green);
+      border: 1px solid rgba(31, 169, 113, 0.3);
+    }
+
+    .tree-badge.lts {
+      background: rgba(58, 123, 255, 0.15);
+      color: var(--blue);
+      border: 1px solid rgba(58, 123, 255, 0.3);
+    }
 
     /* Center Content Area */
     main.unity-content {
-      padding: 32px 48px;
-      max-width: 980px;
+      padding: 40px 56px 96px;
+      max-width: 960px;
     }
 
     .page-header {
-      margin-bottom: 24px;
-      border-bottom: 1px solid var(--unity-table-border);
-      padding-bottom: 16px;
+      margin-bottom: 28px;
+      border-bottom: 1px solid var(--line);
+      padding-bottom: 20px;
     }
 
     .page-title {
-      font-size: 32px;
+      font-size: clamp(30px, 3.8vw, 42px);
       font-weight: 700;
-      letter-spacing: -0.5px;
-      color: var(--unity-text);
-      margin-bottom: 8px;
+      letter-spacing: -0.035em;
+      line-height: 1.1;
+      color: var(--fg);
+      margin-bottom: 10px;
       display: flex;
       align-items: center;
       gap: 12px;
+      flex-wrap: wrap;
     }
 
     .page-badges {
       display: flex;
       gap: 8px;
-      margin-top: 8px;
+      margin-top: 10px;
       flex-wrap: wrap;
     }
 
     .chip-badge {
       font-size: 11px;
+      font-family: var(--font-mono);
       font-weight: 600;
-      padding: 3px 8px;
-      border-radius: 4px;
-      background: var(--unity-sidebar-border);
-      color: var(--unity-text-muted);
+      padding: 3px 10px;
+      border-radius: 999px;
+      background: var(--card);
+      border: 1px solid var(--line);
+      color: var(--mut);
     }
 
     .chip-badge.active-chip {
-      background: rgba(0, 162, 255, 0.15);
-      color: var(--unity-accent);
+      background: rgba(255, 91, 58, 0.1);
+      border-color: rgba(255, 91, 58, 0.3);
+      color: var(--acc);
     }
 
     .cross-mode-card {
-      background: var(--unity-sidebar-bg);
-      border: 1px solid var(--unity-sidebar-border);
-      border-radius: 6px;
-      padding: 12px 16px;
-      margin: 20px 0;
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 14px 18px;
+      margin: 24px 0;
       display: flex;
       align-items: center;
       justify-content: space-between;
-      font-size: 13px;
+      font-size: 13.5px;
+      color: var(--mut);
     }
 
-    /* Unity Callout Boxes */
+    .cross-mode-card strong {
+      color: var(--fg);
+    }
+
+    /* Typography inside Content */
+    .doc-article h2 {
+      font-size: clamp(22px, 2.5vw, 28px);
+      font-weight: 700;
+      letter-spacing: -0.025em;
+      line-height: 1.2;
+      color: var(--fg);
+      margin: 40px 0 16px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .doc-article h3 {
+      font-size: 18px;
+      font-weight: 600;
+      letter-spacing: -0.015em;
+      color: var(--fg);
+      margin: 28px 0 12px;
+    }
+
+    .doc-article p {
+      color: var(--mut);
+      font-size: 15.5px;
+      line-height: 1.7;
+      margin-bottom: 18px;
+    }
+
+    .doc-article strong, .doc-article b {
+      color: var(--fg);
+      font-weight: 600;
+    }
+
+    .doc-article ul, .doc-article ol {
+      color: var(--mut);
+      font-size: 15.5px;
+      line-height: 1.7;
+      margin: 0 0 20px 24px;
+    }
+
+    .doc-article li {
+      margin-bottom: 8px;
+    }
+
+    .doc-article a {
+      color: var(--acc);
+      text-decoration: none;
+      border-bottom: 1px solid rgba(255, 91, 58, 0.3);
+      transition: border-color 0.15s;
+    }
+
+    .doc-article a:hover {
+      border-bottom-color: var(--acc);
+    }
+
+    /* Callout Boxes */
     .unity-alert {
       border-left: 4px solid;
-      border-radius: 0 6px 6px 0;
-      padding: 14px 18px;
-      margin: 20px 0;
-      font-size: 14px;
+      border-radius: 12px;
+      padding: 16px 20px;
+      margin: 24px 0;
+      font-size: 14.5px;
+      line-height: 1.6;
+      border-top: 1px solid var(--line);
+      border-right: 1px solid var(--line);
+      border-bottom: 1px solid var(--line);
     }
 
     .unity-alert.note {
       background: var(--note-bg);
-      border-color: var(--note-border);
+      border-left-color: var(--note-border);
       color: var(--note-text);
     }
 
     .unity-alert.tip {
       background: var(--tip-bg);
-      border-color: var(--tip-border);
+      border-left-color: var(--tip-border);
       color: var(--tip-text);
     }
 
     .unity-alert.warning {
       background: var(--warn-bg);
-      border-color: var(--warn-border);
+      border-left-color: var(--warn-border);
       color: var(--warn-text);
     }
 
     .unity-alert.important {
       background: var(--imp-bg);
-      border-color: var(--imp-border);
+      border-left-color: var(--imp-border);
       color: var(--imp-text);
     }
 
@@ -635,181 +771,229 @@
       font-weight: 700;
       display: flex;
       align-items: center;
-      gap: 6px;
-      margin-bottom: 4px;
+      gap: 8px;
+      margin-bottom: 6px;
+      font-size: 14px;
+      letter-spacing: -0.01em;
     }
 
-    /* Unity Code Windows with Tabs */
+    /* Code Windows with Tabs */
     .unity-code-card {
-      background: var(--unity-code-bg);
-      border-radius: 6px;
-      margin: 20px 0;
+      background: var(--code);
+      border-radius: 14px;
+      margin: 24px 0;
       overflow: hidden;
-      border: 1px solid rgba(255, 255, 255, 0.1);
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+      border: 1px solid var(--line);
+      box-shadow: 0 6px 24px rgba(0, 0, 0, 0.25);
     }
 
     .code-card-header {
-      background: #202428;
+      background: var(--card);
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 6px 12px;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      padding: 8px 14px;
+      border-bottom: 1px solid var(--line);
     }
 
     .code-tabs {
       display: flex;
-      gap: 4px;
+      gap: 6px;
     }
 
     .code-tab-btn {
       background: transparent;
       border: none;
-      color: #8b949e;
+      color: var(--mut);
       padding: 4px 10px;
       font-size: 12px;
-      font-weight: 600;
-      border-radius: 4px;
+      font-family: var(--font-mono);
+      font-weight: 500;
+      border-radius: 6px;
       cursor: pointer;
       transition: all 0.15s;
     }
 
+    .code-tab-btn:hover {
+      color: var(--fg);
+    }
+
     .code-tab-btn.active {
-      background: #2d333b;
-      color: #fff;
+      background: rgba(255, 255, 255, 0.08);
+      color: var(--fg);
+      font-weight: 600;
     }
 
     .code-copy-btn {
-      background: rgba(255, 255, 255, 0.1);
-      border: 1px solid rgba(255, 255, 255, 0.15);
-      color: #f0f6fc;
-      padding: 3px 10px;
+      background: var(--card);
+      border: 1px solid var(--line);
+      color: var(--mut);
+      padding: 4px 12px;
       font-size: 11px;
-      border-radius: 4px;
+      font-family: var(--font-sans);
+      border-radius: 999px;
       cursor: pointer;
       display: flex;
       align-items: center;
       gap: 5px;
-      transition: background 0.15s;
+      transition: all 0.15s;
+      font-weight: 500;
     }
 
     .code-copy-btn:hover {
-      background: rgba(255, 255, 255, 0.2);
+      color: var(--fg);
+      border-color: var(--fg);
+      background: rgba(255, 255, 255, 0.04);
     }
 
     pre.unity-pre {
-      padding: 16px;
+      padding: 18px 20px;
       overflow-x: auto;
-      font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+      font-family: var(--font-mono);
       font-size: 13px;
-      line-height: 1.55;
-      color: var(--unity-code-text);
+      line-height: 1.7;
+      color: #f4efe4;
+    }
+
+    code {
+      font-family: var(--font-mono);
+      font-size: 0.9em;
+      padding: 2px 6px;
+      border-radius: 5px;
+      background: var(--code);
+      border: 1px solid var(--line);
+      color: #f4efe4;
+    }
+
+    pre.unity-pre code {
+      border: none;
+      padding: 0;
+      background: transparent;
+      color: inherit;
     }
 
     table.unity-table {
       width: 100%;
-      border-collapse: collapse;
-      margin: 20px 0;
+      border-collapse: separate;
+      border-spacing: 0;
+      margin: 24px 0;
       font-size: 13.5px;
-      border: 1px solid var(--unity-table-border);
-      border-radius: 6px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
       overflow: hidden;
+      background: var(--card);
     }
 
     table.unity-table th {
-      background: var(--unity-sidebar-bg);
-      color: var(--unity-text);
+      background: var(--code);
+      color: var(--fg);
       font-weight: 600;
       text-align: left;
-      padding: 10px 14px;
-      border-bottom: 2px solid var(--unity-table-border);
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--line);
+      font-size: 13px;
+      letter-spacing: 0.01em;
     }
 
     table.unity-table td {
-      padding: 10px 14px;
-      border-bottom: 1px solid var(--unity-table-border);
-      color: var(--unity-text);
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--line);
+      color: var(--mut);
+      line-height: 1.55;
     }
 
-    table.unity-table tr:nth-child(even) {
-      background: var(--unity-table-stripe);
+    table.unity-table tr:last-child td {
+      border-bottom: none;
+    }
+
+    table.unity-table tr:hover td {
+      background: rgba(255, 255, 255, 0.02);
     }
 
     .mono-pill {
-      font-family: monospace;
-      background: rgba(0, 162, 255, 0.1);
-      color: var(--unity-accent);
-      padding: 2px 6px;
-      border-radius: 4px;
+      font-family: var(--font-mono);
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid var(--line);
+      color: var(--fg);
+      padding: 2px 8px;
+      border-radius: 999px;
       font-size: 12px;
-      font-weight: 600;
+      font-weight: 500;
     }
 
     .script-signature-box {
-      background: var(--unity-sidebar-bg);
-      border: 1px solid var(--unity-sidebar-border);
-      border-left: 4px solid var(--unity-accent);
-      border-radius: 4px;
-      padding: 14px 18px;
-      font-family: monospace;
-      font-size: 14px;
-      color: var(--unity-text);
-      margin: 16px 0;
-    }
-
-    /* Right Rail (Table of Contents / On This Page) */
-    aside.unity-right-rail {
-      padding: 24px 16px;
-      height: calc(100vh - 96px);
-      position: sticky;
-      top: 96px;
-      overflow-y: auto;
+      background: var(--code);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 16px 20px;
+      margin: 20px 0;
+      font-family: var(--font-mono);
       font-size: 13px;
-      border-left: 1px solid var(--unity-sidebar-border);
+      color: var(--fg);
+      line-height: 1.6;
     }
 
-    .rail-heading {
-      font-size: 12px;
+    /* Right Rail (Table of Contents) */
+    aside.unity-right-rail {
+      background: var(--bg);
+      border-left: 1px solid var(--line);
+      padding: 24px 18px;
+      height: calc(100vh - 105px);
+      position: sticky;
+      top: 105px;
+      overflow-y: auto;
+    }
+
+    .rail-title {
+      font-size: 11px;
       font-weight: 700;
       text-transform: uppercase;
-      letter-spacing: 0.5px;
-      color: var(--unity-text-muted);
-      margin-bottom: 12px;
+      letter-spacing: 0.06em;
+      color: var(--mut);
+      margin-bottom: 14px;
     }
 
-    .rail-nav {
+    .rail-toc-list {
       list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
     }
 
     .rail-nav-item {
-      margin-bottom: 8px;
+      font-size: 13px;
     }
 
     .rail-nav-link {
-      color: var(--unity-text-muted);
+      color: var(--mut);
       text-decoration: none;
+      line-height: 1.45;
       display: block;
       transition: color 0.15s;
     }
 
-    .rail-nav-link:hover, .rail-nav-link.active {
-      color: var(--unity-accent);
+    .rail-nav-link:hover {
+      color: var(--fg);
+    }
+
+    .rail-nav-link.active {
+      color: var(--acc);
       font-weight: 600;
     }
 
     .rail-feedback-card {
-      margin-top: 32px;
+      margin-top: 36px;
       padding: 16px;
-      background: var(--unity-sidebar-bg);
-      border: 1px solid var(--unity-sidebar-border);
-      border-radius: 6px;
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 14px;
     }
 
     .feedback-title {
       font-size: 12px;
       font-weight: 600;
-      margin-bottom: 8px;
+      margin-bottom: 10px;
+      color: var(--fg);
     }
 
     .feedback-btns {
@@ -820,25 +1004,26 @@
     .feedback-btn {
       flex: 1;
       padding: 6px 0;
-      border: 1px solid var(--unity-sidebar-border);
-      background: var(--unity-card-bg);
-      border-radius: 4px;
+      border: 1px solid var(--line);
+      background: transparent;
+      border-radius: 999px;
       cursor: pointer;
       font-size: 12px;
       font-weight: 600;
-      color: var(--unity-text);
+      color: var(--mut);
       transition: all 0.15s;
+      font-family: var(--font-sans);
     }
 
     .feedback-btn:hover {
-      background: var(--unity-accent);
-      color: #fff;
-      border-color: var(--unity-accent);
+      background: var(--fg);
+      color: var(--bg);
+      border-color: var(--fg);
     }
 
     /* Comparison Bar Styling */
     .bench-bar-container {
-      margin: 16px 0 24px 0;
+      margin: 20px 0 28px 0;
     }
 
     .bench-bar-row {
@@ -851,17 +1036,19 @@
     .bench-label {
       width: 140px;
       font-weight: 600;
+      color: var(--fg);
     }
 
     .bench-track {
       flex: 1;
-      height: 26px;
-      background: var(--unity-sidebar-border);
-      border-radius: 4px;
+      height: 28px;
+      background: var(--code);
+      border: 1px solid var(--line);
+      border-radius: 999px;
       overflow: hidden;
       display: flex;
       align-items: center;
-      padding: 0 10px;
+      padding: 0 12px;
       position: relative;
     }
 
@@ -870,7 +1057,7 @@
       position: absolute;
       left: 0;
       top: 0;
-      border-radius: 4px;
+      border-radius: 999px;
       transition: width 0.6s ease;
     }
 
@@ -883,29 +1070,31 @@
     }
 
     .docs-footer-nav {
-      margin-top: 48px;
-      padding-top: 24px;
-      border-top: 1px solid var(--unity-table-border);
+      margin-top: 56px;
+      padding-top: 28px;
+      border-top: 1px solid var(--line);
       display: flex;
       justify-content: space-between;
+      gap: 16px;
     }
 
     .footer-nav-btn {
       text-decoration: none;
-      padding: 10px 18px;
-      border-radius: 6px;
-      border: 1px solid var(--unity-sidebar-border);
-      background: var(--unity-sidebar-bg);
-      color: var(--unity-text);
+      padding: 10px 22px;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      background: var(--card);
+      color: var(--fg);
       font-size: 13px;
       font-weight: 600;
-      transition: all 0.15s;
+      cursor: pointer;
+      transition: transform 0.15s, border-color 0.15s;
+      font-family: var(--font-sans);
     }
 
     .footer-nav-btn:hover {
-      background: var(--unity-accent);
-      color: #fff;
-      border-color: var(--unity-accent);
+      transform: translateY(-1px);
+      border-color: var(--fg);
     }
 
     @media (max-width: 1024px) {
@@ -925,9 +1114,12 @@
         display: none;
       }
       main.unity-content {
-        padding: 20px;
+        padding: 24px 20px 64px;
       }
       .unity-search-container {
+        display: none;
+      }
+      .version-select-pill {
         display: none;
       }
     }
@@ -939,8 +1131,8 @@
   <header class="unity-top-header" role="banner">
     <div class="header-left">
       <a href="https://mereb.cloud" class="unity-brand" aria-label="Mereb Homepage">
-        <div class="unity-cube-icon">⚔️</div>
-        <span>Mereb Engine</span>
+        <span class="logo"><i></i>mereb</span>
+        <span class="docs-tag">docs</span>
       </a>
 
       <div class="version-select-pill">
@@ -966,6 +1158,7 @@
     </div>
 
     <div class="header-right">
+      <a href="https://mereb.cloud" class="header-link-btn">mereb.cloud ↗</a>
       <a href="https://github.com/dawitbaslyos/Mereb" target="_blank" class="header-link-btn">GitHub</a>
       <button class="header-link-btn" onclick="toggleTheme()" id="btn-theme" title="Toggle Dark/Light Mode">🌓</button>
     </div>
